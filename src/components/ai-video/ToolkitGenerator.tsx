@@ -37,7 +37,6 @@ import {
   durationsFor,
   exactFrameLabel,
   getStudioCapabilities,
-  resolveSupportedMode,
   validateStudioSelection,
 } from '@/lib/videoCapabilities/studioCapabilities';
 import { GenerateSection } from './generate/GenerateSection';
@@ -494,16 +493,18 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
    * Every technical option the UI offers comes from ONE place:
    * `studioCapabilities` over the generated mirror of the server registry.
    * Nothing here re-derives provider knowledge locally. */
+  /**
+   * The mode comes STRICTLY from the inputs actually attached. If the model
+   * does not offer that mode, `caps.supported` is false and the capability
+   * violation below names the real `mode` conflict — nothing is bent to t2v.
+   */
   const studioMode = useMemo(
-    () => resolveSupportedMode(
-      model.id,
-      deriveStudioMode({
-        hasStartImage: !!startImageUrl,
-        hasReferenceImages: viduReferences.length > 0,
-        hasReferenceVideo: !!referenceVideoUrl,
-      }),
-    ),
-    [model.id, startImageUrl, viduReferences.length, referenceVideoUrl],
+    () => deriveStudioMode({
+      hasStartImage: !!startImageUrl,
+      hasReferenceImages: viduReferences.length > 0,
+      hasReferenceVideo: !!referenceVideoUrl,
+    }),
+    [startImageUrl, viduReferences.length, referenceVideoUrl],
   );
   const caps = useMemo(() => getStudioCapabilities(model.id, studioMode), [model.id, studioMode]);
   const capDurations = useMemo(
@@ -526,34 +527,56 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     [model.id, studioMode, resolution, duration, aspectRatio],
   );
 
-  /* ── Sync settings to model capabilities when switching ── */
-  useEffect(() => {
-    // Duration / aspect ratio / resolution are NEVER silently rewritten here.
-    // An invalid combination is surfaced by `capabilityViolation` below and
-    // blocks the start until the user picks a startable option themselves.
-    if (!model.capabilities.audio) setGenerateAudio(false);
-    if (!model.capabilities.i2v) setStartImageUrl(null);
-    if (!model.capabilities.v2v) setReferenceVideoUrl(null);
-    if (!model.capabilities.multiRef) setViduReferences([]);
-    // Reset placement to 'start' if the current one isn't available on this model.
-    // 'end' → only Luma Ray 2 (capabilities.endFrame). 'anchor' → Vidu/Kling (capabilities.anchorOnly).
+  /**
+   * Placement violations are explicit, never silently routed to 'start'.
+   * `endFrame` / `anchorOnly` come from the canonical registry (endFrame) resp.
+   * the documented product semantics (anchorOnly).
+   */
+  const placementViolation = useMemo<string | null>(() => {
     if (referencePlacement === 'end' && !model.capabilities.endFrame) {
-      setReferencePlacement('start');
-      toast.info(
-        language === 'de'
-          ? tx({ de: `Placement wurde auf „Am Anfang“ zurückgesetzt — ${model.name} unterstützt keinen Endframe.`, en: `Placement has been reset to “At the beginning” — ${model.name} does not support an end frame.`, es: `La ubicación se restableció a «Al principio» — ${model.name} no admite un fotograma final.` })
-          : `Placement reset to "At start" — ${model.name} does not support end-frame.`,
-      );
+      return tx({
+        de: `${model.name} kann kein Endbild verarbeiten. Bitte Platzierung ändern oder ein Modell mit Endbild wählen.`,
+        en: `${model.name} cannot take an end frame. Change the placement or pick a model that supports it.`,
+        es: `${model.name} no admite un fotograma final. Cambia la ubicación o elige otro modelo.`,
+      });
     }
     if (referencePlacement === 'anchor' && !model.capabilities.anchorOnly) {
-      setReferencePlacement('start');
-      toast.info(
-        language === 'de'
-          ? tx({ de: `Placement wurde auf „Am Anfang“ zurückgesetzt — ${model.name} unterstützt keinen Anker-Modus.`, en: `Placement has been reset to “At the beginning” — ${model.name} does not support anchor mode.`, es: `La ubicación se restableció a «Al principio» — ${model.name} no admite el modo de anclaje.` })
-          : `Placement reset to "At start" — ${model.name} does not support anchor mode.`,
-      );
+      return tx({
+        de: `${model.name} kennt keinen Anker-Modus. Bitte Platzierung ändern oder ein Modell mit Anker wählen.`,
+        en: `${model.name} has no anchor mode. Change the placement or pick a model that supports it.`,
+        es: `${model.name} no tiene modo de anclaje. Cambia la ubicación o elige otro modelo.`,
+      });
     }
-    // Reflect selection in URL for shareable / bookmarkable state
+    return null;
+  }, [referencePlacement, model.capabilities.endFrame, model.capabilities.anchorOnly, model.name]);
+
+  /** Attached inputs the current model cannot accept — blocked, never cleared. */
+  const inputViolation = useMemo<string | null>(() => {
+    const unsupported: string[] = [];
+    if (startImageUrl && !model.capabilities.i2v && !model.capabilities.anchorOnly) {
+      unsupported.push(tx({ de: 'Startbild', en: 'start image', es: 'imagen inicial' }));
+    }
+    if (referenceVideoUrl && !model.capabilities.v2v) {
+      unsupported.push(tx({ de: 'Referenzvideo', en: 'reference video', es: 'vídeo de referencia' }));
+    }
+    if (viduReferences.length > 0 && !model.capabilities.multiRef) {
+      unsupported.push(tx({ de: 'Referenzbilder', en: 'reference images', es: 'imágenes de referencia' }));
+    }
+    if (!unsupported.length) return null;
+    return tx({
+      de: `${model.name} kann Folgendes nicht verarbeiten: ${unsupported.join(', ')}. Bitte entfernen oder Modell wechseln.`,
+      en: `${model.name} cannot use: ${unsupported.join(', ')}. Remove it or switch the model.`,
+      es: `${model.name} no puede usar: ${unsupported.join(', ')}. Quítalo o cambia de modelo.`,
+    });
+  }, [startImageUrl, referenceVideoUrl, viduReferences.length, model]);
+
+  const blockingIssue = capabilityViolation?.message ?? placementViolation ?? inputViolation;
+
+  /* ── Model switch: URL sync ONLY ──
+   * No silent resets. Duration / aspect ratio / resolution / audio / uploads
+   * and the chosen placement are the user's state; an unsupported combination
+   * is surfaced above and blocks the start until the user resolves it. */
+  useEffect(() => {
     if (searchParams.get('model') !== model.id) {
       const next = new URLSearchParams(searchParams);
       next.set('model', model.id);
@@ -561,6 +584,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model.id]);
+
 
   // Canonical per-second price from server catalog (falls back to local config).
   const { getPricePerSecond, getTotalCost, isReady: catalogReady, walletCurrency } =
@@ -652,8 +676,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   /* ── Generate dispatch ── */
   const runGenerate = async () => {
-    if (capabilityViolation) {
-      toast.error(capabilityViolation.message);
+    if (blockingIssue) {
+      toast.error(blockingIssue);
       return;
     }
     if (!prompt.trim()) {
@@ -876,21 +900,14 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       //   • Any user-uploaded reference image or @-mention fallback follows
       //     the selected placement (start / end / anchor) as before, but only
       //     when no composed anchor exists.
-      const effectivePlacement: 'start' | 'end' | 'anchor' =
-        referencePlacement === 'end' && !model.capabilities.endFrame ? 'start'
-        : referencePlacement === 'anchor' && !model.capabilities.anchorOnly ? 'start'
-        : referencePlacement;
-
-      // Safety-net: block invalid end-placement submissions (UI should already prevent this)
-      if (referencePlacement === 'end' && !model.capabilities.endFrame) {
-        toast.error(
-          language === 'de'
-            ? tx({ de: `${model.name} unterstützt keinen Endframe. Bitte Luma Ray 2 wählen.`, en: `${model.name} does not support an end frame. Please select Luma Ray 2.`, es: `${model.name} no admite un fotograma final. Por favor, selecciona Luma Ray 2.` })
-            : `${model.name} does not support end-frame. Please switch to Luma Ray 2.`,
-        );
+      // No silent routing: an unsupported placement blocks the run, it is never
+      // rewritten to 'start'. `placementViolation` mirrors this in the UI.
+      if (placementViolation) {
+        toast.error(placementViolation);
         setGenerating(false);
         return;
       }
+      const effectivePlacement: 'start' | 'end' | 'anchor' = referencePlacement;
 
       // Route the composed character anchor first (highest priority).
       let anchorRoute: 'start' | 'anchor' | 'text-only' | 'none' = 'none';
@@ -1047,8 +1064,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   /* Gate: opens cost-confirm dialog unless user suppressed it within 24 h. */
   const handleGenerate = () => {
-    if (capabilityViolation) {
-      toast.error(capabilityViolation.message);
+    if (blockingIssue) {
+      toast.error(blockingIssue);
       return;
     }
     if (!prompt.trim()) {
@@ -1224,18 +1241,19 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       {/* ── Capability gate mirror — an invalid combination is shown, never
        *  silently rewritten. The start stays blocked until the user picks a
        *  startable option. The server remains authoritative. */}
-      {capabilityViolation && (
+      {blockingIssue && (
         <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive-foreground">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
             <span className="font-medium">
               {tx({
-                de: 'Diese Kombination kann dieses Modell nicht rendern:',
-                en: 'This model cannot render this combination:',
-                es: 'Este modelo no puede renderizar esta combinación:',
+                de: 'Start blockiert:',
+                en: 'Start blocked:',
+                es: 'Inicio bloqueado:',
               })}
             </span>{' '}
-            {capabilityViolation.message}
+
+            {blockingIssue}
           </span>
         </div>
       )}
@@ -1260,7 +1278,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         <Button
           size="lg"
           onClick={handleGenerate}
-          disabled={generating || !prompt.trim() || !canAfford || priceUnverified || !!capabilityViolation}
+          disabled={generating || !prompt.trim() || !canAfford || priceUnverified || !!blockingIssue}
           className="min-w-[200px] bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {composingScene ? (

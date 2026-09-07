@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { VisualInputProfile } from '@/lib/composer/visualInputs/types';
-import { getModelCapabilityUnion } from '@/lib/videoCapabilities/studioCapabilities';
+import { getModelCapabilityUnion, referenceModeRequirement } from '@/lib/videoCapabilities/studioCapabilities';
 
 
 import { KLING_VIDEO_MODELS } from './klingVideoCredits';
@@ -52,42 +52,43 @@ export interface ToolkitModel {
   capabilities: {
     t2v: boolean;
     i2v: boolean;
-    /** Video-to-Video: accepts a reference clip as motion / style source. */
+    /** DERIVED from canonical `inputs.videos` — never hand-maintained. */
     v2v?: boolean;
     audio: boolean;
-    /** Multi-Reference: accepts 1–N reference images blended into one scene. */
+    /** DERIVED from canonical `inputs.images` of the reference mode. */
     multiRef?: boolean;
-    /** Max number of reference images supported when multiRef is true. */
+    /** DERIVED from canonical `inputs.images.max`. */
     maxReferences?: number;
     /**
      * True when the model CANNOT generate without at least one reference image
      * (Vidu Reference2V). Models that also support plain text-to-video leave
      * this false so references stay optional.
+     * NOT canonically derivable: `ModeInputs.images.min` documents the slot
+     * size, not that the whole model refuses a text-only task.
      */
     multiRefRequired?: boolean;
     /**
      * Native dialogue: model generates video + speech + lip-sync in a single
      * pass. Required for the Composer's Dialog/Lip-Sync mode (Artlist-style).
-     * Set true only for models that produce in-frame synchronous mouth
-     * articulation matched to the generated audio.
+     * NOT canonically derivable: the registry models audio output, not
+     * in-frame synchronous mouth articulation.
      */
     nativeDialogue?: boolean;
-    /**
-     * End-frame guidance: model accepts an `endImageUrl` WITHOUT requiring a
-     * matching start image. Only Luma Ray 2 satisfies this — Kling requires
-     * start+end together, Pika Pikaframes requires both frames.
-     */
+    /** DERIVED from a canonical mode with `inputs.lastFrame`. */
     endFrame?: boolean;
     /**
      * True identity/subject reference: model can use a reference image as
-     * character/style anchor without forcing it into frame 0. Currently
-     * Vidu Q2 (referenceImages[]) and Kling 3 Std/Pro (reference_images).
+     * character/style anchor without forcing it into frame 0.
+     * NOT canonically derivable: `ModeInputs.images` says a mode takes images,
+     * not whether image #1 is pinned to frame 0.
      */
     anchorOnly?: boolean;
     /**
      * True when reference images and a start/end frame are mutually exclusive
      * at the provider (Seedance 2.5 / ModelArk: first-frame, first+last-frame
      * and multi-reference are three separate, non-combinable input modes).
+     * NOT canonically derivable: exclusivity is expressed only as free-text
+     * `constraint.reason` today.
      */
     refExclusive?: boolean;
     /**
@@ -100,11 +101,11 @@ export interface ToolkitModel {
     /** Max number of reference audio clips supported when refAudio is true. */
     maxReferenceAudios?: number;
     /**
-     * Provider constraints under which reference images are accepted at all.
-     * Veo 3.1 for example only honours `reference_images` at 16:9 and 8 s.
+     * DERIVED from the canonical `reference` mode constraint (Veo 3.1: 16:9 + 8 s).
      * The UI hides the reference uploader while the constraint is unmet.
      */
     refRequires?: { aspectRatios?: string[]; durations?: number[] };
+
     /**
      * Provider-side smart duration (`duration: -1`): the model picks the clip
      * length itself. Billed at the maximum duration and corrected downwards
@@ -179,8 +180,6 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
       i2v: true,
       v2v: true,
       audio: true,
-      multiRef: true,
-      maxReferences: 30,
       maxReferenceVideos: 10,
       maxReferenceAudios: 10,
       refAudio: true,
@@ -288,7 +287,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     icon: Film,
     // kwaivgi/kling-v3-omni-video: duration 3-15, generate_audio + dialog,
     // reference_images (max 7, max 4 with a reference_video) and reference_video.
-    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true, anchorOnly: true, multiRef: true, maxReferences: 7 },
+    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true, anchorOnly: true },
     costPerSecond: KLING_VIDEO_MODELS['kling-omni'].costPerSecond,
     badge: 'Lip-Sync EN',
     tagline: 'Native Lip-Sync EN · DE/ES silent-only',
@@ -308,8 +307,6 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     // reference_images 1-3 — provider honours them only at 16:9 + 8 s.
     capabilities: {
       t2v: true, i2v: true, audio: true, nativeDialogue: true,
-      multiRef: true, maxReferences: 3,
-      refRequires: { aspectRatios: ['16:9'], durations: [8] },
     },
     costPerSecond: VEO_VIDEO_MODELS['veo-3.1-lite-720p'].costPerSecond,
     badge: 'Native Audio',
@@ -326,8 +323,6 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     icon: Volume2,
     capabilities: {
       t2v: true, i2v: true, audio: true, nativeDialogue: true,
-      multiRef: true, maxReferences: 3,
-      refRequires: { aspectRatios: ['16:9'], durations: [8] },
     },
     costPerSecond: VEO_VIDEO_MODELS['veo-3.1-fast'].costPerSecond,
     tagline: tx({ de: 'Schnell · 1080p · Audio', en: 'Fast · 1080p · audio', es: 'Rápido · 1080p · audio' }),
@@ -343,8 +338,6 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     icon: Volume2,
     capabilities: {
       t2v: true, i2v: true, audio: true, nativeDialogue: true,
-      multiRef: true, maxReferences: 3,
-      refRequires: { aspectRatios: ['16:9'], durations: [8] },
     },
     costPerSecond: VEO_VIDEO_MODELS['veo-3.1-pro'].costPerSecond,
     badge: 'Premium',
@@ -379,7 +372,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     icon: Zap,
     // lightricks/ltx-2.3-fast: duration enum 6-20 (step 2), 1080p/2k/4k,
     // 16:9/9:16, native audio, last frame + camera motion.
-    capabilities: { t2v: true, i2v: true, audio: true, endFrame: true },
+    capabilities: { t2v: true, i2v: true, audio: true },
     costPerSecond: LTX_VIDEO_MODELS['ltx-standard'].costPerSecond,
     badge: tx({ de: "Schnell & Günstig", en: "Fast & Affordable", es: "Rápido y Económico" }),
     tagline: tx({ de: 'Schnellster Generator', en: 'Fastest generator', es: 'Generador más rápido' }),
@@ -511,7 +504,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     edgeFunction: 'generate-luma-video',
     group: 'recommended',
     icon: Camera,
-    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
+    capabilities: { t2v: true, i2v: true, audio: false },
     costPerSecond: LUMA_VIDEO_MODELS['luma-standard'].costPerSecond,
     tagline: 'Cinematic · Camera Concepts',
     legacyRoute: '/luma-video-studio',
@@ -524,7 +517,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     edgeFunction: 'generate-luma-video',
     group: 'premium',
     icon: Camera,
-    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
+    capabilities: { t2v: true, i2v: true, audio: false },
     // luma/ray-2-720p has no resolution input — the model renders 720p only.
     costPerSecond: LUMA_VIDEO_MODELS['luma-pro'].costPerSecond,
     badge: 'Premium',
@@ -539,7 +532,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     edgeFunction: 'generate-luma-video',
     group: 'recommended',
     icon: Camera,
-    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
+    capabilities: { t2v: true, i2v: true, audio: false },
     // luma/ray-3.2: resolution enum 540p/720p/1080p; start/end frame only at 5 s.
     costPerSecond: LUMA_VIDEO_MODELS['luma-ray32-5s'].costPerSecond,
     badge: 'New',
@@ -556,7 +549,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     icon: Camera,
     // Ray 3.2 accepts start/end frames only at 5 s — the 10 s tier is text-only
     // plus optional prompt guidance, and `loop` is rejected at 10 s.
-    capabilities: { t2v: true, i2v: false, audio: false, endFrame: false },
+    capabilities: { t2v: true, i2v: false, audio: false },
     costPerSecond: LUMA_VIDEO_MODELS['luma-ray32-10s'].costPerSecond,
     badge: 'Neu · 10s',
     tagline: tx({ de: `Ray 3.2 ${'Langclip'} · 10 ${'Sekunden am Stück'}`, en: `Ray 3.2 ${'long clip'} · 10 ${'seconds straight'}`, es: `Ray 3.2 ${'clip largo'} · 10 ${'segundos seguidos'}` }),
@@ -571,7 +564,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     group: 'fast',
     icon: Video,
     // bytedance/seedance-1-lite: 5 s or 10 s, 480p/720p, start + last frame.
-    capabilities: { t2v: true, i2v: true, audio: false, endFrame: true },
+    capabilities: { t2v: true, i2v: true, audio: false },
     costPerSecond: SEEDANCE_VIDEO_MODELS['seedance-mini'].costPerSecond,
     badge: 'Draft',
     tagline: tx({ de: "Seedance 1 Lite · günstigster Draft-Renderer", en: "Seedance 1 Lite · cheapest draft renderer", es: "Seedance 1 Lite · renderizador de borrador más económico" }),
@@ -618,7 +611,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     icon: Film,
     // Runway Gen-4 Aleph consumes at most 5 s of the source clip per call and
     // accepts one optional reference image.
-    capabilities: { t2v: false, i2v: false, v2v: true, audio: false, multiRef: true, maxReferences: 1 },
+    capabilities: { t2v: false, i2v: false, v2v: true, audio: false },
     costPerSecond: { EUR: 0.18, USD: 0.18 },
     badge: 'V2V Specialist',
     tagline: 'Restyle & transform existing clips',
@@ -680,7 +673,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     edgeFunction: 'generate-vidu-video',
     group: 'recommended',
     icon: Eye,
-    capabilities: { t2v: true, i2v: true, audio: true, endFrame: true },
+    capabilities: { t2v: true, i2v: true, audio: true },
     costPerSecond: { EUR: 0.265, USD: 0.265 },
     badge: 'Start+End',
     tagline: tx({ de: 'Q3 Pro: Start- und Endframe, natives Audio, bis 16s', en: 'Q3 Pro: start + end frame, native audio, up to 16s', es: 'Q3 Pro: fotograma inicial y final, audio nativo, hasta 16s' }),
@@ -694,7 +687,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     edgeFunction: 'generate-vidu-video',
     group: 'fast',
     icon: Eye,
-    capabilities: { t2v: false, i2v: true, audio: true, endFrame: true },
+    capabilities: { t2v: false, i2v: true, audio: true },
     costPerSecond: { EUR: 0.265, USD: 0.265 },
     badge: 'I2V',
     tagline: tx({ de: 'Animiert ein Standbild zu bis zu 16s Video', en: 'Animates a still image into up to 16s of video', es: 'Anima una imagen fija en un vídeo de hasta 16s' }),
@@ -772,15 +765,28 @@ function deriveTechnicalCapabilities(m: ToolkitModelMeta): ToolkitModel {
     );
   }
   const resolutionLabels = union.resolutionLabels;
+  const maxRefImages = union.inputs.images?.max ?? 0;
+  const refRequirement = referenceModeRequirement(m.id);
   return {
     ...m,
     capabilities: {
       ...m.capabilities,
       t2v: union.modes.includes('t2v'),
       i2v: union.modes.includes('i2v'),
-      v2v: union.modes.includes('v2v'),
+      v2v: (union.inputs.videos?.max ?? 0) > 0,
       audio: union.audio,
       smartDuration: union.smartDuration,
+      // Canonical input slots — no second hand-maintained mirror.
+      endFrame: !!union.inputs.lastFrame,
+      ...(maxRefImages > 0 ? { multiRef: true, maxReferences: maxRefImages } : { multiRef: false }),
+      ...(refRequirement
+        ? {
+            refRequires: {
+              ...(refRequirement.aspectRatios ? { aspectRatios: refRequirement.aspectRatios } : {}),
+              ...(refRequirement.durations ? { durations: refRequirement.durations } : {}),
+            },
+          }
+        : {}),
     },
     durations: union.durations,
     resolution: resolutionLabels[0] ?? union.resolutions[0]?.label ?? '',
@@ -789,6 +795,7 @@ function deriveTechnicalCapabilities(m: ToolkitModelMeta): ToolkitModel {
     costPerSecond: { EUR: m.costPerSecond.EUR, USD: usdFromEur(m.costPerSecond.EUR) },
   };
 }
+
 
 export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] =
   AI_VIDEO_TOOLKIT_MODELS_RAW.map(deriveTechnicalCapabilities);

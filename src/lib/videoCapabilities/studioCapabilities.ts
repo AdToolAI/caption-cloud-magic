@@ -29,6 +29,9 @@ import {
   projectTargetFrame,
   validateCapability,
   type CapabilityViolation,
+  type ModeConstraint,
+  type ModeControls,
+  type ModeInputs,
   type ModeSpec,
   type PixelFrame,
   type ResolutionSpec,
@@ -36,7 +39,7 @@ import {
   type VideoModelSpec,
 } from '@/config/videoModelSpecs';
 
-export type { VideoMode, PixelFrame, CapabilityViolation };
+export type { VideoMode, PixelFrame, CapabilityViolation, ModeInputs, ModeConstraint };
 
 export interface ResolutionOption {
   /** Provider label exactly as the registry spells it ("1080p", "4K"). */
@@ -49,6 +52,12 @@ export interface ResolutionOption {
   durations: number[];
   native: boolean;
   parityStatus: ResolutionSpec['parityStatus'];
+  /**
+   * True only when the exact target frame of this tier is provider-backed.
+   * A generically derived frame table is an ASSUMPTION and must never be shown
+   * as exact pixels.
+   */
+  pixelsVerified: boolean;
 }
 
 export interface StudioCapabilities {
@@ -65,6 +74,10 @@ export interface StudioCapabilities {
   fps: number[];
   audio: boolean;
   smartDuration: boolean;
+  /** Canonical input slots of this mode (first/last frame, images, videos, audios). */
+  inputs: ModeInputs;
+  controls: ModeControls;
+  constraints: ModeConstraint[];
 }
 
 const EMPTY: StudioCapabilities = {
@@ -78,9 +91,17 @@ const EMPTY: StudioCapabilities = {
   fps: [],
   audio: false,
   smartDuration: false,
+  inputs: {},
+  controls: {},
+  constraints: [],
 };
 
 function lockedReasonFor(spec: VideoModelSpec, tier: ResolutionSpec): string {
+  // Rule 3a: a model-level outage is NOT a missing smoke test — name the real
+  // release status instead of inventing a tier-level reason.
+  if (!spec.available) {
+    return `${spec.displayName}: Modell ist aktuell nicht startbar (Status: ${spec.releaseStatus}).`;
+  }
   if (!tier.available) {
     return `${tier.label}: Tier ist gesperrt, bis ein Smoke-Test auf ${spec.apiRoute} die echten Pixel misst.`;
   }
@@ -88,7 +109,8 @@ function lockedReasonFor(spec: VideoModelSpec, tier: ResolutionSpec): string {
 }
 
 function toResolutionOption(spec: VideoModelSpec, mode: ModeSpec, tier: ResolutionSpec): ResolutionOption {
-  const startable = isResolutionTierAvailable(tier);
+  // Rule 3: an unavailable MODEL can never have a startable tier.
+  const startable = spec.available && isResolutionTierAvailable(tier);
   return {
     label: tier.label,
     shortEdge: tier.shortEdge,
@@ -97,6 +119,7 @@ function toResolutionOption(spec: VideoModelSpec, mode: ModeSpec, tier: Resoluti
     durations: tier.durations ?? mode.durations,
     native: tier.native,
     parityStatus: tier.parityStatus,
+    pixelsVerified: startable && tier.sizingRuleVerified,
   };
 }
 
@@ -106,6 +129,7 @@ export function getStudioCapabilities(modelId: string, mode: VideoMode): StudioC
   if (!spec) return EMPTY;
   const modeSpec = getModeSpec(spec, mode);
   if (!modeSpec) {
+    // Rule 4: an unsupported mode stays unsupported — never resolved to another.
     return { ...EMPTY, modelAvailable: spec.available, modes: spec.modes.map((m) => m.mode) };
   }
   // Rule 2: native tiers only — enhanceUpscaleTiers live on a different axis.
@@ -124,8 +148,12 @@ export function getStudioCapabilities(modelId: string, mode: VideoMode): StudioC
     fps: [...(modeSpec.fps ?? [])],
     audio: modeSpec.audio,
     smartDuration: !!modeSpec.controls.smartDuration,
+    inputs: { ...modeSpec.inputs },
+    controls: { ...modeSpec.controls },
+    constraints: [...(modeSpec.constraints ?? [])],
   };
 }
+
 
 /**
  * Union of the technical options across all modes of a model. Used where the
@@ -151,6 +179,17 @@ export function getModelCapabilityUnion(modelId: string): StudioCapabilities {
   resolutions.sort((a, b) => b.shortEdge - a.shortEdge);
   const uniqNum = (arr: number[]) => [...new Set(arr)].sort((a, b) => a - b);
   const uniqStr = (arr: string[]) => [...new Set(arr)];
+  const maxOf = (pick: (i: ModeInputs) => { min: number; max: number } | undefined) => {
+    const found = merged.map((c) => pick(c.inputs)).filter((x): x is { min: number; max: number } => !!x);
+    return found.length ? { min: Math.min(...found.map((f) => f.min)), max: Math.max(...found.map((f) => f.max)) } : undefined;
+  };
+  const inputs: ModeInputs = {
+    ...(merged.some((c) => c.inputs.firstFrame) ? { firstFrame: true } : {}),
+    ...(merged.some((c) => c.inputs.lastFrame) ? { lastFrame: true } : {}),
+    ...(maxOf((i) => i.images) ? { images: maxOf((i) => i.images)! } : {}),
+    ...(maxOf((i) => i.videos) ? { videos: maxOf((i) => i.videos)! } : {}),
+    ...(maxOf((i) => i.audios) ? { audios: maxOf((i) => i.audios)! } : {}),
+  };
   return {
     supported: true,
     modelAvailable: spec.available,
@@ -162,8 +201,55 @@ export function getModelCapabilityUnion(modelId: string): StudioCapabilities {
     fps: uniqNum(merged.flatMap((c) => c.fps)),
     audio: merged.some((c) => c.audio),
     smartDuration: merged.some((c) => c.smartDuration),
+    inputs,
+    controls: Object.assign({}, ...merged.map((c) => c.controls)) as ModeControls,
+    constraints: merged.flatMap((c) => c.constraints),
   };
 }
+
+/* ─────────────── Canonical input selectors (no hand-maintained mirror) ───────────────
+ * Everything below reads `ModeInputs` / `ModeConstraint` straight from the
+ * canonical registry. The UI must use these instead of re-declaring provider
+ * knowledge in `aiVideoModelRegistry`.
+ */
+
+/** True when ANY mode of the model accepts a last frame (end-frame guidance). */
+export function supportsLastFrame(modelId: string, mode?: VideoMode): boolean {
+  const caps = mode ? getStudioCapabilities(modelId, mode) : getModelCapabilityUnion(modelId);
+  return !!caps.inputs.lastFrame;
+}
+
+/** Max reference images the canonical registry documents (0 = not supported). */
+export function maxReferenceImages(modelId: string, mode?: VideoMode): number {
+  const caps = mode ? getStudioCapabilities(modelId, mode) : getModelCapabilityUnion(modelId);
+  return caps.inputs.images?.max ?? 0;
+}
+
+/** True when the model takes a reference/source video on any mode. */
+export function supportsReferenceVideo(modelId: string, mode?: VideoMode): boolean {
+  const caps = mode ? getStudioCapabilities(modelId, mode) : getModelCapabilityUnion(modelId);
+  return (caps.inputs.videos?.max ?? 0) > 0;
+}
+
+/**
+ * Canonical constraint under which the `reference` mode accepts images
+ * (Veo 3.1: 16:9 + 8 s). Returns null when the model has no reference mode or
+ * the registry documents no constraint.
+ */
+export function referenceModeRequirement(
+  modelId: string,
+): { aspectRatios?: string[]; durations?: number[]; reason: string } | null {
+  const spec = getVideoModelSpec(modelId);
+  const modeSpec = spec ? getModeSpec(spec, 'reference') : undefined;
+  const c = (modeSpec?.constraints ?? []).find((x) => x.aspectRatios || x.durations);
+  if (!c) return null;
+  return {
+    ...(c.aspectRatios ? { aspectRatios: [...c.aspectRatios] } : {}),
+    ...(c.durations ? { durations: [...c.durations] } : {}),
+    reason: c.reason,
+  };
+}
+
 
 /** Durations valid at a concrete tier (tier override wins over the mode list). */
 export function durationsFor(modelId: string, mode: VideoMode, resolutionLabel?: string): number[] {
@@ -175,7 +261,15 @@ export function durationsFor(modelId: string, mode: VideoMode, resolutionLabel?:
 
 /**
  * Exact provider-backed frame for a (model x mode x tier x ratio).
- * Returns null when the registry documents no frame — never a guess.
+ *
+ * Returns a frame ONLY when
+ *   a) the tier is startable (model available + tier available/smoke-tested),
+ *   b) `sizingRuleVerified === true` — a provider frame table, an explicit
+ *      provider sizing reference or a measured smoke test, and
+ *   c) the aspect ratio is documented in `framesByAspectRatio`.
+ *
+ * A grandfathered/UNVERIFIED tier only carries a generically derived frame
+ * table. That is an assumption, never "exact pixels", so it returns null.
  */
 export function exactFrame(
   modelId: string,
@@ -184,17 +278,19 @@ export function exactFrame(
   aspectRatio: string,
 ): PixelFrame | null {
   const spec = getVideoModelSpec(modelId);
-  if (!spec) return null;
+  if (!spec || !spec.available) return null;
   const modeSpec = getModeSpec(spec, mode);
   const tier = modeSpec?.resolutions.find(
     (r) => r.native && r.label.toLowerCase() === resolutionLabel.toLowerCase(),
   );
   if (!tier) return null;
+  if (!isResolutionTierAvailable(tier)) return null;
+  if (!tier.sizingRuleVerified) return null;
   if (!tier.framesByAspectRatio[aspectRatio]) return null;
   return projectTargetFrame(tier, aspectRatio);
 }
 
-/** "3840×2160" — exact pixel truth for the UI, or null when undocumented. */
+/** "3840×2160" — exact pixel truth for the UI, or null when unverified. */
 export function exactFrameLabel(
   modelId: string,
   mode: VideoMode,
@@ -204,6 +300,7 @@ export function exactFrameLabel(
   const frame = exactFrame(modelId, mode, resolutionLabel, aspectRatio);
   return frame ? `${frame.width}×${frame.height}` : null;
 }
+
 
 export interface StudioSelection {
   modelId: string;
@@ -233,8 +330,8 @@ export function validateStudioSelection(sel: StudioSelection): CapabilityViolati
 }
 
 /**
- * Mode the studio is generating in, derived from the inputs actually attached.
- * Kept here so the UI and the capability lookup can never disagree.
+ * Mode the studio is generating in, derived STRICTLY from the inputs actually
+ * attached. Never adjusted to what a model happens to support.
  */
 export function deriveStudioMode(inputs: {
   hasStartImage?: boolean;
@@ -250,16 +347,14 @@ export function deriveStudioMode(inputs: {
 }
 
 /**
- * Picks the mode that actually exists for this model, closest to the derived
- * one. Used only to LOOK UP options — never to rewrite a user's choice.
+ * Does this model expose that mode at all?
+ * There is deliberately no `resolveSupportedMode()` any more: if the derived
+ * mode does not exist for the chosen model, `getStudioCapabilities()` returns
+ * unsupported and `validateStudioSelection()` reports a `mode` violation. The
+ * user removes the conflicting input or switches the model — the studio never
+ * bends the mode to something the provider was not asked for.
  */
-export function resolveSupportedMode(modelId: string, desired: VideoMode): VideoMode {
+export function modeSupported(modelId: string, mode: VideoMode): boolean {
   const spec = getVideoModelSpec(modelId);
-  if (!spec) return desired;
-  if (spec.modes.some((m) => m.mode === desired)) return desired;
-  const fallbackOrder: VideoMode[] = ['t2v', 'i2v', 'reference', 'firstLast', 'v2v'];
-  for (const m of fallbackOrder) {
-    if (spec.modes.some((x) => x.mode === m)) return m;
-  }
-  return spec.modes[0]?.mode ?? desired;
+  return !!spec?.modes.some((m) => m.mode === mode);
 }
