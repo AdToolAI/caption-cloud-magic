@@ -21273,6 +21273,15 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       staff_wallet_topup: { Args: never; Returns: number }
+      stripe_revoke_ai_video_credits_for_refund: {
+        Args: {
+          p_charge_amount_minor: number
+          p_refund_amount_minor: number
+          p_refund_id: string
+          p_stripe_session_id: string
+        }
+        Returns: Json
+      }
       syncso_recent_failure_count: {
         Args: { _window_min?: number }
         Returns: number
