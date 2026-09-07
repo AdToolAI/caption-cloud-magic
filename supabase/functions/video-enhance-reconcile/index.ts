@@ -88,6 +88,7 @@ async function readProvider(
         status:
           outcome === "complete" ? "succeeded" : outcome === "canceled" ? "canceled" : outcome,
         output: topazDownloadUrl(status),
+        outputExpiresAt: status.download?.expiresAt ?? null,
         error: status.errorCode ?? status.message ?? null,
         metrics: credits !== undefined ? { units: credits } : {},
       };
@@ -267,6 +268,9 @@ serve(async (req) => {
           // inside the provider loop.
           await setStatus(admin, run.id, "provider_output_ready", {
             provider_output_url: outputUrl,
+            // Kept so persistence can tell "link expired" from "file gone".
+            provider_output_expires_at:
+              typeof prediction.outputExpiresAt === "string" ? prediction.outputExpiresAt : null,
             provider_status: "succeeded",
             provider_completed_at: run.provider_completed_at ?? nowIso,
             next_persist_at: nowIso,
