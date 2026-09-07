@@ -347,16 +347,14 @@ export function deriveStudioMode(inputs: {
 }
 
 /**
- * Picks the mode that actually exists for this model, closest to the derived
- * one. Used only to LOOK UP options — never to rewrite a user's choice.
+ * Mode the studio is generating in, derived STRICTLY from the attached inputs.
+ * There is deliberately no `resolveSupportedMode()` any more: if the derived
+ * mode does not exist for the chosen model, `getStudioCapabilities()` returns
+ * unsupported and `validateStudioSelection()` reports a `mode` violation. The
+ * user removes the conflicting input or switches the model — the studio never
+ * bends the mode to something the provider was not asked for.
  */
-export function resolveSupportedMode(modelId: string, desired: VideoMode): VideoMode {
+export function modeSupported(modelId: string, mode: VideoMode): boolean {
   const spec = getVideoModelSpec(modelId);
-  if (!spec) return desired;
-  if (spec.modes.some((m) => m.mode === desired)) return desired;
-  const fallbackOrder: VideoMode[] = ['t2v', 'i2v', 'reference', 'firstLast', 'v2v'];
-  for (const m of fallbackOrder) {
-    if (spec.modes.some((x) => x.mode === m)) return m;
-  }
-  return spec.modes[0]?.mode ?? desired;
+  return !!spec?.modes.some((m) => m.mode === mode);
 }
