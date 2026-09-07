@@ -90,8 +90,10 @@ export async function finalizeSuccess(
     return { ok: true, status: 'completed', outputUrl: run.output_url, assetId: run.output_asset_id };
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  // Read through globalThis so the shared app typecheck (no Deno typings) passes.
+  const env = (globalThis as any).Deno?.env;
+  const supabaseUrl = (env?.get('SUPABASE_URL') as string) ?? '';
+  const serviceKey = (env?.get('SUPABASE_SERVICE_ROLE_KEY') as string) ?? '';
   const destKey = run.destination_object_path ?? destinationObjectPath(run.user_id, run.id);
   const attempts = Number(run.persist_attempts ?? 0) + 1;
 
@@ -155,9 +157,9 @@ export async function finalizeSuccess(
         size,
       });
       if (!created.ok) {
-        return await persistFailure(admin, run, attempts, 'STAGING_FAILED', created.error);
+        return await persistFailure(admin, run, attempts, 'STAGING_FAILED', created.error ?? 'tus create failed');
       }
-      uploadUrl = created.uploadUrl;
+      uploadUrl = created.uploadUrl ?? null;
       offset = 0;
     }
 

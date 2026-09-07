@@ -114,7 +114,7 @@ export async function createUploadSession(params: {
   objectKey: string;
   contentType: string;
   size: number;
-}): Promise<{ ok: true; uploadUrl: string } | { ok: false; error: string }> {
+}): Promise<{ ok: boolean; uploadUrl?: string; error?: string }> {
   const res = await fetch(`${params.supabaseUrl}/storage/v1/upload/resumable`, {
     method: 'POST',
     headers: {
@@ -158,7 +158,7 @@ async function readChunk(
   url: string,
   offset: number,
   size: number,
-): Promise<{ ok: true; bytes: Uint8Array } | { ok: false; error: string }> {
+): Promise<{ ok: boolean; bytes?: Uint8Array; error?: string }> {
   const res = await fetch(url, { headers: { range: `bytes=${offset}-${offset + size - 1}` } });
   if (!res.ok || !res.body) return { ok: false, error: `provider read ${res.status}` };
 
@@ -230,7 +230,7 @@ export async function transferChunks(params: {
       const head = await headProviderOutput(params.providerUrl);
       return { done: false, offset, uploadUrl: params.uploadUrl, error: chunk.error, providerGone: head.gone };
     }
-    if (chunk.bytes.byteLength === 0) {
+    if (!chunk.bytes || chunk.bytes.byteLength === 0) {
       return { done: false, offset, uploadUrl: params.uploadUrl, error: 'provider returned no bytes' };
     }
     if (offset === 0 && !looksLikeVideoHead(chunk.bytes)) {
@@ -244,7 +244,9 @@ export async function transferChunks(params: {
         'content-type': 'application/offset+octet-stream',
         'upload-offset': String(offset),
       },
-      body: chunk.bytes,
+      // `as BodyInit`: a byte view is a valid fetch body at runtime; the DOM
+      // typings used for the app build do not model it.
+      body: chunk.bytes as unknown as BodyInit,
     });
     if (patch.status !== 204) {
       return {
