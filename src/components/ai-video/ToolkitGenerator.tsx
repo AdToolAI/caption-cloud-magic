@@ -1079,8 +1079,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       }
 
       const { data, error } = await supabase.functions.invoke(model.edgeFunction, { body });
-      if (error) throw error;
+      if (error) throw new Error(await extractEdgeErrorMessage(error));
       if (data?.error) throw new Error(data.error);
+
 
       // Track Brand Character usage for analytics & usage_count increment
       if (brandCharacter) {
