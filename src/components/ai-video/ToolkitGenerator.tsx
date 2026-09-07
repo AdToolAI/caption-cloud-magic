@@ -1547,7 +1547,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 })}
               </p>
             )}
+          </div>
         </GenerateSection>
+
       )}
 
 
