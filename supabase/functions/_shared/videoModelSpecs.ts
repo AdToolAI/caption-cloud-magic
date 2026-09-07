@@ -2568,13 +2568,13 @@ export function parityKeyOf(
 }
 
 /**
- * DIAGNOSTIC / IN-MEMORY identity string.
+ * The FORMAL parity identity (Phase 3A):
+ *   model x provider_model_slug x api_route x region x mode x resolution.
  *
- * `providerModelSlug` is part of the runtime parity identity but is NOT
- * persisted: `ParityContextColumns` and `video_model_tier_parity` key on
- * (model x api_route x region x mode x resolution) only. Persisting the slug
- * would need a nullable column migration (see
- * docs/video-provider-freshness-2026-09-07.md) — deliberately not applied.
+ * `providerModelSlug` is persisted — on the generation as
+ * `parity_provider_model_slug` and on the parity row as `provider_model_slug`.
+ * A legacy row without a slug (empty segment here) is historical data and can
+ * never stand as proof for a concrete provider contract.
  * Never fold the slug into `apiRoute` to fake persistence.
  */
 export function parityKeyString(key: ParityKey): string {

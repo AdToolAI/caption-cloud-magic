@@ -33,6 +33,8 @@ import {
 /** Columns persisted on `ai_video_generations` to reconstruct the parity key. */
 export interface ParityContextColumns {
   parity_model_id: string;
+  /** The concrete provider contract really executed (Phase 3A). */
+  parity_provider_model_slug: string | null;
   parity_api_route: string;
   parity_region: string;
   parity_mode: string;
@@ -119,6 +121,7 @@ export function evaluateCapabilityGate(req: CapabilityRequest): CapabilityGateRe
     parityColumns: parityKey
       ? {
           parity_model_id: parityKey.modelId,
+          parity_provider_model_slug: parityKey.providerModelSlug ?? null,
           parity_api_route: parityKey.apiRoute,
           parity_region: parityKey.region,
           parity_mode: parityKey.mode,
@@ -195,8 +198,14 @@ export async function loadTierDisabled(
       .eq('region', key.region)
       .eq('mode', key.mode)
       .eq('resolution_label', key.resolutionLabel)
-      .maybeSingle();
-    return !!data?.tier_disabled;
+      // Slug-scoped: a kill switch belongs to ONE provider contract. Legacy
+      // rows (slug NULL) still disable the route they were recorded for.
+      .or(
+        key.providerModelSlug
+          ? `provider_model_slug.eq.${key.providerModelSlug},provider_model_slug.is.null`
+          : 'provider_model_slug.is.null',
+      );
+    return (data ?? []).some((r: { tier_disabled?: boolean }) => !!r.tier_disabled);
   } catch (err) {
     // Availability of the parity table must never break a paid run.
     console.error('[videoCapabilityGate] tier state lookup failed:', err);
