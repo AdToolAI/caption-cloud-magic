@@ -24,15 +24,10 @@ type Admin = any;
 export const CHUNK_SIZE = 6 * 1024 * 1024;
 /**
  * Wall-clock budget for one invocation — never race the function timeout.
- * Overridable through `VIDEO_ENHANCE_TRANSFER_BUDGET_MS` so a resume can be
- * exercised deliberately without touching production behaviour by default.
+ * Within this budget the transfer loop moves AS MANY chunks as it can; the
+ * remainder resumes on the next cycle from the persisted offset.
  */
-export const TRANSFER_BUDGET_MS = (() => {
-  // deno-lint-ignore no-explicit-any
-  const raw = (globalThis as any).Deno?.env?.get('VIDEO_ENHANCE_TRANSFER_BUDGET_MS');
-  const parsed = raw ? Number(raw) : NaN;
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 60_000;
-})();
+export const TRANSFER_BUDGET_MS = 60_000;
 /** Persistence retry schedule in minutes (attempt 1 runs immediately). */
 export const PERSIST_BACKOFF_MINUTES = [0, 2, 5, 15, 30];
 /** After this many failed persistence attempts a run goes to manual review. */
