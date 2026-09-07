@@ -1109,7 +1109,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       refetchWallet();
       onAfterGenerate?.();
     } catch (err: any) {
-      toast.error(err?.message ?? tx({ de: tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Error al generar" }), en: 'Generation failed', es: 'Error en la generación' }));
+      toast.error(friendlyVideoErrorMessage(err?.message));
+
     } finally {
       setGenerating(false);
     }
