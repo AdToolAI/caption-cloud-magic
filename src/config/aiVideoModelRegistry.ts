@@ -52,42 +52,43 @@ export interface ToolkitModel {
   capabilities: {
     t2v: boolean;
     i2v: boolean;
-    /** Video-to-Video: accepts a reference clip as motion / style source. */
+    /** DERIVED from canonical `inputs.videos` — never hand-maintained. */
     v2v?: boolean;
     audio: boolean;
-    /** Multi-Reference: accepts 1–N reference images blended into one scene. */
+    /** DERIVED from canonical `inputs.images` of the reference mode. */
     multiRef?: boolean;
-    /** Max number of reference images supported when multiRef is true. */
+    /** DERIVED from canonical `inputs.images.max`. */
     maxReferences?: number;
     /**
      * True when the model CANNOT generate without at least one reference image
      * (Vidu Reference2V). Models that also support plain text-to-video leave
      * this false so references stay optional.
+     * NOT canonically derivable: `ModeInputs.images.min` documents the slot
+     * size, not that the whole model refuses a text-only task.
      */
     multiRefRequired?: boolean;
     /**
      * Native dialogue: model generates video + speech + lip-sync in a single
      * pass. Required for the Composer's Dialog/Lip-Sync mode (Artlist-style).
-     * Set true only for models that produce in-frame synchronous mouth
-     * articulation matched to the generated audio.
+     * NOT canonically derivable: the registry models audio output, not
+     * in-frame synchronous mouth articulation.
      */
     nativeDialogue?: boolean;
-    /**
-     * End-frame guidance: model accepts an `endImageUrl` WITHOUT requiring a
-     * matching start image. Only Luma Ray 2 satisfies this — Kling requires
-     * start+end together, Pika Pikaframes requires both frames.
-     */
+    /** DERIVED from a canonical mode with `inputs.lastFrame`. */
     endFrame?: boolean;
     /**
      * True identity/subject reference: model can use a reference image as
-     * character/style anchor without forcing it into frame 0. Currently
-     * Vidu Q2 (referenceImages[]) and Kling 3 Std/Pro (reference_images).
+     * character/style anchor without forcing it into frame 0.
+     * NOT canonically derivable: `ModeInputs.images` says a mode takes images,
+     * not whether image #1 is pinned to frame 0.
      */
     anchorOnly?: boolean;
     /**
      * True when reference images and a start/end frame are mutually exclusive
      * at the provider (Seedance 2.5 / ModelArk: first-frame, first+last-frame
      * and multi-reference are three separate, non-combinable input modes).
+     * NOT canonically derivable: exclusivity is expressed only as free-text
+     * `constraint.reason` today.
      */
     refExclusive?: boolean;
     /**
@@ -100,11 +101,11 @@ export interface ToolkitModel {
     /** Max number of reference audio clips supported when refAudio is true. */
     maxReferenceAudios?: number;
     /**
-     * Provider constraints under which reference images are accepted at all.
-     * Veo 3.1 for example only honours `reference_images` at 16:9 and 8 s.
+     * DERIVED from the canonical `reference` mode constraint (Veo 3.1: 16:9 + 8 s).
      * The UI hides the reference uploader while the constraint is unmet.
      */
     refRequires?: { aspectRatios?: string[]; durations?: number[] };
+
     /**
      * Provider-side smart duration (`duration: -1`): the model picks the clip
      * length itself. Billed at the maximum duration and corrected downwards
