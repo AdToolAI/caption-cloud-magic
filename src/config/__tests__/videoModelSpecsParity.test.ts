@@ -8,6 +8,8 @@ import {
   VIDEO_MODEL_SPECS,
   VIDEO_MODEL_ALIASES,
   getVideoModelSpec,
+  getVideoModelCandidate,
+
   maxNativeResolution,
   validateCapability,
   projectTargetFrame,
