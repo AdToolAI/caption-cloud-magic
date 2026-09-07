@@ -19,6 +19,11 @@ serve(async (req) => {
     return new Response("forbidden", { status: 403 });
   }
   const body = await req.json().catch(() => ({}));
+  if (body.cleanup) {
+    const admin0 = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const del = await admin0.storage.from(BUCKET).remove(body.cleanup as string[]);
+    return Response.json({ ok: !del.error, removed: del.data?.length ?? 0, error: del.error?.message });
+  }
   const srcKey: string = body.srcKey;
   const dstKey: string = body.dstKey;
   const budgetMs: number = Number(body.budgetMs ?? 60_000);
