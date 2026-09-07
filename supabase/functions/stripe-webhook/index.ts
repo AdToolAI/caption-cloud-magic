@@ -767,6 +767,8 @@ serve(withTelemetry('stripe-webhook', async (req) => {
 
             if (reversalError) {
               console.error('[STRIPE-WEBHOOK] Credit reversal failed:', reversalError);
+              // Idempotenz-Marker lösen, damit Stripes Wiederholung erneut greift.
+              await supabaseAdmin.from('stripe_webhook_events').delete().eq('event_id', event.id);
               return new Response(JSON.stringify({ error: 'Credit reversal failed' }), {
                 status: 500,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -778,12 +780,14 @@ serve(withTelemetry('stripe-webhook', async (req) => {
         }
       } catch (refundError) {
         console.error('[STRIPE-WEBHOOK] Refund handling error:', refundError);
+        await supabaseAdmin.from('stripe_webhook_events').delete().eq('event_id', event.id);
         return new Response(JSON.stringify({ error: 'Refund handling error' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
     }
+
 
 
     return new Response(JSON.stringify({ received: true }), {
