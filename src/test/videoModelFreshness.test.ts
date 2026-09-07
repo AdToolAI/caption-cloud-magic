@@ -201,6 +201,34 @@ describe('video model freshness audit — invariants', () => {
     expect(v2v.constraints?.length ?? 0).toBeGreaterThan(0);
   });
 
+  it('Kling Omni exposes 4K only where the route allows it, and never startable', () => {
+    const spec = getVideoModelSpec('kling-omni')!;
+    for (const m of ['t2v', 'i2v', 'reference'] as const) {
+      const tier = getModeSpec(spec, m)!.resolutions.find((r) => r.label === '4K');
+      expect(tier, `kling-omni/${m} misses the documented 4K tier`).toBeDefined();
+      expect(tier!.available).toBe(false);
+      expect(tier!.grandfathered).toBe(false);
+      expect(tier!.parityStatus).toBe('UNVERIFIED');
+      expect(tier!.smokeTest).toBeUndefined();
+      // Exact 4K pixels are not documented on this route.
+      expect(tier!.sizingRuleVerified).toBe(false);
+    }
+    // "4K does not support reference_video" — no 4K tier on the v2v route.
+    const v2v = getModeSpec(spec, 'v2v')!;
+    expect(v2v.resolutions.map((r) => r.label)).not.toContain('4K');
+  });
+
+  it('Kling standard route and Omni stay separate capability identities', () => {
+    const std = getVideoModelSpec('kling-3')!;
+    const omni = getVideoModelSpec('kling-omni')!;
+    expect(std.providerModelSlug).toBe('kwaivgi/kling-v3-video');
+    expect(omni.providerModelSlug).toBe('kwaivgi/kling-v3-omni-video');
+    // Omni carries reference/v2v modes the standard route does not.
+    expect(std.modes.map((m) => m.mode)).not.toContain('v2v');
+    expect(omni.modes.map((m) => m.mode)).toContain('v2v');
+  });
+
+
   it('no spec claims a provider slug that the audit proved non-existent', () => {
     const dead = ['minimax/hailuo-02-pro', 'wan-video/wan-2.7-pro', 'alibaba/happyhorse-1.0-pro'];
     for (const spec of VIDEO_MODEL_SPECS) {
