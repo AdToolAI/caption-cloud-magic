@@ -186,7 +186,7 @@ const LEGACY_PAID_PRODUCT_IDS = new Set<string>([
 export const getProductInfo = (productId: string | null) => {
   if (!productId) return { name: 'Free', price: 0, currency: '€' };
   if (LEGACY_PAID_PRODUCT_IDS.has(productId)) {
-    return { name: 'Beta-Basic', price: 14.99, currency: '€' };
+    return { name: 'Beta-Basic', price: 14.95, currency: '€' };
   }
   return { name: 'Free', price: 0, currency: '€' };
 };
