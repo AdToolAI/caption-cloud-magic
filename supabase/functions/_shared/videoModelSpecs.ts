@@ -2114,6 +2114,117 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// CANDIDATES — models we know exist at the provider, whose CONCRETE route,
+// schema or pricing is not verified yet. They are deliberately NOT VideoModelSpecs:
+// a spec may only state technical values that a route source backs. A candidate
+// claims nothing executable — no modes, no resolutions, no durations, no fps.
+// Promotion to VIDEO_MODEL_SPECS requires at minimum: concrete provider slug,
+// concrete API route, mode list and input-schema basics from the route docs.
+// New maximum tiers stay locked after promotion until a paid smoke test passes.
+// ---------------------------------------------------------------------------
+
+export interface VideoModelCandidate {
+  id: string;
+  displayName: string;
+  family: string;
+  provider: string;
+  /** Only when the provider names it verbatim; still exactly ONE slug. */
+  providerModelSlug?: string;
+  /** What a source really proves. */
+  knownFacts: string[];
+  /** Everything still unverified — must NOT appear as a structured value. */
+  unknowns: string[];
+  auditStatus: 'NEW_MODEL_AVAILABLE' | 'ROUTE_AUDIT_REQUIRED' | 'DOCS_CONFLICT';
+  sourceUrl: string;
+  notedAt: string;
+}
+
+export const VIDEO_MODEL_CANDIDATES: VideoModelCandidate[] = [
+  {
+    id: 'runway-aleph-2',
+    displayName: 'Runway Aleph 2.0',
+    family: 'runway',
+    provider: 'Runway',
+    providerModelSlug: 'aleph2',
+    knownFacts: [
+      'Runway API changelog names "aleph2" as the successor model id of the removed gen4_aleph.',
+    ],
+    unknowns: ['exact REST path', 'modes', 'resolutions', 'durations', 'fps', 'pricing'],
+    auditStatus: 'ROUTE_AUDIT_REQUIRED',
+    sourceUrl: 'https://docs.dev.runwayml.com/api-details/api_changelog/',
+    notedAt: '2026-09-07',
+  },
+  {
+    id: 'seedance-2-0-mini',
+    displayName: 'Seedance 2.0 Mini',
+    family: 'seedance',
+    provider: 'ByteDance',
+    providerModelSlug: 'bytedance/seedance-2.0-mini',
+    knownFacts: [
+      'Replicate model page exists; description states "up to 720p" and points to seedance-2.0 for 1080p/4K.',
+    ],
+    unknowns: [
+      'exact input schema (references / native audio / smart duration not confirmed on this route)',
+      'resolution tier labels',
+      'durations',
+      'aspect ratios',
+      'pricing',
+    ],
+    auditStatus: 'ROUTE_AUDIT_REQUIRED',
+    sourceUrl: 'https://replicate.com/bytedance/seedance-2.0-mini',
+    notedAt: '2026-09-07',
+  },
+  {
+    id: 'ltx-2-5-fast',
+    displayName: 'LTX-2.5 Fast',
+    family: 'ltx',
+    provider: 'Lightricks',
+    providerModelSlug: 'lightricks/ltx-2.5-fast',
+    knownFacts: ['A LTX 2.5 generation exists and does NOT replace LTX 2.3.'],
+    unknowns: [
+      'resolutions (Replicate route vs. docs.ltx.io contradict each other)',
+      'fps set',
+      'durations',
+      'audio support',
+      'pricing',
+    ],
+    auditStatus: 'DOCS_CONFLICT',
+    sourceUrl: 'https://replicate.com/lightricks/ltx-2.5-fast',
+    notedAt: '2026-09-07',
+  },
+  {
+    id: 'happyhorse-1-1',
+    displayName: 'HappyHorse 1.1',
+    family: 'happyhorse',
+    provider: 'Alibaba',
+    providerModelSlug: 'alibaba/happyhorse-1.1',
+    knownFacts: ['Replicate model exists; multi-reference with up to 9 reference images.'],
+    unknowns: ['modes', 'resolutions', 'durations', 'aspect ratios', 'audio', 'pricing'],
+    auditStatus: 'ROUTE_AUDIT_REQUIRED',
+    sourceUrl: 'https://replicate.com/alibaba/happyhorse-1.1',
+    notedAt: '2026-09-07',
+  },
+  {
+    id: 'wan-3-0',
+    displayName: 'Wan 3.0',
+    family: 'wan',
+    provider: 'Alibaba Wan',
+    knownFacts: ['A Wan 3 generation was announced by the vendor.'],
+    unknowns: ['Replicate slug(s)', 'routes', 'modes', 'resolutions', 'durations', 'pricing'],
+    auditStatus: 'ROUTE_AUDIT_REQUIRED',
+    sourceUrl: 'https://replicate.com/wan-video',
+    notedAt: '2026-09-07',
+  },
+];
+
+const CANDIDATE_BY_ID = new Map(VIDEO_MODEL_CANDIDATES.map((c) => [c.id, c]));
+
+export function getVideoModelCandidate(id: string): VideoModelCandidate | undefined {
+  return CANDIDATE_BY_ID.get(id);
+}
+
+
+// ---------------------------------------------------------------------------
 // Aliases — persisted legacy ids keep resolving. Never delete an entry here.
 // An alias MUST point at the same model family; a cross-family alias would
 // silently rename a user's run into a different product.
