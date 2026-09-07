@@ -9,6 +9,15 @@
 ## Bereit
 - Video Enhance: Live-Nachweis der Härtung mit dem QA-Konto (1 Estimate-Ablehnung 1080p→1080p, 1 Hochkant-4K-Routing-Estimate; keine Provider-Läufe nötig)
 
+## Stripe-Umzug auf AdTool AI
+- [x] Alle Preis-IDs im Code auf das AdTool-AI-Konto umgestellt (Abo + 4 Credit-Pakete), GBP als dritte Zahlungswährung im Katalog ergänzt, Abopreis 14,95
+- [ ] Geheimer Live-Schlüssel des AdTool-AI-Kontos hinterlegen (ersetzt den alten caption-cloud-magic-Schlüssel)
+- [ ] Korrekten Webhook-Schlüssel hinterlegen und Webhook-Ziel im AdTool-AI-Konto auf den Abo-Endpunkt setzen
+- [ ] Webhook: ungültige Signatur muss 400 statt 500 liefern
+- [ ] Altes Konto: Webhook-Ziel abschalten, Probe-Abos beenden
+- [ ] GBP in der Preisanzeige/Währungswahl sichtbar machen (aktuell nur im Zahlungskatalog hinterlegt)
+- [ ] Testkauf je Währung nach Freigabe
+
 ## In Progress
 - Video Enhance Freigabe-Run mit echten Provider-Läufen (Topaz vs. ByteDance vCube)
   - Account: bestofproducts4u@gmail.com (8948d3d9-2c5e-4405-9e9c-1624448e7189)
