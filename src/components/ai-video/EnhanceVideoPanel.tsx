@@ -440,8 +440,13 @@ export function EnhanceVideoPanel({
   const executionModeLabel =
     getVideoEnhanceModel(executionModelId ?? model.id)?.processingModes.find((m) => m.id === executionMode)
       ?.label[lang] ?? executionMode;
+  // Topaz already names its model in its own row — no second "footage type"
+  // row that would repeat the same value under a wrong label.
   const showFootageRow =
-    !!executionModelId && (getVideoEnhanceModel(executionModelId)?.processingModes.length ?? 0) > 1;
+    !isTopaz &&
+    !!executionModelId &&
+    (getVideoEnhanceModel(executionModelId)?.processingModes.length ?? 0) > 1;
+
 
   const completed = run?.status === 'completed' && !!run.output_url;
   const match = completed && run ? targetMatchOf(run) : null;
