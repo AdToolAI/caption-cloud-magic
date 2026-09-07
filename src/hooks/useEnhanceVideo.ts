@@ -244,9 +244,18 @@ export function useEnhanceVideo() {
 
   useEffect(() => stopPolling, [stopPolling]);
 
-  /** Authoritative price preview — the server measures the source itself. */
+  /**
+   * Authoritative price preview — the server measures the source itself.
+   *
+   * Previews race: a configuration change fires a new request while an older
+   * one is still in flight. Only the NEWEST request may write price, plan or
+   * error — otherwise a superseded rejection would stay on screen next to a
+   * valid price.
+   */
+  const previewSeqRef = useRef(0);
   const previewPrice = useCallback(
     async (source: EnhanceSource, config: EnhanceConfig) => {
+      const seq = ++previewSeqRef.current;
       clearFailure();
       setPlan(null);
       try {
@@ -257,6 +266,7 @@ export function useEnhanceVideo() {
           sourceUrl: source.url,
           ...config,
         });
+        if (seq !== previewSeqRef.current) return null;
         if (data?.source) setSourceMeta(data.source as ServerSourceMeta);
         const pricing = data?.pricing;
         if (!pricing) return null;
@@ -283,12 +293,14 @@ export function useEnhanceVideo() {
         setEstimate(next);
         return next;
       } catch (e) {
+        if (seq !== previewSeqRef.current) return null;
         recordFailure(e);
         return null;
       }
     },
     [clearFailure, recordFailure],
   );
+
 
   const pollUntilDone = useCallback(
     (runId: string) => {
