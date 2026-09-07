@@ -34,6 +34,8 @@ export interface MeasurableGeneration {
   video_url?: string | null;
   /** Parity context written by the gate. Falls back to inference when absent. */
   parity_model_id?: string | null;
+  /** Executed provider contract (Phase 3A). NULL on pre-3A generations. */
+  parity_provider_model_slug?: string | null;
   parity_api_route?: string | null;
   parity_region?: string | null;
   parity_mode?: string | null;
@@ -58,6 +60,7 @@ export function measurableFromRow(
     aspect_ratio: row.aspect_ratio ?? null,
     video_url: patch.video_url,
     parity_model_id: row.parity_model_id ?? null,
+    parity_provider_model_slug: row.parity_provider_model_slug ?? null,
     parity_api_route: row.parity_api_route ?? null,
     parity_region: row.parity_region ?? null,
     parity_mode: row.parity_mode ?? null,
@@ -140,6 +143,8 @@ export async function recordGenerationOutput(
       })
       .eq('id', generation.id);
 
+    // Identity of what was ACTUALLY executed — never reconstructed from the
+    // current registry when the run recorded it.
     const key: ParityKey = generation.parity_api_route
       ? {
           modelId,
@@ -147,6 +152,7 @@ export async function recordGenerationOutput(
           region: generation.parity_region ?? spec.region,
           mode,
           resolutionLabel: tier.label,
+          providerModelSlug: generation.parity_provider_model_slug ?? undefined,
         }
       : parityKeyOf(spec, mode, tier.label);
 
@@ -165,15 +171,21 @@ async function updateTierParity(
   specStatus: ParityStatus,
   verdict: OutputVerdict,
 ): Promise<void> {
-  const { data: row } = await supabase
+  // EXACT identity lookup: model x slug x route x region x mode x tier.
+  // A legacy row (provider_model_slug NULL) is historical data — it must never
+  // hand its status to a concrete provider contract.
+  let query = supabase
     .from('video_model_tier_parity')
     .select('parity_status, consecutive_mismatches, tier_disabled')
     .eq('model_id', key.modelId)
     .eq('api_route', key.apiRoute)
     .eq('region', key.region)
     .eq('mode', key.mode)
-    .eq('resolution_label', key.resolutionLabel)
-    .maybeSingle();
+    .eq('resolution_label', key.resolutionLabel);
+  query = key.providerModelSlug
+    ? query.eq('provider_model_slug', key.providerModelSlug)
+    : query.is('provider_model_slug', null);
+  const { data: row } = await query.maybeSingle();
 
   const next = applyOutputMeasurement(
     {
@@ -184,25 +196,44 @@ async function updateTierParity(
     verdict,
   );
 
-  await supabase.from('video_model_tier_parity').upsert(
-    {
+  const state = {
+    parity_status: next.parityStatus,
+    consecutive_mismatches: next.consecutiveMismatches,
+    tier_disabled: next.tierDisabled,
+    last_verdict: verdict,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (row) {
+    // Update exactly the identity we read — no onConflict inference over a
+    // generated key column.
+    let upd = supabase
+      .from('video_model_tier_parity')
+      .update(state)
+      .eq('model_id', key.modelId)
+      .eq('api_route', key.apiRoute)
+      .eq('region', key.region)
+      .eq('mode', key.mode)
+      .eq('resolution_label', key.resolutionLabel);
+    upd = key.providerModelSlug
+      ? upd.eq('provider_model_slug', key.providerModelSlug)
+      : upd.is('provider_model_slug', null);
+    await upd;
+  } else {
+    await supabase.from('video_model_tier_parity').insert({
       model_id: key.modelId,
       api_route: key.apiRoute,
       region: key.region,
       mode: key.mode,
       resolution_label: key.resolutionLabel,
-      parity_status: next.parityStatus,
-      consecutive_mismatches: next.consecutiveMismatches,
-      tier_disabled: next.tierDisabled,
-      last_verdict: verdict,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'model_id,api_route,region,mode,resolution_label' },
-  );
+      provider_model_slug: key.providerModelSlug ?? null,
+      ...state,
+    });
+  }
 
   if (next.downgraded) {
     console.warn(
-      `[videoOutputMeasurement] ${key.modelId} ${key.apiRoute}/${key.region}/${key.mode} ${key.resolutionLabel} downgraded FULL_PARITY -> VERIFY after ${next.consecutiveMismatches} mismatches`,
+      `[videoOutputMeasurement] ${key.modelId} ${key.providerModelSlug ?? '(legacy)'} ${key.apiRoute}/${key.region}/${key.mode} ${key.resolutionLabel} downgraded FULL_PARITY -> VERIFY after ${next.consecutiveMismatches} mismatches`,
     );
   }
 }
