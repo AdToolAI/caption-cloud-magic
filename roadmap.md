@@ -11,10 +11,11 @@
 
 ## Stripe-Umzug auf AdTool AI
 - [x] Alle Preis-IDs im Code auf das AdTool-AI-Konto umgestellt (Abo + 4 Credit-Pakete), GBP als dritte Zahlungswährung im Katalog ergänzt, Abopreis 14,95
-- [ ] Geheimer Live-Schlüssel des AdTool-AI-Kontos hinterlegen (ersetzt den alten caption-cloud-magic-Schlüssel)
-- [ ] Korrekten Webhook-Schlüssel hinterlegen und Webhook-Ziel im AdTool-AI-Konto auf den Abo-Endpunkt setzen
-- [ ] Webhook: ungültige Signatur muss 400 statt 500 liefern
-- [ ] Altes Konto: Webhook-Ziel abschalten, Probe-Abos beenden
+- [x] Geheimer Live-Schlüssel des AdTool-AI-Kontos hinterlegt (Konto acct_1SLqO0DRu4kfSFxj bestätigt)
+- [x] Webhook-Schlüssel hinterlegt, Ziel `stripe-webhook` im AdTool-AI-Konto aktiv
+- [x] Webhook liefert bei ungültiger Signatur 400 (live geprüft)
+- [x] Totes Ziel `billing-update` im AdTool-AI-Konto abgeschaltet
+- [ ] Altes Konto caption-cloud-magic: Webhook-Ziel abschalten, Probe-Abos beenden
 - [ ] GBP in der Preisanzeige/Währungswahl sichtbar machen (aktuell nur im Zahlungskatalog hinterlegt)
 - [ ] Testkauf je Währung nach Freigabe
 
