@@ -32,6 +32,9 @@ import {
 import { ShotDirectorPanel } from './ShotDirectorPanel';
 import CinematicStylePresets from './CinematicStylePresets';
 import { MultiReferenceUploader, type ViduReferenceSlot } from './MultiReferenceUploader';
+import { GenerateSection } from './generate/GenerateSection';
+import { QuickSettingsBar } from './generate/QuickSettingsBar';
+
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
