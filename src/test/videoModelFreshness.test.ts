@@ -7,6 +7,7 @@ import {
   getVideoModelCandidate,
   resolveRouteIdentity,
   isSingleProviderSlug,
+  parityKeyOf,
   getVideoModelSpec,
   getModeSpec,
   isResolutionTierAvailable,
@@ -106,6 +107,12 @@ describe('video model freshness audit — invariants', () => {
         expect(identity.region).toBeTruthy();
       }
     }
+  });
+
+  it('parity identity carries the executed slug', () => {
+    const spec = getVideoModelSpec('wan-2-7-standard')!;
+    expect(parityKeyOf(spec, 't2v', '720p').providerModelSlug).toBe('wan-video/wan-2.7-t2v');
+    expect(parityKeyOf(spec, 'i2v', '720p').providerModelSlug).toBe('wan-video/wan-2.7-i2v');
   });
 
   it('Wan 2.7 t2v and i2v keep distinct route identities', () => {
