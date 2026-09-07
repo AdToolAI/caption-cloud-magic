@@ -1,5 +1,6 @@
 import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
+import type { PaymentCurrency } from './stripe';
 
 export const AI_VIDEO_CREDIT_PACKS = {
   starter: {
