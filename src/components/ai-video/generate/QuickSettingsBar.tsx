@@ -13,6 +13,19 @@ import { tx } from '@/lib/i18nText';
 interface Option {
   value: string;
   label: string;
+  /** Secondary line, e.g. the exact pixel frame "3840×2160". */
+  hint?: string;
+  /** Locked tier: rendered, but never selectable (no smoke test yet). */
+  disabled?: boolean;
+}
+
+/** Native resolution tier as delivered by the canonical capability selector. */
+export interface ResolutionChoice {
+  label: string;
+  startable: boolean;
+  lockedReason?: string;
+  /** Exact provider-backed frame for the current aspect ratio, if documented. */
+  pixels?: string | null;
 }
 
 interface Props {
@@ -28,8 +41,15 @@ interface Props {
   resolution: string;
   onResolutionChange: (value: string) => void;
   resolutions?: string[];
+  /**
+   * Native tiers from the canonical registry (incl. locked ones). When set it
+   * wins over `resolutions` — this is the technical truth the UI must show.
+   */
+  resolutionChoices?: ResolutionChoice[];
   /** Shown when the model offers exactly one resolution. */
   fixedResolution: string;
+  /** Exact pixel frame of the current selection, e.g. "2160×3840". */
+  pixelLabel?: string | null;
 
   audioSupported: boolean;
   audioEnabled: boolean;
@@ -80,13 +100,18 @@ function OptionList({
         <button
           key={o.value}
           type="button"
-          onClick={() => onSelect(o.value)}
+          disabled={o.disabled}
+          onClick={() => { if (!o.disabled) onSelect(o.value); }}
           className={cn(
             'flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left text-xs transition-colors hover:bg-primary/10',
             o.value === value && 'text-primary',
+            o.disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent',
           )}
         >
-          <span>{o.label}</span>
+          <span className="flex flex-col">
+            <span>{o.label}</span>
+            {o.hint && <span className="text-[10px] text-muted-foreground">{o.hint}</span>}
+          </span>
           {o.value === value && <Check className="h-3.5 w-3.5 shrink-0" />}
         </button>
       ))}
@@ -105,7 +130,9 @@ export function QuickSettingsBar({
   resolution,
   onResolutionChange,
   resolutions,
+  resolutionChoices,
   fixedResolution,
+  pixelLabel,
   audioSupported,
   audioEnabled,
   audioDisabled,
@@ -129,7 +156,15 @@ export function QuickSettingsBar({
     ? tx({ de: 'Auto', en: 'Auto', es: 'Auto' })
     : `${duration}s`;
 
-  const hasResolutionChoice = (resolutions?.length ?? 0) > 1;
+  const resolutionOptions: Option[] = resolutionChoices?.length
+    ? resolutionChoices.map((r) => ({
+        value: r.label,
+        label: r.startable ? r.label : `${r.label} — ${tx({ de: 'gesperrt', en: 'locked', es: 'bloqueado' })}`,
+        hint: r.startable ? (r.pixels ?? undefined) : r.lockedReason,
+        disabled: !r.startable,
+      }))
+    : (resolutions ?? []).map((r) => ({ value: r, label: r }));
+  const hasResolutionChoice = resolutionOptions.length > 1;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -173,15 +208,18 @@ export function QuickSettingsBar({
         <Popover>
           <PopoverTrigger asChild>
             <div>
-              <Chip icon={<Sparkle className="h-3.5 w-3.5" />} label={resolution} />
+              <Chip
+                icon={<Sparkle className="h-3.5 w-3.5" />}
+                label={pixelLabel ? `${resolution} · ${pixelLabel}` : resolution}
+              />
             </div>
           </PopoverTrigger>
-          <PopoverContent align="start" className="w-44 p-1.5">
+          <PopoverContent align="start" className="w-64 p-1.5">
             <p className="px-2.5 pb-1 pt-1 text-[10px] uppercase tracking-wider text-muted-foreground">
               {tx({ de: 'Qualität', en: 'Quality', es: 'Calidad' })}
             </p>
             <OptionList
-              options={(resolutions ?? []).map((r) => ({ value: r, label: r }))}
+              options={resolutionOptions}
               value={resolution}
               onSelect={onResolutionChange}
             />
