@@ -119,7 +119,7 @@ serve(async (req) => {
       {
         modelId: model,
         resolution: WAN_RESOLUTION[model],
-        mode: inferMode({ startImageUrl, endImageUrl }),
+        mode: inferMode({ modelId: model, startImageUrl, endImageUrl }),
         durationSeconds: duration,
         aspectRatio,
       },

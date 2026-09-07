@@ -195,7 +195,7 @@ serve(async (req) => {
       supabaseAdmin,
       {
         modelId: model,
-        mode: inferMode({ videoUrl: referenceVideoUrl }),
+        mode: inferMode({ modelId: model, videoUrl: referenceVideoUrl }),
         resolution: '720p',
         durationSeconds: Number(duration),
         aspectRatio,

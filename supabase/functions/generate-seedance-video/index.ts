@@ -92,7 +92,7 @@ serve(async (req) => {
         // The REQUESTED tier, verbatim. No rewrite: seedance-mini + 1080p is a
         // 400 INVALID_MODEL_CAPABILITY, never a silent downgrade to 720p.
         resolution: body.resolution,
-        mode: inferMode({ startImageUrl, endImageUrl }),
+        mode: inferMode({ modelId: model, startImageUrl, endImageUrl }),
         durationSeconds: duration,
         aspectRatio,
       },

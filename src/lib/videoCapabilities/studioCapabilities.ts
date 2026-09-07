@@ -27,6 +27,9 @@ import {
   getVideoModelSpec,
   isResolutionTierAvailable,
   projectTargetFrame,
+  resolveGenerationMode,
+  supportsEndOnly,
+  supportsPairedEndFrame,
   validateCapability,
   type CapabilityViolation,
   type ModeConstraint,
@@ -334,16 +337,43 @@ export function validateStudioSelection(sel: StudioSelection): CapabilityViolati
  * attached. Never adjusted to what a model happens to support.
  */
 export function deriveStudioMode(inputs: {
+  modelId?: string;
   hasStartImage?: boolean;
   hasEndImage?: boolean;
   hasReferenceImages?: boolean;
   hasReferenceVideo?: boolean;
 }): VideoMode {
-  if (inputs.hasStartImage && inputs.hasEndImage) return 'firstLast';
-  if (inputs.hasReferenceVideo) return 'v2v';
-  if (inputs.hasStartImage) return 'i2v';
-  if (inputs.hasReferenceImages) return 'reference';
-  return 't2v';
+  // ONE resolver, shared with the edge functions through the generated mirror:
+  // an end image without a start image is `lastFrame`, never `t2v`.
+  return resolveGenerationMode(inputs.modelId ?? '', {
+    hasFirstFrame: !!inputs.hasStartImage,
+    hasLastFrame: !!inputs.hasEndImage,
+    hasReferenceImages: !!inputs.hasReferenceImages,
+    hasVideo: !!inputs.hasReferenceVideo,
+  });
+}
+
+/**
+ * True when the model has a route that accepts a SINGLE end image without a
+ * first frame — the exact contract behind the "at the end" placement.
+ * `supportsLastFrame` is weaker: it is also true for first+last pairing.
+ */
+export function supportsEndOnlyPlacement(modelId: string): boolean {
+  return supportsEndOnly(modelId);
+}
+
+/** True when the model can pair a first frame with an end frame. */
+export function supportsFirstLastPair(modelId: string): boolean {
+  return supportsPairedEndFrame(modelId);
+}
+
+/**
+ * Canonical audio truth for the CURRENT mode. A model that generates sound in
+ * one mode does not automatically do so in another, so the studio asks per
+ * mode instead of reading a model-level flag.
+ */
+export function audioSupportedForMode(modelId: string, mode: VideoMode): boolean {
+  return getStudioCapabilities(modelId, mode).audio;
 }
 
 /**

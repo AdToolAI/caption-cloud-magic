@@ -72,7 +72,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       supabaseAdmin,
       {
         modelId: model,
-        mode: inferMode({ startImageUrl }),
+        mode: inferMode({ modelId: model, startImageUrl }),
         resolution: requestedResolution,
         durationSeconds: duration,
         aspectRatio,
