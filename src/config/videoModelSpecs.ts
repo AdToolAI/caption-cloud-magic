@@ -4,7 +4,7 @@
 // Regenerate with: node scripts/generate-video-model-specs.mjs
 // =============================================================================
 
-export const SPECS_SOURCE_HASH = '07a769ba1577998bb0e9ffbf483b39d6bf091c655bc91b856870844e79b409c9';
+export const SPECS_SOURCE_HASH = '54c30d4b37ad94d65bd5a6fcfaad22e553e108d3c738c146b89e7d14865e1fea';
 
 // ============================================================================
 // CANONICAL VIDEO MODEL CAPABILITY REGISTRY
@@ -843,13 +843,24 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     deprecated: false,
     uiGroup: 'professional',
     available: true,
-    providerDocsVersion: 'Replicate 11.08.2026',
-    verificationSourceUrl: 'https://replicate.com/kwaivgi',
-    verificationNotes: 'Nativer Dialog (EN). Referenzbilder max. 7, mit Referenzvideo max. 4.',
+    providerDocsVersion: 'Replicate 07.09.2026',
+    verificationSourceUrl: 'https://replicate.com/kwaivgi/kling-v3-omni-video',
+    verificationNotes:
+      'Nativer Dialog (EN). Referenzbilder max. 7, mit Referenzvideo max. 4. ' +
+      'Routen-Audit 07.09.2026 (openapi_schema von kwaivgi/kling-v3-omni-video): mode = standard (720p) | pro (1080p, default) | 4k. ' +
+      'Die frühere Annahme "max. 1080p" war falsch — 4K ist routen-dokumentiert und daher als GESPERRTES Tier hinterlegt (t2v/i2v/reference). ' +
+      'Harte Routen-Regel: "4K does not support reference_video" — deshalb KEIN 4K-Tier auf v2v. ' +
+      'Dauer 3–15 s und aspect_ratio 16:9|9:16|1:1 sind laut Schema modus- und auflösungsunabhängig; das Schema nennt für 4K KEINE exakten Pixel, ' +
+      'daher bleibt sizingRuleVerified=false, bis ein Smoke-Test auf UNSEREM Endpoint die Frames misst. ' +
+      'Kling-3.0-Standard-Route (kwaivgi/kling-v3-video) und Omni sind getrennte Capability-Identitäten — keine Übertragung von Einschränkungen in eine der beiden Richtungen.',
+
     ...UNAUDITED,
     modes: [
       mode('t2v', {
-        resolutions: [res('1080p', 1080, 'kling-omni')],
+        resolutions: [
+          res('1080p', 1080, 'kling-omni'),
+          newTier('4K', 2160, 'kling-omni-4k'),
+        ],
         durations: [3, 5, 8, 10, 15],
         aspectRatios: ['16:9', '9:16', '1:1'],
         audio: true,
@@ -857,7 +868,10 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         inputs: {},
       }),
       mode('i2v', {
-        resolutions: [res('1080p', 1080, 'kling-omni')],
+        resolutions: [
+          res('1080p', 1080, 'kling-omni'),
+          newTier('4K', 2160, 'kling-omni-4k'),
+        ],
         durations: [3, 5, 8, 10, 15],
         aspectRatios: ['16:9', '9:16', '1:1'],
         audio: true,
@@ -865,13 +879,17 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         inputs: { firstFrame: true },
       }),
       mode('reference', {
-        resolutions: [res('1080p', 1080, 'kling-omni')],
+        resolutions: [
+          res('1080p', 1080, 'kling-omni'),
+          newTier('4K', 2160, 'kling-omni-4k'),
+        ],
         durations: [3, 5, 8, 10, 15],
         aspectRatios: ['16:9', '9:16', '1:1'],
         audio: true,
         controls: { seed: true, negativePrompt: true },
         inputs: { images: { min: 1, max: 7 } },
       }),
+
       /**
        * V2V (reference_video). Der Provider dokumentiert eine harte
        * Ausschluss-Regel: `generate_audio` ist NICHT mit `reference_video`
@@ -888,8 +906,10 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         constraints: [
           {
             reason:
-              'Kling 3.0 Omni: generate_audio und reference_video schließen sich aus. Mit Referenzvideo max. 4 Referenzbilder (sonst 7); Referenzvideo 3–10 s.',
+              'Kling 3.0 Omni: generate_audio und reference_video schließen sich aus. Mit Referenzvideo max. 4 Referenzbilder (sonst 7); Referenzvideo 3–10 s. ' +
+              'Routen-Regel 07.09.2026: "4K does not support reference_video" — auf diesem Modus existiert daher kein 4K-Tier (max. 1080p/pro).',
           },
+
         ],
       }),
     ],
