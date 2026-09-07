@@ -1,45 +1,77 @@
-# Umzug der Zahlungen auf das Konto „AdTool AI"
+# Umzug der Zahlungen auf „AdTool AI" — mit Multi-Währung von Anfang an
 
 ## Befund (geprüft)
 
-- Der im Projekt hinterlegte geheime Stripe-Schlüssel gehört zum **alten Konto** „caption-cloud-magic.lovable.app" (`acct_1SH6Va1xgyPAUyx6`). Damit laufen alle Zahlungsvorgänge und der Webhook heute über das alte Konto.
-- Der im Frontend hinterlegte öffentliche Schlüssel (`pk_live_51SLqO0…`) gehört dagegen zum **Konto AdTool AI** (`acct_1SLqO0DRu4kfSFxj`). Frontend und Backend zeigen also auf zwei verschiedene Konten — das ist die eigentliche Fehlerquelle.
-- Sämtliche fest im Code hinterlegten Produkt- und Preis-IDs (z. B. `price_1TzLNc1xgyPAUyx6…`, `prod_UyE4edZ94ktyOt`) gehören zum alten Konto und existieren im AdTool-AI-Konto nicht.
-- Im AdTool-AI-Konto ist bisher nur ein Ereignisziel eingerichtet, und zwar auf `billing-update` — nicht auf `stripe-webhook`. Deshalb erreicht das neue Konto unsere Abo-Verarbeitung gar nicht.
-- Laut deiner Prüfung gibt es auf dem alten Konto nur Probeabos und keinen echten Umsatz. Damit ist ein harter Schnitt möglich.
+- Der im Projekt hinterlegte geheime Stripe-Schlüssel gehört zum **alten Konto** „caption-cloud-magic.lovable.app" (`acct_1SH6Va1xgyPAUyx6`). Alle Zahlungen und der Webhook laufen heute darüber.
+- Der öffentliche Schlüssel im Frontend (`pk_live_51SLqO0…`) gehört zum **Konto AdTool AI** (`acct_1SLqO0DRu4kfSFxj`). Frontend und Backend zeigen also auf zwei verschiedene Konten — das ist die eigentliche Fehlerquelle hinter den Webhook-Fehlern.
+- Alle fest im Code stehenden Produkt- und Preis-Kennungen (z. B. `price_1TzLNc1xgyPAUyx6…`, `prod_UyE4edZ94ktyOt`) gehören zum alten Konto und existieren im Zielkonto nicht.
+- Im AdTool-AI-Konto gibt es bisher nur ein Ereignisziel auf `billing-update`, nicht auf unsere Abo-Verarbeitung.
+- Auf dem alten Konto laufen laut deiner Prüfung nur Probeabos (3 aktive à 9,99 €), kein echter Umsatz. Ein harter Schnitt ist damit möglich.
 
-## Vorgehen: harter Schnitt
+## Neue Vorgabe: Multi-Währung statt Doppel-Katalog
 
-**1. Katalog im AdTool-AI-Konto neu aufbauen**
-Im Zielkonto werden angelegt: das Abo-Produkt „Beta-Basic" mit Preis in EUR und USD, die Credit-Pakete, die Enterprise-Preise sowie die Rabatt-Codes (Gründer-Rabatt und der Launch-Gutschein). Alles wird 1:1 mit den heutigen Beträgen angelegt, damit sich an der Preisliste nichts ändert.
+Statt für jede Währung ein eigenes Produkt/Preis-Paar anzulegen, bekommt jeder Preis **eine Basiswährung EUR plus zusätzliche Währungsvarianten** (USD, GBP) im selben Preis. Für alle übrigen Märkte übernimmt Stripe die lokale Währung automatisch. Vorteile: eine Kennung pro Produkt im Code, keine zweite Migration, wenn eine Währung dazukommt.
 
-**2. Schlüssel umstellen**
-Der geheime Stripe-Schlüssel im Projekt wird auf den Live-Schlüssel des AdTool-AI-Kontos gewechselt (über das sichere Eingabefenster, der Wert läuft nicht über den Chat). Der öffentliche Schlüssel im Frontend passt bereits.
+- **Basis/Abrechnung: EUR** — das Konto sitzt in Deutschland; Stripe verlangt für die automatische lokale Anzeige eine Auszahlungswährung als Basis.
+- **Feste Verkaufspreise: EUR, USD, GBP** — echte psychologische Preise, kein tagesaktueller Wechselkurs.
+- **Übrige Märkte:** automatische lokale Währung.
 
-**3. Neue IDs im Code eintragen**
-Alle fest hinterlegten Produkt-, Preis- und Gutschein-Kennungen werden auf die neuen Werte aus dem AdTool-AI-Konto umgestellt (Preis-Zuordnung, Credit-Pakete, Enterprise-Preise, Gründer-Gutschein, Gutschein-Einträge in der Datenbank).
+Zu verkaufen gibt es nur noch: **ein Abo (Beta Basic)** und die **AI-Credit-Pakete**.
 
-**4. Ereignisziel (Webhook) im neuen Konto einrichten**
-Im AdTool-AI-Konto wird ein Ziel auf unsere Abo-Verarbeitung gesetzt, mit denselben Ereignissen wie bisher. Das zugehörige Signaturgeheimnis wird als neues Projektgeheimnis gespeichert. Zusätzlich wird der bekannte Signaturfehler sauber mit „ungültige Signatur" (400) statt mit einem Serverfehler (500) beantwortet, damit Stripe solche Fälle nicht endlos wiederholt.
+**Preismatrix — noch offen, wird vor dem Anlegen zur Freigabe vorgelegt.** Es werden keine Beträge festgelegt, bevor du EUR/USD/GBP je Position bestätigt hast. Vorschlag als Diskussionsgrundlage:
 
-**5. Alte Abos beenden, altes Konto stilllegen**
-Die drei Probeabos auf dem alten Konto werden gekündigt und die Testkunden in unserer Datenbank auf „kein aktives Abo" gesetzt, damit niemand versehentlich weiter belastet wird oder ein Abo behält, das es im neuen Konto nicht gibt. Das alte Ereignisziel wird deaktiviert.
+| Position | EUR | USD | GBP |
+|---|---|---|---|
+| Beta Basic (Monat) | 14,95 € | ? | ? |
+| Credit-Paket klein | ? | ? | ? |
+| Credit-Paket mittel | ? | ? | ? |
+| Credit-Paket groß | ? | ? | ? |
 
-**6. Abnahme**
-Ein echter Testkauf mit einem Cent-Betrag bzw. der Gutschein-Weg, Prüfung dass Abo, Guthaben und Verlauf korrekt ankommen, danach Rückabwicklung des Testkaufs.
+## Strikte Trennung: Zahlungswährung ≠ Guthaben
+
+Credits bleiben eine interne Einheit. Ein Kauf desselben Pakets in USD, EUR oder GBP schreibt exakt dieselbe Credit-Menge gut. Das Wallet wird niemals „eine EUR-" oder „eine USD-Wallet". Zu jeder Buchung werden getrennt gespeichert: gezahlter Betrag, gezahlte Währung, gekauftes Paket, gutgeschriebene Credits, Stripe-Zahlungs-Kennung. Die Gutschrift wird ausschließlich über die Paket-Kennung aus dem Kaufvorgang bestimmt, nie über den Betrag oder die Währung.
+
+## Vorgehen
+
+**1. Katalog im AdTool-AI-Konto neu anlegen**
+Ein Abo-Produkt und die Credit-Pakete, jeweils mit EUR-Basis und zusätzlichen USD-/GBP-Beträgen im selben Preis. Dazu die Gutscheine (Gründer-Rabatt auf Credit-Käufe, Launch-Gutschein). Rabatte werden als prozentuale Gutscheine angelegt, damit sie in jeder Währung funktionieren.
+
+**2. Lokale Währungen prüfen und aktivieren**
+Für die Märkte ohne festen Preis wird die automatische lokale Anzeige im Zielkonto geprüft und, wo sie greift, eingeschaltet.
+
+**3. Schlüssel umstellen**
+Der geheime Stripe-Schlüssel wird auf das AdTool-AI-Konto gewechselt (über das sichere Eingabefenster; der Wert läuft nicht über den Chat). Der öffentliche Schlüssel passt bereits.
+
+**4. Code auf eine Kennung pro Produkt umbauen**
+Die heutige Zuordnung „Plan × Währung → Preis-Kennung" wird auf „Plan → eine Preis-Kennung" reduziert; die Währung entscheidet der Kaufvorgang. Betroffen sind Abo-Kauf, Enterprise-Kauf, Credit-Kauf, Abo-Prüfung, Kundenportal und Gutschein-Einlösung.
+
+**5. Preisanzeige auf der Website**
+Die angezeigte Währung folgt Sprache/Standort: deutsche Ansicht in Euro, englische Ansicht in US-Dollar, britische Besucher in Pfund. Die angezeigte Währung wird in den Kaufvorgang übernommen, damit Anzeige und Kasse identisch sind.
+
+**6. Ereignisziel (Webhook) im neuen Konto**
+Neues Ziel auf unsere Abo-Verarbeitung mit denselben Ereignissen, das Signaturgeheimnis wird als Projektgeheimnis hinterlegt. Zusätzlich: ungültige Signaturen werden mit „ungültige Anfrage" statt mit einem Serverfehler beantwortet, damit Stripe nicht endlos wiederholt. Der Verarbeiter speichert Betrag und Währung jeder Zahlung mit.
+
+**7. Altes Konto stilllegen**
+Die drei Probeabos kündigen, die betroffenen Konten in unserer Datenbank auf „kein aktives Abo" setzen, altes Ereignisziel deaktivieren.
+
+**8. Abnahme**
+Je ein Testkauf in Euro und in US-Dollar (Abo und Credit-Paket), Prüfung: gleiche Credits trotz unterschiedlicher Währung, korrekte Währung in Rechnung, Verlauf und Buchhaltungsfeldern, Gutschein greift in beiden Währungen, Kundenportal zeigt die richtige Währung. Danach Rückabwicklung der Testkäufe.
 
 ## Was unverändert bleibt
 
-Preise, Guthaben-Pakete, Gründer-Programm (20 % auf Credit-Käufe, 1.000 Plätze), Wallet-Logik, Video- und Lip-Sync-Pipeline.
+Guthaben-Logik, Gründer-Programm (20 % auf Credit-Käufe, 1.000 Plätze), Video- und Lip-Sync-Pipeline.
 
 ## Was ich von dir brauche
 
-- Bestätigung, dass das AdTool-AI-Konto live freigeschaltet ist (Identität geprüft, Bankverbindung hinterlegt).
-- Den geheimen Live-Schlüssel des AdTool-AI-Kontos, sobald ich das sichere Eingabefenster öffne.
+- Bestätigung, dass das AdTool-AI-Konto live freigeschaltet ist (Identität, Bankverbindung).
+- Freigabe der Preismatrix EUR/USD/GBP.
+- Den geheimen Live-Schlüssel, sobald ich das sichere Eingabefenster öffne.
 
 ## Technische Details
 
-- Betroffen: `src/config/stripe.ts`, `src/config/pricing.ts`, `src/config/aiVideoCredits.ts`, `supabase/functions/_shared/stripe-config.ts`, `create-checkout`, `create-enterprise-checkout`, `ai-video-purchase-credits`, `check-subscription`, `customer-portal`, `redeem-promo-code`, `stripe-webhook`.
-- Neues Geheimnis: `STRIPE_WEBHOOK_SECRET` (Wert des neuen Ereignisziels); `STRIPE_SECRET_KEY` wird ersetzt.
-- Datenbank: `promo_codes.stripe_promo_id` auf die neuen Gutschein-IDs aktualisieren; Abo-Status der drei Testkonten zurücksetzen; bestehende `stripe_customer_id`-Werte gehören zum alten Konto und werden geleert, damit beim nächsten Kauf ein Kunde im neuen Konto entsteht.
-- `stripe-webhook`: Signaturfehler → HTTP 400 statt 500, Ereignis-Idempotenz über `stripe_webhook_events` beibehalten.
+- Preise werden mit `currency_options` angelegt (Basis EUR, zusätzlich USD/GBP); Checkout wählt die passende Währung. Manuell gesetzte Währungen haben Vorrang vor Adaptive Pricing.
+- Betroffene Dateien: `src/config/stripe.ts`, `src/config/pricing.ts`, `src/config/aiVideoCredits.ts`, `supabase/functions/_shared/stripe-config.ts`, `create-checkout`, `create-enterprise-checkout`, `ai-video-purchase-credits`, `check-subscription`, `customer-portal`, `redeem-promo-code`, `stripe-webhook`.
+- `STRIPE_PRICE_MAP` wird von `Record<Plan, Record<Currency, string>>` auf `Record<Plan, string>` reduziert; `currency` bleibt nur noch Anzeige-/Checkout-Parameter.
+- Datenbank: Buchungsfelder für `stripe_amount`, `stripe_currency`, `credits_added`, `package_id`, `stripe_payment_id` prüfen und, wo sie fehlen, ergänzen; `promo_codes.stripe_promo_id` auf die neuen Gutschein-IDs setzen; bestehende `stripe_customer_id`-Werte leeren (gehören zum alten Konto); Abo-Status der drei Testkonten zurücksetzen.
+- Neues Geheimnis `STRIPE_WEBHOOK_SECRET`, `STRIPE_SECRET_KEY` wird ersetzt.
+- Nach Freigabe werden die offenen Punkte zusätzlich als Aufgabenliste in `roadmap.md` abgelegt.
