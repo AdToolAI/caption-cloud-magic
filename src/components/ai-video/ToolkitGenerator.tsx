@@ -1767,8 +1767,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               )}
             </div>
           );
-        })()}
-      </Card>
+          })()}
+        </GenerateSection>
+      )}
+
 
 
 
