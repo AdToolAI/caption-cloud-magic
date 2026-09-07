@@ -253,8 +253,12 @@ export interface VideoModelSpec {
   edgeFunction: string;
   releaseStatus: ReleaseStatus;
   deprecated: boolean;
-  /** Required whenever `deprecated` is true. */
+  /** Required whenever `deprecated` is true — unless the successor is still a
+   * candidate, in which case `supersededByCandidate` carries the id. */
   supersededBy?: string;
+  /** Successor that exists as a provider model but is NOT yet a canonical
+   * spec (route/schema unverified). Points into `VIDEO_MODEL_CANDIDATES`. */
+  supersededByCandidate?: string;
   /** Set on pure alias ids that resolve to another spec. */
   aliasOf?: string;
   uiGroup: UiGroup;
@@ -1725,7 +1729,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     edgeFunction: 'generate-runway-video',
     releaseStatus: 'removed',
     deprecated: true,
-    supersededBy: 'runway-aleph-2',
+    supersededByCandidate: 'runway-aleph-2',
     uiGroup: 'legacy',
     available: false,
     providerDocsVersion: 'Runway API Changelog 30.07.2026',
