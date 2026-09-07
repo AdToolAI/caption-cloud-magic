@@ -1523,8 +1523,17 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           </div>
         )}
 
-        {/* ── Kling 3.0 Omni — Unified Cast + Native Lip-Sync ── */}
-        {isKlingOmni && (() => {
+      {/* ── Sprecher & Lip-Sync — Kling 3.0 Omni (Cast + Native Lip-Sync) ── */}
+      {isKlingOmni && (
+        <GenerateSection
+          id="omni-cast"
+          title={tx({ de: 'Sprecher & Lip-Sync', en: 'Speakers & lip-sync', es: 'Locutores y sincronización labial' })}
+          icon={<Sparkles className="h-4 w-4" />}
+          summary={omniLines.length ? `${omniLines.length} Cast` : null}
+          defaultOpen
+        >
+          {(() => {
+
           const MAX_CAST = 4;
           const LIP_SYNC_MAX = 2;
           const lipSyncCount = omniLines.filter((r) => r.lipSync).length;
