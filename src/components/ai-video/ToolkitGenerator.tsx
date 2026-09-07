@@ -1520,8 +1520,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 })}
               </p>
             )}
-          </div>
-        )}
+        </GenerateSection>
+      )}
+
 
       {/* ── Sprecher & Lip-Sync — Kling 3.0 Omni (Cast + Native Lip-Sync) ── */}
       {isKlingOmni && (
