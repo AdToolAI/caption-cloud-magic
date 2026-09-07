@@ -121,7 +121,14 @@ export function friendlyVideoErrorMessage(errorMessage: string | null | undefine
         en: `The provider took too long and cancelled the job. ${REFUND.en} A shorter video or a new attempt usually works.`,
         es: `El proveedor tardó demasiado y canceló el trabajo. ${REFUND.es} Un vídeo más corto o un nuevo intento suele funcionar.`,
       });
+    case 'real_person_image':
+      return tx({
+        de: `Der Anbieter erlaubt keine Fotos echter Personen als Bildvorlage. ${REFUND.de} Nutze ein KI-erzeugtes Charakterbild aus deiner Library oder beschreibe die Person nur im Text.`,
+        en: `The provider does not allow photos of real people as image input. ${REFUND.en} Use an AI-generated character image from your library, or describe the person in text only.`,
+        es: `El proveedor no permite fotos de personas reales como imagen de referencia. ${REFUND.es} Usa una imagen de personaje generada por IA de tu biblioteca o describe a la persona solo con texto.`,
+      });
     case 'moderation':
+
       return tx({
         de: `Der Anbieter hat diesen Inhalt abgelehnt (Inhaltsprüfung). ${REFUND.de} Bitte formuliere die Beschreibung um oder nutze ein anderes Bild.`,
         en: `The provider rejected this content (content review). ${REFUND.en} Please rephrase the description or use a different image.`,
