@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Loader2, Upload, Sparkles } from 'lucide-react';
@@ -52,6 +53,7 @@ export function AssetPhotoUploadSheet({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
+  const [cutout, setCutout] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const refine = useRefineAssetPhoto();
 
@@ -60,6 +62,7 @@ export function AssetPhotoUploadSheet({
     setPreviewUrl(null);
     setName('');
     setNotes('');
+    setCutout(true);
   }, []);
 
   const handleFile = useCallback((f: File | null) => {
@@ -75,11 +78,12 @@ export function AssetPhotoUploadSheet({
       file,
       name: name.trim(),
       extraPrompt: notes.trim() || undefined,
+      cutout,
     });
     onCreated?.(res.assetId, res.kind);
     reset();
     onOpenChange(false);
-  }, [file, name, notes, kind, refine, onCreated, onOpenChange, reset]);
+  }, [file, name, notes, cutout, kind, refine, onCreated, onOpenChange, reset]);
 
   const busy = refine.isPending;
   const canSubmit = useMemo(
@@ -177,6 +181,26 @@ export function AssetPhotoUploadSheet({
               disabled={busy}
             />
           </div>
+
+          {/* Cutout is optional — a hard cutout can eat hair and fine edges. */}
+          {kind !== 'location' && (
+            <div className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
+              <div className="space-y-0.5">
+                <Label htmlFor="asset-cutout" className="text-xs font-medium">
+                  Cut out the background
+                </Label>
+                <p className="text-[11px] text-muted-foreground">
+                  Off keeps the clean studio backdrop — safer for hair and fine edges.
+                </p>
+              </div>
+              <Switch
+                id="asset-cutout"
+                checked={cutout}
+                onCheckedChange={setCutout}
+                disabled={busy}
+              />
+            </div>
+          )}
         </div>
 
         <SheetFooter className="mt-6 gap-2">
