@@ -9,6 +9,7 @@ import { tx } from '@/lib/i18nText';
 export type VideoErrorKind =
   | 'overloaded'
   | 'timeout'
+  | 'real_person_image'
   | 'moderation'
   | 'invalid_input'
   | 'rate_limit'
@@ -20,6 +21,20 @@ export function classifyVideoError(errorMessage: string | null | undefined): Vid
   if (!errorMessage) return 'unknown';
   const raw = errorMessage.toLowerCase();
 
+  // Provider privacy gate on uploaded images (ByteDance/Seedance:
+  // `InputImageSensitiveContentDetected.PrivacyInformation`). Checked before
+  // the generic moderation branch — the fix is a different image, not a
+  // different prompt.
+  if (
+    raw.includes('inputimagesensitivecontentdetected') ||
+    raw.includes('privacyinformation') ||
+    raw.includes('may contain real person') ||
+    raw.includes('real person') ||
+    raw.includes('portrait right') ||
+    raw.includes('celebrity')
+  ) {
+    return 'real_person_image';
+  }
   if (
     raw.includes('high load') ||
     raw.includes('high demand') ||
@@ -47,6 +62,7 @@ export function classifyVideoError(errorMessage: string | null | undefined): Vid
   ) {
     return 'moderation';
   }
+
   if (
     raw.includes('invalid input') ||
     raw.includes('invalid_request') ||
