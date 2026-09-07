@@ -139,25 +139,41 @@ describe('video enhance — stuck runs finish by themselves', () => {
     expect(reconcile).toMatch(/OUTPUT_VERDICT_CONFIRM_ATTEMPTS\s*=\s*2/);
     // … and it is closed through the failure path, which releases the reservation.
     const branch = reconcile.slice(
-      reconcile.indexOf('run.status === "asset_persist_failed"'),
-      reconcile.indexOf('if (!run.provider_prediction_id)'),
+      reconcile.indexOf('const claim = Array.isArray(claimedRows)'),
+      reconcile.indexOf('const nowIso = new Date().toISOString();'),
     );
-    expect(branch).toContain('DETERMINISTIC_OUTPUT_FAILURES.has(run.error_code)');
+    expect(branch).toContain('DETERMINISTIC_OUTPUT_FAILURES.has(claim.error_code)');
     expect(branch).toContain('finalizeFailure(');
     expect(branch.indexOf('finalizeFailure(')).toBeLessThan(branch.indexOf('finalizeSuccess('));
   });
 
-  it('sends transient persistence retries to manual review after the horizon', () => {
+  it('stops persistence retries at a bounded attempt count, without refunding', () => {
     const reconcile = fn('video-enhance-reconcile');
     const branch = reconcile.slice(
-      reconcile.indexOf('run.status === "asset_persist_failed"'),
-      reconcile.indexOf('if (!run.provider_prediction_id)'),
+      reconcile.indexOf('const claim = Array.isArray(claimedRows)'),
+      reconcile.indexOf('const nowIso = new Date().toISOString();'),
     );
-    expect(branch).toContain('ageMinutes > horizonMinutes');
+    expect(branch).toContain('persistAttempts >= MAX_PERSIST_ATTEMPTS');
     expect(branch).toContain('"manual_review"');
-    // The horizon check sits before the retry, so a retry never bypasses it.
-    expect(branch.indexOf('ageMinutes > horizonMinutes')).toBeLessThan(branch.indexOf('finalizeSuccess('));
+    // The bound sits before the retry, so a retry never bypasses it.
+    expect(branch.indexOf('persistAttempts >= MAX_PERSIST_ATTEMPTS')).toBeLessThan(
+      branch.indexOf('finalizeSuccess('),
+    );
   });
+
+  it('claims persistence work atomically, one heavy transfer per invocation', () => {
+    const reconcile = fn('video-enhance-reconcile');
+    expect(reconcile).toContain('video_enhance_claim_persist_run');
+    // Persistence statuses must never be picked up by the plain provider loop.
+    const open = reconcile.slice(
+      reconcile.indexOf('const OPEN_STATUSES'),
+      reconcile.indexOf('const cycle = {'),
+    );
+    expect(open).not.toContain('asset_staging');
+    expect(open).not.toContain('asset_persisting');
+    expect(open).not.toContain('asset_persist_failed');
+  });
+
 
   it('refunds on a closed output verdict through the existing release ledger', () => {
     const finalize = shared('video-enhance-finalize.ts');
