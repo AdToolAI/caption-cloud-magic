@@ -62,6 +62,9 @@ describe('studio capability selector = canonical registry', () => {
   it('every startable option passes the shared capability gate', () => {
     for (const m of AI_VIDEO_TOOLKIT_MODELS) {
       const spec = getVideoModelSpec(m.id)!;
+      // Models the registry marks unavailable (e.g. Pika in maintenance) are
+      // gate-rejected by design; the UI shows them disabled.
+      if (!spec.available) continue;
       for (const mode of spec.modes) {
         const caps = getStudioCapabilities(m.id, mode.mode);
         for (const tier of caps.resolutions.filter((r) => r.startable)) {
