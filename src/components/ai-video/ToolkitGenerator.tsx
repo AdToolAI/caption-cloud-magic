@@ -1058,34 +1058,26 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </p>
       </Card>
 
-      {/* ── Cinematic Style Presets (one-click director looks) ── */}
-      <Card className="p-4 bg-card/60 backdrop-blur-xl border-border/60">
-        <CinematicStylePresets value={shotSelection} onApply={(sel) => setShotSelection(sel)} />
-      </Card>
-
-      {/* ── Shot Director (cinematic prompt builder) ── */}
-      <ShotDirectorPanel
-        value={shotSelection}
-        onChange={setShotSelection}
-        basePrompt={prompt}
+      {/* ── Kompakte Einstellungsleiste (Dauer · Format · Qualität · Ton) ── */}
+      <QuickSettingsBar
+        duration={duration}
+        onDurationChange={setDuration}
+        durations={model.durations}
+        smartDuration={!!model.capabilities.smartDuration}
+        aspectRatio={aspectRatio}
+        onAspectRatioChange={setAspectRatio}
+        aspectRatios={model.aspectRatios}
+        resolution={resolution}
+        onResolutionChange={setResolution}
+        resolutions={model.resolutions}
+        fixedResolution={model.resolution}
+        audioSupported={!!model.capabilities.audio}
+        audioEnabled={generateAudio && !omniNonEnglishSilent}
+        audioDisabled={omniNonEnglishSilent}
+        onAudioChange={setGenerateAudio}
       />
 
-      {/* Character selection lives exclusively in Cast & World below. */}
-
-      <ToolkitCastWorldPicker
-        characterIds={castCharacterIds}
-        locationId={castLocationId}
-        buildingId={castBuildingId}
-        propIds={castPropIds}
-        onCharacterIdsChange={setCastCharacterIds}
-        onLocationIdChange={setCastLocationId}
-        onBuildingIdChange={setCastBuildingId}
-        onPropIdsChange={setCastPropIds}
-        consistencyKey={consistencyKey}
-        supportsImageInput={model.capabilities.i2v}
-        hideCharacters={isKlingOmni}
-      />
-
+      {/* ── Hinweise & Sperren — bleiben immer sichtbar, nie eingeklappt ── */}
       {/* v241 — text-only warning: model can't accept image reference at all */}
       {castCharacterIds.length > 0 &&
         !model.capabilities.i2v &&
@@ -1124,6 +1116,90 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           </div>
         </Card>
       )}
+
+      {/* ── Generate CTA ── */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between p-4 rounded-xl bg-gradient-to-r from-primary/5 to-accent/5 border border-primary/20">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">
+            {priceUnverified
+              ? tx({ de: 'Preis wird geprüft', en: 'Checking price', es: 'Comprobando precio' })
+              : tx({ de: 'Kosten (verbindlich)', en: 'Cost (binding)', es: 'Costo (vinculante)' })}
+          </p>
+          <p className="text-2xl font-bold text-primary tabular-nums">
+            {priceUnverified ? '—' : `${symbol}${cost.toFixed(2)}`}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {priceUnverified
+              ? tx({ de: 'Aktueller Tarif wird geladen…', en: 'Loading current rate…', es: 'Cargando la tarifa actual…' })
+              : `${duration}s × ${symbol}${pricePerSecond.toFixed(2)}/s · ${model.name}`}
+          </p>
+        </div>
+        <Button
+          size="lg"
+          onClick={handleGenerate}
+          disabled={generating || !prompt.trim() || !canAfford || priceUnverified}
+          className="min-w-[200px] bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 disabled:opacity-50"
+        >
+          {composingScene ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {tx({ de: 'Szene komponieren…', en: 'Composing scene…', es: 'Componiendo escena…' })}</>
+          ) : generating ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {language === 'de' ? 'Generiere…' : 'Generating…'}</>
+          ) : (
+            <><Sparkles className="h-4 w-4 mr-2" /> {tx({ de: 'Video generieren', en: 'Generate video', es: 'Generar video' })}</>
+          )}
+        </Button>
+      </div>
+
+      <div className="flex justify-end -mt-1">
+        <FounderPriorityChip />
+      </div>
+
+      {/* ── Look & Kamera ── */}
+      <GenerateSection
+        id="look"
+        title={tx({ de: 'Look & Kamera', en: 'Look & camera', es: 'Estilo y cámara' })}
+        icon={<Film className="h-4 w-4" />}
+        summary={shotSelection && Object.values(shotSelection).some(Boolean)
+          ? tx({ de: 'gesetzt', en: 'set', es: 'definido' })
+          : null}
+      >
+        <CinematicStylePresets value={shotSelection} onApply={(sel) => setShotSelection(sel)} />
+        <ShotDirectorPanel
+          value={shotSelection}
+          onChange={setShotSelection}
+          basePrompt={prompt}
+        />
+      </GenerateSection>
+
+      {/* Character selection lives exclusively in Cast & World. */}
+      <GenerateSection
+        id="cast-world"
+        title="Cast & World"
+        icon={<Sparkles className="h-4 w-4" />}
+        summary={
+          [
+            castCharacterIds.length ? `${castCharacterIds.length} ${tx({ de: 'Charaktere', en: 'characters', es: 'personajes' })}` : null,
+            castLocationId ? tx({ de: 'Location', en: 'Location', es: 'Ubicación' }) : null,
+            castPropIds.length ? `${castPropIds.length} ${tx({ de: 'Requisiten', en: 'props', es: 'props' })}` : null,
+          ].filter(Boolean).join(' · ') || null
+        }
+        defaultOpen={castCharacterIds.length > 0 || !!castLocationId}
+      >
+        <ToolkitCastWorldPicker
+          characterIds={castCharacterIds}
+          locationId={castLocationId}
+          buildingId={castBuildingId}
+          propIds={castPropIds}
+          onCharacterIdsChange={setCastCharacterIds}
+          onLocationIdChange={setCastLocationId}
+          onBuildingIdChange={setCastBuildingId}
+          onPropIdsChange={setCastPropIds}
+          consistencyKey={consistencyKey}
+          supportsImageInput={model.capabilities.i2v}
+          hideCharacters={isKlingOmni}
+        />
+      </GenerateSection>
+
 
       {/* ── Referenzen & Medien ── */}
       <GenerateSection
