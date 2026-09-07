@@ -32,6 +32,14 @@ import {
 import { ShotDirectorPanel } from './ShotDirectorPanel';
 import CinematicStylePresets from './CinematicStylePresets';
 import { MultiReferenceUploader, type ViduReferenceSlot } from './MultiReferenceUploader';
+import {
+  deriveStudioMode,
+  durationsFor,
+  exactFrameLabel,
+  getStudioCapabilities,
+  resolveSupportedMode,
+  validateStudioSelection,
+} from '@/lib/videoCapabilities/studioCapabilities';
 import { GenerateSection } from './generate/GenerateSection';
 import { QuickSettingsBar } from './generate/QuickSettingsBar';
 
@@ -482,14 +490,47 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   /* ── Shot Director (cinematic prompt builder) ── */
   const [shotSelection, setShotSelection] = useState<ShotSelection>({});
 
+  /* ── Canonical capability truth for the current selection ──
+   * Every technical option the UI offers comes from ONE place:
+   * `studioCapabilities` over the generated mirror of the server registry.
+   * Nothing here re-derives provider knowledge locally. */
+  const studioMode = useMemo(
+    () => resolveSupportedMode(
+      model.id,
+      deriveStudioMode({
+        hasStartImage: !!startImageUrl,
+        hasReferenceImages: viduReferences.length > 0,
+        hasReferenceVideo: !!referenceVideoUrl,
+      }),
+    ),
+    [model.id, startImageUrl, viduReferences.length, referenceVideoUrl],
+  );
+  const caps = useMemo(() => getStudioCapabilities(model.id, studioMode), [model.id, studioMode]);
+  const capDurations = useMemo(
+    () => durationsFor(model.id, studioMode, resolution),
+    [model.id, studioMode, resolution],
+  );
+  const capPixelLabel = useMemo(
+    () => exactFrameLabel(model.id, studioMode, resolution, aspectRatio),
+    [model.id, studioMode, resolution, aspectRatio],
+  );
+  /** Mirror of the server gate — blocks the start, never rewrites a value. */
+  const capabilityViolation = useMemo(
+    () => validateStudioSelection({
+      modelId: model.id,
+      mode: studioMode,
+      resolution,
+      duration,
+      aspectRatio,
+    }),
+    [model.id, studioMode, resolution, duration, aspectRatio],
+  );
+
   /* ── Sync settings to model capabilities when switching ── */
   useEffect(() => {
-    const smartOk = duration === -1 && model.capabilities.smartDuration;
-    if (!smartOk && !model.durations.includes(duration)) setDuration(model.durations[0]);
-
-    if (!model.aspectRatios.includes(aspectRatio)) setAspectRatio(model.aspectRatios[0]);
-    const allowedResolutions = model.resolutions ?? [model.resolution];
-    if (!allowedResolutions.includes(resolution)) setResolution(allowedResolutions[0]);
+    // Duration / aspect ratio / resolution are NEVER silently rewritten here.
+    // An invalid combination is surfaced by `capabilityViolation` below and
+    // blocks the start until the user picks a startable option themselves.
     if (!model.capabilities.audio) setGenerateAudio(false);
     if (!model.capabilities.i2v) setStartImageUrl(null);
     if (!model.capabilities.v2v) setReferenceVideoUrl(null);
@@ -611,6 +652,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   /* ── Generate dispatch ── */
   const runGenerate = async () => {
+    if (capabilityViolation) {
+      toast.error(capabilityViolation.message);
+      return;
+    }
     if (!prompt.trim()) {
       toast.error(language === 'de' ? tx({ de: 'Bitte gib einen Prompt ein.', en: 'Please enter a prompt.', es: 'Por favor, introduce un prompt.' }) : 'Please enter a prompt.');
       return;
@@ -1002,6 +1047,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   /* Gate: opens cost-confirm dialog unless user suppressed it within 24 h. */
   const handleGenerate = () => {
+    if (capabilityViolation) {
+      toast.error(capabilityViolation.message);
+      return;
+    }
     if (!prompt.trim()) {
       toast.error(language === 'de' ? tx({ de: 'Bitte gib einen Prompt ein.', en: 'Please enter a prompt.', es: 'Por favor, introduce un prompt.' }) : 'Please enter a prompt.');
       return;
@@ -1110,15 +1159,22 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       <QuickSettingsBar
         duration={duration}
         onDurationChange={setDuration}
-        durations={model.durations}
-        smartDuration={!!model.capabilities.smartDuration}
+        durations={capDurations}
+        smartDuration={caps.smartDuration}
         aspectRatio={aspectRatio}
         onAspectRatioChange={setAspectRatio}
-        aspectRatios={model.aspectRatios}
+        aspectRatios={caps.aspectRatios}
         resolution={resolution}
         onResolutionChange={setResolution}
-        resolutions={model.resolutions}
-        fixedResolution={model.resolution}
+        resolutions={caps.resolutionLabels}
+        resolutionChoices={caps.resolutions.map((r) => ({
+          label: r.label,
+          startable: r.startable,
+          lockedReason: r.lockedReason,
+          pixels: exactFrameLabel(model.id, studioMode, r.label, aspectRatio),
+        }))}
+        fixedResolution={caps.resolutionLabels[0] ?? model.resolution}
+        pixelLabel={capPixelLabel}
         audioSupported={!!model.capabilities.audio}
         audioEnabled={generateAudio && !omniNonEnglishSilent}
         audioDisabled={omniNonEnglishSilent}
@@ -1165,6 +1221,25 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </Card>
       )}
 
+      {/* ── Capability gate mirror — an invalid combination is shown, never
+       *  silently rewritten. The start stays blocked until the user picks a
+       *  startable option. The server remains authoritative. */}
+      {capabilityViolation && (
+        <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive-foreground">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            <span className="font-medium">
+              {tx({
+                de: 'Diese Kombination kann dieses Modell nicht rendern:',
+                en: 'This model cannot render this combination:',
+                es: 'Este modelo no puede renderizar esta combinación:',
+              })}
+            </span>{' '}
+            {capabilityViolation.message}
+          </span>
+        </div>
+      )}
+
       {/* ── Generate CTA ── */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between p-4 rounded-xl bg-gradient-to-r from-primary/5 to-accent/5 border border-primary/20">
         <div>
@@ -1185,7 +1260,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         <Button
           size="lg"
           onClick={handleGenerate}
-          disabled={generating || !prompt.trim() || !canAfford || priceUnverified}
+          disabled={generating || !prompt.trim() || !canAfford || priceUnverified || !!capabilityViolation}
           className="min-w-[200px] bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {composingScene ? (
