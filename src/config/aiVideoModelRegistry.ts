@@ -179,8 +179,6 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
       i2v: true,
       v2v: true,
       audio: true,
-      multiRef: true,
-      maxReferences: 30,
       maxReferenceVideos: 10,
       maxReferenceAudios: 10,
       refAudio: true,
@@ -288,7 +286,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     icon: Film,
     // kwaivgi/kling-v3-omni-video: duration 3-15, generate_audio + dialog,
     // reference_images (max 7, max 4 with a reference_video) and reference_video.
-    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true, anchorOnly: true, multiRef: true, maxReferences: 7 },
+    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true, anchorOnly: true, maxReferences: 7 },
     costPerSecond: KLING_VIDEO_MODELS['kling-omni'].costPerSecond,
     badge: 'Lip-Sync EN',
     tagline: 'Native Lip-Sync EN · DE/ES silent-only',
@@ -308,8 +306,6 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     // reference_images 1-3 — provider honours them only at 16:9 + 8 s.
     capabilities: {
       t2v: true, i2v: true, audio: true, nativeDialogue: true,
-      multiRef: true, maxReferences: 3,
-      refRequires: { aspectRatios: ['16:9'], durations: [8] },
     },
     costPerSecond: VEO_VIDEO_MODELS['veo-3.1-lite-720p'].costPerSecond,
     badge: 'Native Audio',
@@ -326,8 +322,6 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     icon: Volume2,
     capabilities: {
       t2v: true, i2v: true, audio: true, nativeDialogue: true,
-      multiRef: true, maxReferences: 3,
-      refRequires: { aspectRatios: ['16:9'], durations: [8] },
     },
     costPerSecond: VEO_VIDEO_MODELS['veo-3.1-fast'].costPerSecond,
     tagline: tx({ de: 'Schnell · 1080p · Audio', en: 'Fast · 1080p · audio', es: 'Rápido · 1080p · audio' }),
@@ -343,8 +337,6 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     icon: Volume2,
     capabilities: {
       t2v: true, i2v: true, audio: true, nativeDialogue: true,
-      multiRef: true, maxReferences: 3,
-      refRequires: { aspectRatios: ['16:9'], durations: [8] },
     },
     costPerSecond: VEO_VIDEO_MODELS['veo-3.1-pro'].costPerSecond,
     badge: 'Premium',
@@ -618,7 +610,7 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     icon: Film,
     // Runway Gen-4 Aleph consumes at most 5 s of the source clip per call and
     // accepts one optional reference image.
-    capabilities: { t2v: false, i2v: false, v2v: true, audio: false, multiRef: true, maxReferences: 1 },
+    capabilities: { t2v: false, i2v: false, v2v: true, audio: false, maxReferences: 1 },
     costPerSecond: { EUR: 0.18, USD: 0.18 },
     badge: 'V2V Specialist',
     tagline: 'Restyle & transform existing clips',
