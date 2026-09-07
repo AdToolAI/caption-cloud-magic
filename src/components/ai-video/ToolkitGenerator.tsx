@@ -1569,7 +1569,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           };
 
           return (
-            <div className="sm:col-span-3 space-y-3 p-3 rounded-md bg-primary/5 border border-primary/30">
+            <div className="space-y-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary" />
