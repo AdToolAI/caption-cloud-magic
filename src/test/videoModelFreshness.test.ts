@@ -3,10 +3,16 @@ import {
   VIDEO_MODEL_SPECS,
   VIDEO_MODEL_ALIASES,
   ALIAS_SOURCE_FAMILY,
+  VIDEO_MODEL_CANDIDATES,
+  getVideoModelCandidate,
+  resolveRouteIdentity,
+  isSingleProviderSlug,
   getVideoModelSpec,
   getModeSpec,
   isResolutionTierAvailable,
   resolveVideoModelId,
+  resolveGenerationMode,
+  validateCapability,
 } from '@/config/videoModelSpecs';
 
 /**
@@ -26,7 +32,8 @@ describe('video model freshness audit — invariants', () => {
     expect(spec!.releaseStatus).toBe('removed');
     expect(spec!.deprecated).toBe(true);
     expect(spec!.available).toBe(false);
-    expect(spec!.supersededBy).toBe('runway-aleph-2');
+    expect(spec!.supersededBy).toBeUndefined();
+    expect(spec!.supersededByCandidate).toBe('runway-aleph-2');
     expect(startableTiers('runway-gen4-aleph')).toHaveLength(0);
   });
 
@@ -44,14 +51,82 @@ describe('video model freshness audit — invariants', () => {
     }
   });
 
-  it('newly prepared specs are locked: unavailable and without startable tiers', () => {
-    for (const id of ['runway-aleph-2', 'hailuo-h3', 'seedance-2-0-mini', 'ltx-2-5-fast', 'happyhorse-1-1']) {
+  it('unverified successors live in the candidate registry, not in the canonical specs', () => {
+    for (const id of ['runway-aleph-2', 'seedance-2-0-mini', 'ltx-2-5-fast', 'happyhorse-1-1', 'wan-3-0']) {
+      expect(getVideoModelSpec(id), `${id} must not be a canonical spec`).toBeUndefined();
+      const candidate = getVideoModelCandidate(id);
+      expect(candidate, `${id} missing from candidate registry`).toBeDefined();
+      expect(candidate!.unknowns.length).toBeGreaterThan(0);
+      expect(candidate!.sourceUrl).toMatch(/^https:\/\//);
+    }
+  });
+
+  it('candidates are never startable through the canonical lookup', () => {
+    for (const candidate of VIDEO_MODEL_CANDIDATES) {
+      expect(getVideoModelSpec(candidate.id)).toBeUndefined();
+      expect(VIDEO_MODEL_ALIASES[candidate.id]).toBeUndefined();
+    }
+  });
+
+  it('candidate slugs, when present, are single concrete slugs', () => {
+    for (const candidate of VIDEO_MODEL_CANDIDATES) {
+      if (!candidate.providerModelSlug) continue;
+      expect(isSingleProviderSlug(candidate.providerModelSlug), candidate.id).toBe(true);
+    }
+  });
+
+  it('route-verified locked specs stay locked and carry an audit trail', () => {
+    for (const id of ['hailuo-h3']) {
       const spec = getVideoModelSpec(id);
       expect(spec, `${id} missing`).toBeDefined();
       expect(spec!.available, `${id} must stay locked`).toBe(false);
       expect(startableTiers(id), `${id} must have no startable tier`).toHaveLength(0);
       expect(spec!.verificationSourceUrl).toMatch(/^https:\/\//);
       expect(spec!.verificationNotes.length).toBeGreaterThan(20);
+    }
+  });
+
+  it('no canonical spec documents a value as UNKNOWN and asserts it structurally', () => {
+    for (const spec of VIDEO_MODEL_SPECS) {
+      const notes = spec.verificationNotes.toUpperCase();
+      expect(notes.includes('UNBEKANNT') || notes.includes('UNKNOWN'), `${spec.id} keeps UNKNOWN values in a canonical spec`).toBe(false);
+    }
+  });
+
+  it('providerModelSlug is always exactly one concrete slug', () => {
+    for (const spec of VIDEO_MODEL_SPECS) {
+      expect(isSingleProviderSlug(spec.providerModelSlug), `${spec.id}: composite slug`).toBe(true);
+      for (const m of spec.modes) {
+        if (m.providerModelSlug) {
+          expect(isSingleProviderSlug(m.providerModelSlug), `${spec.id}/${m.mode}: composite slug`).toBe(true);
+        }
+        const identity = resolveRouteIdentity(spec, m.mode);
+        expect(identity.providerModelSlug).toBeTruthy();
+        expect(identity.apiRoute).toBeTruthy();
+        expect(identity.region).toBeTruthy();
+      }
+    }
+  });
+
+  it('Wan 2.7 t2v and i2v keep distinct route identities', () => {
+    for (const id of ['wan-2-7-standard', 'wan-2-7-pro']) {
+      const spec = getVideoModelSpec(id)!;
+      const t2v = resolveRouteIdentity(spec, 't2v');
+      const i2v = resolveRouteIdentity(spec, 'i2v');
+      expect(t2v.providerModelSlug).toBe('wan-video/wan-2.7-t2v');
+      expect(i2v.providerModelSlug).toBe('wan-video/wan-2.7-i2v');
+      expect(t2v.providerModelSlug).not.toBe(i2v.providerModelSlug);
+    }
+  });
+
+  it('every new (non-grandfathered) tier without smoke test is unavailable', () => {
+    for (const spec of VIDEO_MODEL_SPECS) {
+      for (const m of spec.modes) {
+        for (const tier of m.resolutions) {
+          if (tier.grandfathered || tier.smokeTest) continue;
+          expect(tier.available, `${spec.id}/${m.mode}/${tier.label} new tier must be locked`).toBe(false);
+        }
+      }
     }
   });
 
@@ -90,15 +165,26 @@ describe('video model freshness audit — invariants', () => {
     }
   });
 
-  it('Hailuo 2.3 offers no end-frame mode (route has no last_frame_image)', () => {
+  it('Hailuo 2.3 declares no end-frame input anywhere (route has no last_frame_image)', () => {
     for (const id of ['hailuo-standard', 'hailuo-pro']) {
       const spec = getVideoModelSpec(id)!;
-      const modes = spec.modes.map((m) => m.mode);
-      expect(modes).not.toContain('firstLast');
-      expect(modes).not.toContain('lastFrame');
+      expect(spec.modes.some((m) => m.mode === 'firstLast')).toBe(false);
       for (const m of spec.modes) {
-        expect(m.inputs.lastFrame).toBeFalsy();
+        expect(m.inputs.lastFrame, `${id}/${m.mode}`).toBeFalsy();
       }
+    }
+  });
+
+  it('an end image on Hailuo 2.3 resolves to a mode the spec does not have, so the gate rejects it', () => {
+    for (const id of ['hailuo-standard', 'hailuo-pro']) {
+      const spec = getVideoModelSpec(id)!;
+      const endOnly = resolveGenerationMode(id, { hasLastFrame: true });
+      expect(getModeSpec(spec, endOnly)).toBeUndefined();
+      expect(validateCapability({ modelId: id, mode: endOnly })?.field).toBe('mode');
+
+      const paired = resolveGenerationMode(id, { hasFirstFrame: true, hasLastFrame: true });
+      expect(getModeSpec(spec, paired)).toBeUndefined();
+      expect(validateCapability({ modelId: id, mode: paired })?.field).toBe('mode');
     }
   });
 
