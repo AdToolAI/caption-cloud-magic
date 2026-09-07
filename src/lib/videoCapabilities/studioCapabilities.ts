@@ -330,8 +330,8 @@ export function validateStudioSelection(sel: StudioSelection): CapabilityViolati
 }
 
 /**
- * Mode the studio is generating in, derived from the inputs actually attached.
- * Kept here so the UI and the capability lookup can never disagree.
+ * Mode the studio is generating in, derived STRICTLY from the inputs actually
+ * attached. Never adjusted to what a model happens to support.
  */
 export function deriveStudioMode(inputs: {
   hasStartImage?: boolean;
@@ -347,7 +347,7 @@ export function deriveStudioMode(inputs: {
 }
 
 /**
- * Mode the studio is generating in, derived STRICTLY from the attached inputs.
+ * Does this model expose that mode at all?
  * There is deliberately no `resolveSupportedMode()` any more: if the derived
  * mode does not exist for the chosen model, `getStudioCapabilities()` returns
  * unsupported and `validateStudioSelection()` reports a `mode` violation. The
