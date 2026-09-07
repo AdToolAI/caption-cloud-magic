@@ -322,7 +322,12 @@ export function EnhanceVideoPanel({
   const interpolationApplies = topazEngine && topazInterpolationAppliesView(sourceFps, fps);
 
 
-  const config: EnhanceConfig | null = model
+  // A mode always belongs to ONE engine. Right after an engine switch the mode
+  // state still holds the previous engine's value for one render — no order is
+  // built from that, so no estimate is ever sent for an impossible pair.
+  const modeBelongsToModel = !!model && model.processingModes.some((m) => m.id === mode);
+
+  const config: EnhanceConfig | null = model && modeBelongsToModel
     ? {
         modelId: model.id,
         mode,
@@ -337,6 +342,7 @@ export function EnhanceVideoPanel({
 
       }
     : null;
+
 
 
   useEffect(() => {
