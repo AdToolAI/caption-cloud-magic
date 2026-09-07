@@ -774,6 +774,7 @@ export type Database = {
           parity_api_route: string | null
           parity_mode: string | null
           parity_model_id: string | null
+          parity_provider_model_slug: string | null
           parity_region: string | null
           parity_resolution_label: string | null
           prompt: string
@@ -816,6 +817,7 @@ export type Database = {
           parity_api_route?: string | null
           parity_mode?: string | null
           parity_model_id?: string | null
+          parity_provider_model_slug?: string | null
           parity_region?: string | null
           parity_resolution_label?: string | null
           prompt: string
@@ -858,6 +860,7 @@ export type Database = {
           parity_api_route?: string | null
           parity_mode?: string | null
           parity_model_id?: string | null
+          parity_provider_model_slug?: string | null
           parity_region?: string | null
           parity_resolution_label?: string | null
           prompt?: string
@@ -18932,6 +18935,8 @@ export type Database = {
           mode: string
           model_id: string
           parity_status: string
+          provider_model_slug: string | null
+          provider_slug_key: string
           region: string
           resolution_label: string
           tier_disabled: boolean
@@ -18944,6 +18949,8 @@ export type Database = {
           mode?: string
           model_id: string
           parity_status?: string
+          provider_model_slug?: string | null
+          provider_slug_key?: string
           region?: string
           resolution_label: string
           tier_disabled?: boolean
@@ -18956,6 +18963,8 @@ export type Database = {
           mode?: string
           model_id?: string
           parity_status?: string
+          provider_model_slug?: string | null
+          provider_slug_key?: string
           region?: string
           resolution_label?: string
           tier_disabled?: boolean
