@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { VisualInputProfile } from '@/lib/composer/visualInputs/types';
-import { getModelCapabilityUnion } from '@/lib/videoCapabilities/studioCapabilities';
+import { getModelCapabilityUnion, referenceModeRequirement } from '@/lib/videoCapabilities/studioCapabilities';
 
 
 import { KLING_VIDEO_MODELS } from './klingVideoCredits';
