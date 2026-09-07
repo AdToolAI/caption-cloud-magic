@@ -1269,14 +1269,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               : 'Describe your video … use @character and @location from your library'
           }
           rows={4}
+          extraMentions={uploadMentions.map((m) => ({
+            token: m.token,
+            name: m.name,
+            thumbnail: m.thumbnail,
+            description: tx({ de: 'Dein Upload', en: 'Your upload', es: 'Tu subida' }),
+          }))}
         />
         <p className="mt-1.5 text-[10px] text-muted-foreground/80 italic">
-          {language === 'de'
-            ? tx({ de: 'ℹ️ Tippe @ um Charaktere & Locations aus deiner Library zu taggen.', en: 'ℹ️ Type @ to tag characters & locations from your Library.', es: 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones de tu Biblioteca.' })
-            : language === 'es'
-            ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones de tu biblioteca.'
-            : 'ℹ️ Type @ to tag characters & locations from your library.'}
+          {uploadMentions.length > 0
+            ? tx({
+                de: `ℹ️ Tippe @ für Charaktere & Locations aus deiner Library — und für deine Uploads (${uploadMentions.map((m) => `@${m.token}`).join(', ')}).`,
+                en: `ℹ️ Type @ for characters & locations from your library — and for your uploads (${uploadMentions.map((m) => `@${m.token}`).join(', ')}).`,
+                es: `ℹ️ Escribe @ para personajes y ubicaciones de tu biblioteca — y para tus subidas (${uploadMentions.map((m) => `@${m.token}`).join(', ')}).`,
+              })
+            : tx({ de: 'ℹ️ Tippe @ um Charaktere & Locations aus deiner Library zu taggen.', en: 'ℹ️ Type @ to tag characters & locations from your Library.', es: 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones de tu Biblioteca.' })}
         </p>
+
       </Card>
 
       {/* ── Kompakte Einstellungsleiste (Dauer · Format · Qualität · Ton) ── */}
