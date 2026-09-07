@@ -241,10 +241,13 @@ serve(async (req) => {
       supabaseAdmin,
       {
         modelId: model,
+        // Route truth: q3-pro/q3-turbo accept exactly ONE image input
+        // (`start_image`, optionally paired with `end_image`). Extra uploads are
+        // AdTool prompt-assistance, never provider references — so the mode is
+        // resolved from the image that is really sent, not from the upload count.
         mode: inferMode({ modelId: model,
-          startImageUrl,
+          startImageUrl: startImageUrl ?? (Array.isArray(referenceImages) ? referenceImages[0] : undefined),
           endImageUrl,
-          referenceImageUrls: Array.isArray(referenceImages) ? referenceImages : null,
         }),
         resolution: requestedResolution,
         durationSeconds: duration,
