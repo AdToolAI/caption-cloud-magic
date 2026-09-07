@@ -67,3 +67,24 @@ describe('runtime estimate formatting', () => {
     expect(formatElapsed(9)).toBe('0:09');
   });
 });
+
+describe('real person image gate', () => {
+  it('classifies the ByteDance privacy rejection', () => {
+    expect(
+      classifyVideoError(
+        "InputImageSensitiveContentDetected.PrivacyInformation: input image 'content[1]' may contain real person",
+      ),
+    ).toBe('real_person_image');
+  });
+
+  it('does not fall through to generic moderation', () => {
+    expect(classifyVideoError('portrait rights violation')).toBe('real_person_image');
+    expect(classifyVideoError('flagged by content policy')).toBe('moderation');
+  });
+
+  it('explains the fix and the refund', () => {
+    const msg = friendlyVideoErrorMessage('InputImageSensitiveContentDetected.PrivacyInformation');
+    expect(msg.length).toBeGreaterThan(30);
+    expect(msg).not.toContain('InputImage');
+  });
+});
