@@ -2029,11 +2029,13 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
   },
 
   /* ──────── Neue Provider-Generationen: vorbereitet, GESPERRT (Phase E) ─────────
-   * Alle folgenden Specs: available = false, alle Tiers via newTier() =>
-   * grandfathered false, parityStatus UNVERIFIED, kein Smoke-Test-Beleg.
-   * Sie sind damit weder in der UI wählbar noch server-seitig startbar und
-   * dienen ausschließlich als maschinenlesbarer Audit-Stand.
+   * Ein Spec steht hier NUR, wenn Slug, Route, Modi und Input-Schema durch die
+   * konkrete Routen-Doku belegt sind. Alles andere gehört in
+   * VIDEO_MODEL_CANDIDATES — locked ist keine Erlaubnis, Werte zu raten.
+   * Alle Tiers via newTier() => grandfathered false, UNVERIFIED, kein
+   * Smoke-Test-Beleg; damit weder in der UI wählbar noch startbar.
    * ------------------------------------------------------------------------- */
+
   {
     id: 'hailuo-h3',
     displayName: 'Hailuo H3',
