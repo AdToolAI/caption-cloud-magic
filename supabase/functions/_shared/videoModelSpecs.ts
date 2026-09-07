@@ -898,8 +898,10 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         constraints: [
           {
             reason:
-              'Kling 3.0 Omni: generate_audio und reference_video schließen sich aus. Mit Referenzvideo max. 4 Referenzbilder (sonst 7); Referenzvideo 3–10 s.',
+              'Kling 3.0 Omni: generate_audio und reference_video schließen sich aus. Mit Referenzvideo max. 4 Referenzbilder (sonst 7); Referenzvideo 3–10 s. ' +
+              'Routen-Regel 07.09.2026: "4K does not support reference_video" — auf diesem Modus existiert daher kein 4K-Tier (max. 1080p/pro).',
           },
+
         ],
       }),
     ],
