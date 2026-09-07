@@ -278,3 +278,105 @@ Formale Paritäts-Identität ist ab jetzt
 - Kill-Switch, Paritäts-Lookup und Upsert sind slug-scoped; der Upsert ist bewusst durch
   select→update/insert ersetzt, damit die Identität nicht über eine generierte Spalte
   inferiert werden muss.
+
+## Pre-Smoke-Audit 07.09.2026 (kostenlos, keine Provider-Generierung)
+
+Quelle für alles Folgende: `GET https://api.replicate.com/v1/models/<slug>` (offizielles
+`openapi_schema` der EXAKTEN Route) plus die Preistabelle auf der jeweiligen Replicate-Modellseite,
+beide am 07.09.2026 gelesen. Keine Marketing-Seite, keine Drittquelle.
+
+### 1. Kling 3.0 Omni — Freshness-Korrektur (`kwaivgi/kling-v3-omni-video`)
+
+Schema-Auszug: `mode ∈ {standard, pro, 4k}` (default `pro`), Beschreibung wörtlich
+„'standard' generates 720p, 'pro' generates 1080p, '4k' generates 4K. 4K does not support reference_video."
+
+| Frage | Antwort aus dem Route-Schema |
+| --- | --- |
+| 4K bei T2V | ja (mode ist input-unabhängig) |
+| 4K bei I2V (`start_image`) | ja |
+| 4K bei Referenzbildern (`reference_images`) | ja (max. 7 ohne Video) |
+| 4K bei Referenzvideo (`reference_video`) | **nein — explizit ausgeschlossen** |
+| Dauer | `duration` 3–15 s, default 5; keine 4K-spezifische Einschränkung dokumentiert |
+| Aspect Ratio | `16:9 / 9:16 / 1:1`; keine 4K-spezifische Einschränkung dokumentiert |
+| Audio | `generate_audio` default false; **exklusiv zu `reference_video`** (unabhängig von 4K) |
+| Exakte Pixel für 4K | **nicht dokumentiert** → `sizingRuleVerified = false` |
+
+Umsetzung: 4K ist als NEUES GESPERRTES Tier (`kling-omni-4k`) auf `t2v`, `i2v`, `reference`
+hinterlegt — `available:false`, `grandfathered:false`, `parityStatus:UNVERIFIED`, kein SmokeTest.
+Auf `v2v` existiert bewusst kein 4K-Tier. Keine Übertragung von/auf `kwaivgi/kling-v3-video`.
+
+### 2. Seedance 2.0 — exakter Test-Input-Vertrag (`bytedance/seedance-2.0`)
+
+`resolution ∈ {480p, 720p, 1080p, 4k}` (default `720p`) · `aspect_ratio ∈ {16:9, 4:3, 1:1, 3:4, 9:16, 21:9, 9:21, adaptive}`
+(default `16:9`) · `duration` integer 3–15, default 5, `-1` = intelligente Dauer ·
+`generate_audio` default **true** · `seed` optional · `prompt` das einzige Pflichtfeld für T2V ·
+4K-Ausgabe laut Schema „10-bit H.265/HEVC at high bitrate".
+
+Test-Payloads (noch NICHT ausgeführt):
+
+```json
+A) {"prompt":"<neutral test prompt>","resolution":"1080p","aspect_ratio":"16:9","duration":5,"generate_audio":false,"seed":12345}
+B) {"prompt":"<neutral test prompt>","resolution":"4k","aspect_ratio":"16:9","duration":5,"generate_audio":false,"seed":12345}
+```
+
+`generate_audio:false` wird bewusst explizit gesetzt (Default wäre true) — Audio ist auf dieser Route
+canonical noch nicht abgebildet und darf das Messergebnis nicht verunklaren. Der Preis hängt NICHT vom
+Audio-Flag ab (siehe unten). Kein DOCS_CONFLICT für diese beiden Tiers.
+
+### 3. Kling 3.0 — exakter 4K-Test-Vertrag (`kwaivgi/kling-v3-video`)
+
+`mode ∈ {standard, pro, 4k}` · `aspect_ratio ∈ {16:9, 9:16, 1:1}` (bei `start_image` ignoriert) ·
+`duration` 3–15, default 5 · `generate_audio` default false · `negative_prompt` optional.
+
+```json
+C) {"prompt":"<neutral test prompt>","mode":"4k","aspect_ratio":"16:9","duration":5,"generate_audio":false}
+```
+
+Exakte 4K-Pixel sind auch hier nicht dokumentiert → `sizingRuleVerified` bleibt false, bis der
+Smoke-Test die Frames misst.
+
+### 4. Exakte aktuelle Provider-Preise (Replicate-Preistabelle, 07.09.2026)
+
+`bytedance/seedance-2.0`, Preis pro Sekunde Ausgabevideo, gestaffelt nach Auflösung und danach,
+ob ein Video als Input mitgeht (`video_in` vs. `non_video_in`):
+
+| Auflösung | non_video_in | video_in |
+| --- | --- | --- |
+| 480p | $0.08 | $0.10 |
+| 720p | $0.18 | $0.22 |
+| 1080p | $0.45 | $0.55 |
+| 4K | $1.00 | $1.25 |
+
+`kwaivgi/kling-v3-video` bzw. `kwaivgi/kling-v3-omni-video`, pro Sekunde:
+
+| Variante | kling-v3-video | kling-v3-omni-video |
+| --- | --- | --- |
+| standard ohne Audio | $0.168 | $0.168 |
+| standard mit Audio | $0.252 | $0.224 |
+| pro ohne Audio | $0.224 | $0.224 |
+| pro mit Audio | $0.336 | $0.280 |
+| 4k ohne Audio | $0.42 | $0.42 |
+| 4k mit Audio | $0.42 | $0.42 |
+
+### 5. Minimaler bezahlter Smoke-Test-Batch (vorbereitet, NICHT ausgeführt)
+
+| # | Modell | Slug | Modus | Auflösung | Dauer | Ratio | Audio | Preisformel | Erwartete Kosten | Konservatives Maximum | Warum nötig |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Seedance 2.0 | `bytedance/seedance-2.0` | t2v | 1080p | 5 s | 16:9 | aus | $0.45 × s (non_video_in) | $2.25 | $2.70 | günstigster Nachweis für ein gesperrtes Tier; misst echte Pixel |
+| 2 | Kling 3.0 | `kwaivgi/kling-v3-video` | t2v | 4K | 5 s | 16:9 | aus | $0.42 × s | $2.10 | $2.52 | einziger nativer 4K-Modus der Kling-Standardroute |
+| 3 | Seedance 2.0 | `bytedance/seedance-2.0` | t2v | 4K | 5 s | 16:9 | aus | $1.00 × s (non_video_in) | $5.00 | $6.00 | teuerstes Tier; HEVC/10-bit-Ausgabe muss unsere Pipeline überstehen |
+
+**Summe erwartet: $9.35 · konservatives Maximum (20 % Puffer): $11.22.**
+**Empfohlene harte Ausgabengrenze für diesen Batch: $15** (deckt genau einen Wiederholungslauf des
+teuersten Falls ab). Kling 3.0 Omni 4K ist bewusst NICHT im ersten Batch: erst nachdem die
+Standardroute 4K bestätigt hat (+$2.10, gleiche Formel).
+
+Bei 3 s statt 5 s wäre der Batch $5.61 — bewusst nicht gewählt, weil 5 s der Provider-Default ist
+und näher am echten Kundenverhalten misst.
+
+### 6. Weiterhin ausgeschlossen
+
+- **Hailuo H3**: `GET /v1/models/minimax/hailuo-h3` liefert `{"detail":"Model not found."}` — die Route
+  existiert unter diesem Slug nicht, Preis unbekannt. Status: **ROUTE/PRICING AUDIT REQUIRED**, bleibt gesperrt.
+- **Candidate-Modelle** (`runway-aleph-2`, `seedance-2-0-mini`, `ltx-2-5-fast`, `happyhorse-1-1`, `wan-3-0`):
+  Route/Schema/Preis ungeklärt, kein Smoke-Test, bleiben außerhalb der kanonischen Registry.
