@@ -368,7 +368,7 @@ serve(async (req) => {
       .from("video_enhance_runs")
       .select("id, staging_key")
       .not("staging_key", "is", null)
-      .in("status", ["provider_failed", "provider_cancelled_confirmed", "manual_review"])
+      .in("status", ["provider_failed", "output_lost", "provider_cancelled_confirmed", "manual_review"])
       .lt("updated_at", cleanupBefore)
       .limit(BATCH_SIZE);
 

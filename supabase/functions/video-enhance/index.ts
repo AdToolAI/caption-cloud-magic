@@ -281,7 +281,7 @@ serve(async (req) => {
         .from("video_enhance_runs")
         .select("*")
         .eq("user_id", user.id)
-        .not("status", "in", "(completed,provider_failed,provider_cancelled_confirmed,manual_review)")
+        .not("status", "in", "(completed,provider_failed,output_lost,provider_cancelled_confirmed,manual_review)")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -318,7 +318,7 @@ serve(async (req) => {
         .from("video_enhance_runs")
         .update({ status: "cancel_requested", cancel_requested_at: new Date().toISOString() })
         .eq("id", run.id)
-        .not("status", "in", "(completed,provider_failed,provider_cancelled_confirmed)");
+        .not("status", "in", "(completed,provider_failed,output_lost,provider_cancelled_confirmed)");
 
       const providerId: string | null = run.provider_prediction_id ?? null;
       if (providerId?.startsWith("topaz:")) {

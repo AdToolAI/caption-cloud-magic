@@ -146,7 +146,7 @@ serve(async (req) => {
     const apiKey = Deno.env.get("REPLICATE_API_KEY");
     if (!apiKey) return json({ error: "REPLICATE_API_KEY not configured" }, 500);
 
-    if (["completed", "provider_failed", "provider_cancelled_confirmed"].includes(run.status)) {
+    if (["completed", "provider_failed", "output_lost", "provider_cancelled_confirmed"].includes(run.status)) {
       // Already terminal — but an authoritative cost arriving late must be
       // trued up IMMEDIATELY, not at the next scheduled scan.
       if (
@@ -215,7 +215,7 @@ serve(async (req) => {
           next_reconcile_at: null,
         })
         .eq("id", run.id)
-        .not("status", "in", "(completed,provider_failed,provider_cancelled_confirmed)");
+        .not("status", "in", "(completed,provider_failed,output_lost,provider_cancelled_confirmed)");
       return json({ ok: true, status: "provider_output_ready" });
 
     }
