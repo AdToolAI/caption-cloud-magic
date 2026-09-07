@@ -9,6 +9,7 @@ import { tx } from '@/lib/i18nText';
 export type VideoErrorKind =
   | 'overloaded'
   | 'timeout'
+  | 'real_person_image'
   | 'moderation'
   | 'invalid_input'
   | 'rate_limit'
@@ -20,6 +21,20 @@ export function classifyVideoError(errorMessage: string | null | undefined): Vid
   if (!errorMessage) return 'unknown';
   const raw = errorMessage.toLowerCase();
 
+  // Provider privacy gate on uploaded images (ByteDance/Seedance:
+  // `InputImageSensitiveContentDetected.PrivacyInformation`). Checked before
+  // the generic moderation branch — the fix is a different image, not a
+  // different prompt.
+  if (
+    raw.includes('inputimagesensitivecontentdetected') ||
+    raw.includes('privacyinformation') ||
+    raw.includes('may contain real person') ||
+    raw.includes('real person') ||
+    raw.includes('portrait right') ||
+    raw.includes('celebrity')
+  ) {
+    return 'real_person_image';
+  }
   if (
     raw.includes('high load') ||
     raw.includes('high demand') ||
@@ -47,6 +62,7 @@ export function classifyVideoError(errorMessage: string | null | undefined): Vid
   ) {
     return 'moderation';
   }
+
   if (
     raw.includes('invalid input') ||
     raw.includes('invalid_request') ||
@@ -105,7 +121,14 @@ export function friendlyVideoErrorMessage(errorMessage: string | null | undefine
         en: `The provider took too long and cancelled the job. ${REFUND.en} A shorter video or a new attempt usually works.`,
         es: `El proveedor tardó demasiado y canceló el trabajo. ${REFUND.es} Un vídeo más corto o un nuevo intento suele funcionar.`,
       });
+    case 'real_person_image':
+      return tx({
+        de: `Der Anbieter erlaubt keine Fotos echter Personen als Bildvorlage. ${REFUND.de} Nutze ein KI-erzeugtes Charakterbild aus deiner Library oder beschreibe die Person nur im Text.`,
+        en: `The provider does not allow photos of real people as image input. ${REFUND.en} Use an AI-generated character image from your library, or describe the person in text only.`,
+        es: `El proveedor no permite fotos de personas reales como imagen de referencia. ${REFUND.es} Usa una imagen de personaje generada por IA de tu biblioteca o describe a la persona solo con texto.`,
+      });
     case 'moderation':
+
       return tx({
         de: `Der Anbieter hat diesen Inhalt abgelehnt (Inhaltsprüfung). ${REFUND.de} Bitte formuliere die Beschreibung um oder nutze ein anderes Bild.`,
         en: `The provider rejected this content (content review). ${REFUND.en} Please rephrase the description or use a different image.`,

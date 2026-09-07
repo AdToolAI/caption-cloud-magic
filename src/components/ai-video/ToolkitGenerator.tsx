@@ -48,6 +48,9 @@ import { QuickSettingsBar } from './generate/QuickSettingsBar';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
+import { extractEdgeErrorMessage } from '@/lib/edgeFunctionError';
+import { friendlyVideoErrorMessage } from '@/lib/videoErrorMessages';
+
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters } from '@/hooks/useBrandCharacters';
 import type { ShotSelection } from '@/config/shotDirector';
@@ -505,6 +508,54 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
    * capability violation below names the real `mode` conflict.
    */
   const placedEndImage = !!startImageUrl && referencePlacement === 'end';
+
+  /* ── @-mentionable uploads ────────────────────────────────────────────
+   * The images the user just attached are taggable in the prompt so they can
+   * say *which* upload a sentence refers to. Tokens are replaced with a plain
+   * English phrase before the prompt leaves the client — providers never see
+   * a raw `@token`.
+   */
+  const uploadMentions = useMemo(() => {
+    const list: { token: string; name: string; phrase: string; thumbnail: string | null }[] = [];
+    if (startImageUrl) {
+      const end = referencePlacement === 'end';
+      list.push({
+        token: end ? 'end-image' : 'start-image',
+        name: end
+          ? tx({ de: 'Endbild', en: 'End image', es: 'Imagen final' })
+          : tx({ de: 'Startbild', en: 'Start image', es: 'Imagen inicial' }),
+        phrase: end ? 'the uploaded end image' : 'the uploaded start image',
+        thumbnail: startImageUrl,
+      });
+    }
+    viduReferences.forEach((slot, i) => {
+      list.push({
+        token: `ref-${i + 1}`,
+        name: tx({ de: `Referenz ${i + 1}`, en: `Reference ${i + 1}`, es: `Referencia ${i + 1}` }),
+        phrase: `reference image ${i + 1}`,
+        thumbnail: slot.url,
+      });
+    });
+    if (referenceVideoUrl) {
+      list.push({
+        token: 'ref-video',
+        name: tx({ de: 'Referenzvideo', en: 'Reference video', es: 'Vídeo de referencia' }),
+        phrase: 'the uploaded reference video',
+        thumbnail: null,
+      });
+    }
+    return list;
+  }, [startImageUrl, referencePlacement, viduReferences, referenceVideoUrl]);
+
+  const resolveUploadMentions = useCallback(
+    (text: string): string =>
+      uploadMentions.reduce(
+        (acc, m) => acc.replace(new RegExp(`@${m.token}\\b`, 'gi'), m.phrase),
+        text,
+      ),
+    [uploadMentions],
+  );
+
   const studioMode = useMemo(
     () => deriveStudioMode({
       modelId: model.id,
@@ -776,7 +827,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       const ambientOnlySuffix = dialogueSuppressed
         ? 'IMPORTANT: Do NOT generate any spoken dialogue, narration, voiceover, or lip-synced speech. Characters must remain silent — closed or naturally resting mouths, no lip movement matching speech. The audio track should contain ONLY ambient environmental sound, room tone, or subtle background music appropriate for the scene. No singing, no whispering, no non-verbal vocalizations that imply language.'
         : '';
-      const proseFinalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix, spokenLangSuffix, ambientOnlySuffix, noTextSuffix]
+      const proseFinalPrompt = [resolveUploadMentions(mentionResolved.prompt), shotSuffix, brandSuffix, castSuffix, spokenLangSuffix, ambientOnlySuffix, noTextSuffix]
         .filter(Boolean)
         .join('\n\n');
 
@@ -1079,8 +1130,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       }
 
       const { data, error } = await supabase.functions.invoke(model.edgeFunction, { body });
-      if (error) throw error;
+      if (error) throw new Error(await extractEdgeErrorMessage(error));
       if (data?.error) throw new Error(data.error);
+
 
       // Track Brand Character usage for analytics & usage_count increment
       if (brandCharacter) {
@@ -1108,7 +1160,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       refetchWallet();
       onAfterGenerate?.();
     } catch (err: any) {
-      toast.error(err?.message ?? tx({ de: tx({ de: "Generierung fehlgeschlagen", en: "Generation failed", es: "Error al generar" }), en: 'Generation failed', es: 'Error en la generación' }));
+      toast.error(friendlyVideoErrorMessage(err?.message));
+
     } finally {
       setGenerating(false);
     }
@@ -1216,14 +1269,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               : 'Describe your video … use @character and @location from your library'
           }
           rows={4}
+          extraMentions={uploadMentions.map((m) => ({
+            token: m.token,
+            name: m.name,
+            thumbnail: m.thumbnail,
+            description: tx({ de: 'Dein Upload', en: 'Your upload', es: 'Tu subida' }),
+          }))}
         />
         <p className="mt-1.5 text-[10px] text-muted-foreground/80 italic">
-          {language === 'de'
-            ? tx({ de: 'ℹ️ Tippe @ um Charaktere & Locations aus deiner Library zu taggen.', en: 'ℹ️ Type @ to tag characters & locations from your Library.', es: 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones de tu Biblioteca.' })
-            : language === 'es'
-            ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones de tu biblioteca.'
-            : 'ℹ️ Type @ to tag characters & locations from your library.'}
+          {uploadMentions.length > 0
+            ? tx({
+                de: `ℹ️ Tippe @ für Charaktere & Locations aus deiner Library — und für deine Uploads (${uploadMentions.map((m) => `@${m.token}`).join(', ')}).`,
+                en: `ℹ️ Type @ for characters & locations from your library — and for your uploads (${uploadMentions.map((m) => `@${m.token}`).join(', ')}).`,
+                es: `ℹ️ Escribe @ para personajes y ubicaciones de tu biblioteca — y para tus subidas (${uploadMentions.map((m) => `@${m.token}`).join(', ')}).`,
+              })
+            : tx({ de: 'ℹ️ Tippe @ um Charaktere & Locations aus deiner Library zu taggen.', en: 'ℹ️ Type @ to tag characters & locations from your Library.', es: 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones de tu Biblioteca.' })}
         </p>
+
       </Card>
 
       {/* ── Kompakte Einstellungsleiste (Dauer · Format · Qualität · Ton) ── */}
@@ -1444,6 +1506,22 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           </div>
         )
       )}
+
+      {/* ── Provider privacy gate: ByteDance/Seedance rejects photos of real
+             people as image input. Warn up-front instead of after the run. ── */}
+      {model.family === 'seedance' && (!!startImageUrl || viduReferences.length > 0) && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            {tx({
+              de: `${model.name} lehnt Fotos echter Personen als Bildvorlage ab. Nutze ein KI-erzeugtes Charakterbild aus deiner Library — sonst bricht der Anbieter den Auftrag ab (ohne Kosten).`,
+              en: `${model.name} rejects photos of real people as image input. Use an AI-generated character image from your library — otherwise the provider cancels the job (at no cost).`,
+              es: `${model.name} rechaza fotos de personas reales como imagen de referencia. Usa una imagen de personaje generada por IA de tu biblioteca; de lo contrario el proveedor cancela el trabajo (sin coste).`,
+            })}
+          </span>
+        </div>
+      )}
+
 
       {/* ── Image upload (only for I2V) ── */}
       {model.capabilities.i2v && !omniMediaLock &&
