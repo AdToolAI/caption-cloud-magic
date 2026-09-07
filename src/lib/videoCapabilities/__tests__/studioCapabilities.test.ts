@@ -7,11 +7,20 @@ import {
   validateStudioSelection,
   deriveStudioMode,
   modeSupported,
+  supportsEndOnlyPlacement,
+  supportsFirstLastPair,
+  audioSupportedForMode,
   exactFrame,
   referenceModeRequirement,
 } from '../studioCapabilities';
 import { AI_VIDEO_TOOLKIT_MODELS } from '@/config/aiVideoModelRegistry';
-import { getVideoModelSpec, isResolutionTierAvailable } from '@/config/videoModelSpecs';
+import {
+  VIDEO_MODEL_SPECS,
+  getVideoModelSpec,
+  isResolutionTierAvailable,
+  modeAcceptsEndOnly,
+  resolveGenerationMode,
+} from '@/config/videoModelSpecs';
 
 describe('studio capability selector = canonical registry', () => {
   it('every UI model exists in the canonical registry', () => {
@@ -211,5 +220,80 @@ describe('studio capability selector = canonical registry', () => {
     const meta = AI_VIDEO_TOOLKIT_MODELS.find((m) => m.id === 'veo-3.1-fast')!;
     expect(meta.capabilities.refRequires).toEqual({ aspectRatios: ['16:9'], durations: [8] });
     expect(meta.capabilities.maxReferences).toBe(3);
+  });
+}
+  /* ── Truth gap 1: a single END image is its own mode ── */
+
+  it('an end image without a start image resolves to the lastFrame mode', () => {
+    expect(deriveStudioMode({ modelId: 'luma-standard', hasEndImage: true })).toBe('lastFrame');
+    // never mislabelled as text-to-video or as a first+last pairing
+    expect(deriveStudioMode({ modelId: 'hailuo-02-pro', hasEndImage: true })).toBe('lastFrame');
+    expect(deriveStudioMode({ modelId: 'luma-standard', hasStartImage: true, hasEndImage: true }))
+      .not.toBe('lastFrame');
+  });
+
+  it('end-only placement is only claimed where the registry declares it', () => {
+    for (const spec of VIDEO_MODEL_SPECS) {
+      const declared = spec.modes.some(modeAcceptsEndOnly);
+      expect(supportsEndOnlyPlacement(spec.id), spec.id).toBe(declared);
+      if (supportsEndOnlyPlacement(spec.id)) {
+        expect(modeSupported(spec.id, 'lastFrame'), spec.id).toBe(true);
+      }
+    }
+  });
+
+  it('paired first+last support does not imply end-only support', () => {
+    const pairedOnly = VIDEO_MODEL_SPECS.filter(
+      (s) => supportsFirstLastPair(s.id) && !supportsEndOnlyPlacement(s.id),
+    );
+    expect(pairedOnly.length).toBeGreaterThan(0);
+    for (const s of pairedOnly) {
+      // The studio must block the "at the end" placement for these models.
+      expect(modeSupported(s.id, 'lastFrame'), s.id).toBe(false);
+    }
+  });
+
+  it('the UI registry mirrors end-only, not the weaker lastFrame input', () => {
+    for (const m of AI_VIDEO_TOOLKIT_MODELS) {
+      expect(!!m.capabilities.endFrame, m.id).toBe(supportsEndOnlyPlacement(m.id));
+      expect(!!m.capabilities.firstLastFrame, m.id).toBe(supportsFirstLastPair(m.id));
+    }
+  });
+
+  it('an unsupported end-only request is rejected, never rewritten', () => {
+    const blocked = AI_VIDEO_TOOLKIT_MODELS.find((m) => !m.capabilities.endFrame)!;
+    const violation = validateStudioSelection({ modelId: blocked.id, mode: 'lastFrame' });
+    expect(violation?.field).toBe('mode');
+  });
+
+  it('client and edge resolver agree on every input combination', () => {
+    for (const modelId of ['luma-standard', 'luma-ray32-5s', 'seedance-2-5', 'veo-3.1-fast']) {
+      for (const hasFirstFrame of [false, true]) {
+        for (const hasLastFrame of [false, true]) {
+          const signals = { hasFirstFrame, hasLastFrame };
+          expect(
+            deriveStudioMode({
+              modelId,
+              hasStartImage: hasFirstFrame,
+              hasEndImage: hasLastFrame,
+            }),
+          ).toBe(resolveGenerationMode(modelId, signals));
+        }
+      }
+    }
+  });
+
+  /* ── Truth gap 2: audio is a per-mode fact ── */
+
+  it('audio support is read per mode from the canonical registry', () => {
+    for (const spec of VIDEO_MODEL_SPECS) {
+      for (const mode of spec.modes) {
+        expect(audioSupportedForMode(spec.id, mode.mode), `${spec.id}/${mode.mode}`).toBe(mode.audio);
+      }
+    }
+  });
+
+  it('a mode the model does not have reports no audio', () => {
+    expect(audioSupportedForMode('luma-standard', 'lastFrame')).toBe(false);
   });
 });
