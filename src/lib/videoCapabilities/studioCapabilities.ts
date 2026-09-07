@@ -41,6 +41,7 @@ import {
   type VideoMode,
   type VideoModelSpec,
 } from '@/config/videoModelSpecs';
+import { tx } from '@/lib/i18nText';
 
 export type { VideoMode, PixelFrame, CapabilityViolation, ModeInputs, ModeConstraint };
 
@@ -103,12 +104,24 @@ function lockedReasonFor(spec: VideoModelSpec, tier: ResolutionSpec): string {
   // Rule 3a: a model-level outage is NOT a missing smoke test — name the real
   // release status instead of inventing a tier-level reason.
   if (!spec.available) {
-    return `${spec.displayName}: Modell ist aktuell nicht startbar (Status: ${spec.releaseStatus}).`;
+    return tx({
+      de: `${spec.displayName}: Modell ist aktuell nicht startbar (Status: ${spec.releaseStatus}).`,
+      en: `${spec.displayName}: model cannot be started right now (status: ${spec.releaseStatus}).`,
+      es: `${spec.displayName}: el modelo no se puede iniciar ahora mismo (estado: ${spec.releaseStatus}).`,
+    });
   }
   if (!tier.available) {
-    return `${tier.label}: Tier ist gesperrt, bis ein Smoke-Test auf ${spec.apiRoute} die echten Pixel misst.`;
+    return tx({
+      de: `${tier.label}: Stufe ist gesperrt, bis ein Smoke-Test auf ${spec.apiRoute} die echten Pixel misst.`,
+      en: `${tier.label}: tier is locked until a smoke test on ${spec.apiRoute} measures the real pixels.`,
+      es: `${tier.label}: nivel bloqueado hasta que una prueba real en ${spec.apiRoute} mida los píxeles reales.`,
+    });
   }
-  return `${tier.label}: neuer Tier ohne bestandenen Smoke-Test auf ${spec.apiRoute}.`;
+  return tx({
+    de: `${tier.label}: neue Stufe ohne bestandenen Smoke-Test auf ${spec.apiRoute}.`,
+    en: `${tier.label}: new tier without a passed smoke test on ${spec.apiRoute}.`,
+    es: `${tier.label}: nivel nuevo sin una prueba real superada en ${spec.apiRoute}.`,
+  });
 }
 
 function toResolutionOption(spec: VideoModelSpec, mode: ModeSpec, tier: ResolutionSpec): ResolutionOption {

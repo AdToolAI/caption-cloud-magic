@@ -365,9 +365,9 @@ export function res(
     sizingRuleSource:
       opts.sizingRuleSource ??
       (sizingRule === 'long-edge'
-        ? 'Provider zählt die Label-Zeilen auf der LANGEN Kante (Topaz-Portrait-Falle).'
+        ? 'Provider counts the label lines on the LONG edge (the Topaz portrait trap).'
         : sizingRule === 'fixed-frame'
-          ? 'Provider rendert unabhängig vom Request ein festes Bildformat.'
+          ? 'Provider renders one fixed frame regardless of the request.'
           : 'Provider hält die kurze Kante des Labels; Portrait ist damit echtes Hochkant.'),
     sizingRuleVerified,
     framesByAspectRatio: { ...derived, ...(opts.framesByAspectRatio ?? {}) },
@@ -579,11 +579,18 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     providerDocsVersion: 'Replicate 11.08.2026',
     verificationSourceUrl: 'https://replicate.com/bytedance',
     verificationNotes:
-      'Hochauflösungspfad der Seedance-Familie. 1080p/4K bleiben bis zum bestandenen Smoke-Test auf dieser Route gesperrt.',
+      'Routen-Audit 07.09.2026: bytedance/seedance-2.0 ist die EINZIGE Seedance-Route, deren Replicate-Doku 4K nennt ("4K outputs 10-bit H.265/HEVC at high bitrate"); Fast und Mini verweisen für 1080p/4K ausdrücklich auf diese Route. ' +
+      '1080p/4K sind daher als gesperrte Tiers hinterlegt und bleiben bis zu einem bezahlten Smoke-Test auf UNSEREM Endpoint nicht startbar. ' +
+      'Ebenfalls dokumentiert, aber noch nicht abgebildet (Payload-Arbeit + Smoke-Test): last_frame_image, reference_images (max. 9), reference_videos (max. 3), reference_audios (max. 3), native Audio, intelligente Dauer (-1). ' +
+      'Harte Ausschluss-Regel der Route: image/last_frame_image sind NICHT mit reference_images kombinierbar.',
     ...UNAUDITED,
     modes: [
       mode('t2v', {
-        resolutions: [res('720p', 720, 'seedance-pro')],
+        resolutions: [
+          res('720p', 720, 'seedance-pro'),
+          newTier('1080p', 1080, 'seedance-pro-1080p'),
+          newTier('4K', 2160, 'seedance-pro-4k'),
+        ],
         durations: [3, 5, 8, 10, 12, 15],
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21'],
         audio: false,
@@ -591,7 +598,11 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         inputs: {},
       }),
       mode('i2v', {
-        resolutions: [res('720p', 720, 'seedance-pro')],
+        resolutions: [
+          res('720p', 720, 'seedance-pro'),
+          newTier('1080p', 1080, 'seedance-pro-1080p'),
+          newTier('4K', 2160, 'seedance-pro-4k'),
+        ],
         durations: [3, 5, 8, 10, 12, 15],
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21'],
         audio: false,
@@ -742,11 +753,17 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     available: true,
     providerDocsVersion: 'Replicate 11.08.2026',
     verificationSourceUrl: 'https://replicate.com/kwaivgi',
-    verificationNotes: 'Kein 4K-Tier: Web-App-Funktionen zählen nicht, nur der Endpoint-Slug.',
+    verificationNotes:
+      'Routen-Audit 07.09.2026: das offizielle Replicate-Schema von kwaivgi/kling-v3-video führt mode = standard (720p) | pro (1080p) | 4k. ' +
+      'Das 4K-Tier ist damit routen-dokumentiert, bleibt aber GESPERRT: die Replicate-Doku nennt weder exakte Pixel (3840x2160 nur Drittquellen) noch Dauer-/Ratio-/Audio-Einschränkungen im 4K-Modus (DOCS_CONFLICT). ' +
+      'Ebenfalls dokumentiert und noch NICHT abgebildet: end_image (First+Last) und multi_prompt (bis 6 Shots) — beide brauchen Payload-Arbeit plus Smoke-Test.',
     ...UNAUDITED,
     modes: [
       mode('t2v', {
-        resolutions: [res('1080p', 1080, 'kling-3')],
+        resolutions: [
+          res('1080p', 1080, 'kling-3'),
+          newTier('4K', 2160, 'kling-3-4k'),
+        ],
         durations: [3, 5, 8, 10, 15],
         aspectRatios: ['16:9', '9:16', '1:1'],
         audio: true,
@@ -754,7 +771,10 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         inputs: {},
       }),
       mode('i2v', {
-        resolutions: [res('1080p', 1080, 'kling-3')],
+        resolutions: [
+          res('1080p', 1080, 'kling-3'),
+          newTier('4K', 2160, 'kling-3-4k'),
+        ],
         durations: [3, 5, 8, 10, 15],
         aspectRatios: ['16:9', '9:16', '1:1'],
         audio: true,
@@ -807,13 +827,25 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         controls: { seed: true, negativePrompt: true },
         inputs: { images: { min: 1, max: 7 } },
       }),
+      /**
+       * V2V (reference_video). Der Provider dokumentiert eine harte
+       * Ausschluss-Regel: `generate_audio` ist NICHT mit `reference_video`
+       * kombinierbar. Deshalb ist Audio auf diesem Modus canonical false —
+       * angeforderter Ton wird sichtbar geblockt statt still verworfen.
+       */
       mode('v2v', {
         resolutions: [res('1080p', 1080, 'kling-omni')],
         durations: [3, 5, 8, 10, 15],
         aspectRatios: ['16:9', '9:16', '1:1'],
-        audio: true,
+        audio: false,
         controls: {},
         inputs: { videos: { min: 1, max: 1 }, images: { min: 0, max: 4 } },
+        constraints: [
+          {
+            reason:
+              'Kling 3.0 Omni: generate_audio und reference_video schließen sich aus. Mit Referenzvideo max. 4 Referenzbilder (sonst 7); Referenzvideo 3–10 s.',
+          },
+        ],
       }),
     ],
   },
@@ -1141,7 +1173,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     family: 'wan',
     generation: '2.7',
     provider: 'Alibaba Wan',
-    providerModelSlug: 'wan-video/wan-2.7',
+    providerModelSlug: 'wan-video/wan-2.7-t2v|wan-video/wan-2.7-i2v',
     apiRoute: 'replicate:/v1/predictions',
     region: 'global',
     apiVersion: 'v1',
@@ -1152,7 +1184,9 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     available: true,
     providerDocsVersion: 'Replicate 11.08.2026',
     verificationSourceUrl: 'https://replicate.com/wan-video',
-    verificationNotes: 'Stabiler Wan-Pfad und Fallback, solange Wan 3.0 nur als Preview verfügbar ist.',
+    verificationNotes:
+      'Stabiler Wan-Pfad und Fallback. Slug-Drift 07.09.2026 geschlossen: Wan 2.7 ist auf Replicate in task-spezifische Routen aufgeteilt — unsere Edge Function ruft wan-video/wan-2.7-t2v bzw. wan-video/wan-2.7-i2v; ein Slug "wan-video/wan-2.7" existiert nicht. ' +
+      'Dokumentiert, aber bewusst nicht freigeschaltet: wan-2.7-i2v akzeptiert ein Last-Frame, wan-2.7-r2v (Reference-to-Video) und wan-2.7-videoedit sind EIGENE Routen und damit eigene Capability-Identitäten.',
     ...UNAUDITED,
     modes: [
       mode('t2v', {
@@ -1179,7 +1213,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     family: 'wan',
     generation: '2.7',
     provider: 'Alibaba Wan',
-    providerModelSlug: 'wan-video/wan-2.7-pro',
+    providerModelSlug: 'wan-video/wan-2.7-t2v|wan-video/wan-2.7-i2v',
     apiRoute: 'replicate:/v1/predictions',
     region: 'global',
     apiVersion: 'v1',
@@ -1190,7 +1224,8 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     available: true,
     providerDocsVersion: 'Replicate 11.08.2026',
     verificationSourceUrl: 'https://replicate.com/wan-video',
-    verificationNotes: '1080p-Stufe der 2.7-Generation.',
+    verificationNotes:
+      '1080p-Stufe der 2.7-Generation — dieselbe Route wie Wan 2.7 Standard, nur mit resolution=1080p. Ein Provider-Slug "wan-video/wan-2.7-pro" existiert auf Replicate NICHT (Slug-Drift 07.09.2026 geschlossen).',
     ...UNAUDITED,
     modes: [
       mode('t2v', {
@@ -1334,7 +1369,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     family: 'hailuo',
     generation: '2.3',
     provider: 'MiniMax',
-    providerModelSlug: 'minimax/hailuo-02',
+    providerModelSlug: 'minimax/hailuo-2.3',
     apiRoute: 'replicate:/v1/predictions',
     region: 'global',
     apiVersion: 'v1',
@@ -1346,7 +1381,9 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     providerDocsVersion: 'Replicate 11.08.2026',
     verificationSourceUrl: 'https://replicate.com/minimax',
     verificationNotes:
-      'Route-scoped: die MiniMax-Direct-API und Runway-hosted MiniMax sind eigene Specs. Auf dieser Route kein aspect_ratio-Parameter (T2V immer 16:9).',
+      'Route-scoped: die MiniMax-Direct-API und Runway-hosted MiniMax sind eigene Specs. Auf dieser Route kein aspect_ratio-Parameter (T2V immer 16:9). ' +
+      'Slug-Drift 07.09.2026 geschlossen: die Edge Function ruft real minimax/hailuo-2.3 auf (Registry führte fälschlich minimax/hailuo-02). ' +
+      'minimax/hailuo-2.3 hat KEIN last_frame_image im Schema — kein firstLast/lastFrame-Modus. First+Last gibt es nur auf minimax/hailuo-02 und minimax/h3 (eigene Routen-Identitäten).',
     ...UNAUDITED,
     modes: [
       mode('t2v', {
@@ -1373,7 +1410,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     family: 'hailuo',
     generation: '2.3',
     provider: 'MiniMax',
-    providerModelSlug: 'minimax/hailuo-02-pro',
+    providerModelSlug: 'minimax/hailuo-2.3',
     apiRoute: 'replicate:/v1/predictions',
     region: 'global',
     apiVersion: 'v1',
@@ -1384,7 +1421,9 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     available: true,
     providerDocsVersion: 'Replicate 11.08.2026',
     verificationSourceUrl: 'https://replicate.com/minimax',
-    verificationNotes: '1080p ist bei MiniMax an 6 Sekunden gebunden; 10 s laufen nur auf 768p.',
+    verificationNotes:
+      'On MiniMax, 1080p is bound to 6 seconds; 10s runs only at 768p. ' +
+      'Slug drift closed 2026-09-07: replicate.com/minimax/hailuo-02-pro does not exist (404) — on THIS route "Pro" is only the 1080p tier of minimax/hailuo-2.3.',
     ...UNAUDITED,
     modes: [
       mode('t2v', {
@@ -1630,6 +1669,13 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
 
   /* ───────────────────────────── Runway ───────────────────────────── */
   {
+    /**
+     * TOTE ROUTE (Runway API changelog 30.07.2026): `gen4_aleph` ist über die
+     * Runway API nicht mehr verfügbar, Requests mit dieser Model-ID schlagen
+     * fehl. Der Spec BLEIBT bestehen, damit historische Generierungen weiter
+     * korrekt aufgelöst werden — er ist aber nicht mehr startbar und wird NICHT
+     * auf Aleph 2.0 umgebogen (kein Cross-Alias).
+     */
     id: 'runway-gen4-aleph',
     displayName: 'Runway Gen-4 Aleph',
     family: 'runway',
@@ -1640,14 +1686,16 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     region: 'global',
     apiVersion: 'v1',
     edgeFunction: 'generate-runway-video',
-    releaseStatus: 'live',
-    deprecated: false,
-    uiGroup: 'professional',
-    available: true,
-    providerDocsVersion: 'Runway API 11.08.2026',
-    verificationSourceUrl: 'https://docs.dev.runwayml.com',
+    releaseStatus: 'removed',
+    deprecated: true,
+    supersededBy: 'runway-aleph-2',
+    uiGroup: 'legacy',
+    available: false,
+    providerDocsVersion: 'Runway API Changelog 30.07.2026',
+    verificationSourceUrl: 'https://docs.dev.runwayml.com/api-details/api_changelog/',
     verificationNotes:
-      'Reiner V2V-Spezialist. Gen-4.5 und Aleph 2.0 inkl. ProRes/PNG-Sequence/10-bit/HDR sind Wave 3 nach Routen-Audit.',
+      'Route offiziell abgeschaltet: "Gen-3 Alpha Turbo (gen3a_turbo) and Gen-4 Aleph (gen4_aleph) are no longer available via the Runway API." ' +
+      'Spec bleibt nur zur Auflösung historischer Runs; keine neue Generierung möglich.',
     ...UNAUDITED,
     modes: [
       mode('v2v', {
@@ -1656,6 +1704,39 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
         audio: false,
         controls: { seed: true },
+        inputs: { videos: { min: 1, max: 1 }, images: { min: 0, max: 1 } },
+      }),
+    ],
+  },
+  {
+    /** NEU + GESPERRT: Nachfolger laut Runway-Changelog (gen4_aleph -> aleph2). */
+    id: 'runway-aleph-2',
+    displayName: 'Runway Aleph 2.0',
+    family: 'runway',
+    generation: '2.0',
+    provider: 'Runway',
+    providerModelSlug: 'aleph2',
+    apiRoute: 'runway:/v1/video_to_video',
+    region: 'global',
+    apiVersion: 'v1',
+    edgeFunction: 'generate-runway-video',
+    releaseStatus: 'preview',
+    deprecated: false,
+    uiGroup: 'professional',
+    available: false,
+    providerDocsVersion: 'Runway API Changelog 30.07.2026',
+    verificationSourceUrl: 'https://docs.dev.runwayml.com/api-details/api_changelog/',
+    verificationNotes:
+      'Vorbereitet, NICHT startbar. Belegt ist nur: Model-ID "aleph2" als dokumentierter Nachfolger von gen4_aleph, Video-to-Video mit Text-Prompt und Keyframe-Bildern. ' +
+      'UNBEKANNT: exakter REST-Pfad, Auflösungen, Dauern, FPS, Pricing. Freischaltung erst nach Routen-Audit + bezahltem Smoke-Test.',
+    ...UNAUDITED,
+    modes: [
+      mode('v2v', {
+        resolutions: [newTier('720p', 720, 'runway-aleph-2')],
+        durations: [5],
+        aspectRatios: ['16:9', '9:16'],
+        audio: false,
+        controls: {},
         inputs: { videos: { min: 1, max: 1 }, images: { min: 0, max: 1 } },
       }),
     ],
@@ -1905,7 +1986,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     family: 'happyhorse',
     generation: '1.0',
     provider: 'Alibaba',
-    providerModelSlug: 'alibaba/happyhorse-1.0-pro',
+    providerModelSlug: 'alibaba/happyhorse-1.0',
     apiRoute: 'replicate:/v1/predictions',
     region: 'global',
     apiVersion: 'v1',
@@ -1916,7 +1997,8 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     available: true,
     providerDocsVersion: 'Replicate 11.08.2026',
     verificationSourceUrl: 'https://replicate.com/alibaba/happyhorse-1.0',
-    verificationNotes: '1080p-Stufe derselben Route.',
+    verificationNotes:
+      '1080p-Stufe derselben Route (Edge Function ruft für beide Stufen alibaba/happyhorse-1.0). Slug-Drift 07.09.2026 geschlossen: "alibaba/happyhorse-1.0-pro" existiert auf Replicate nicht.',
     ...UNAUDITED,
     modes: [
       mode('t2v', {
@@ -1937,10 +2019,192 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
       }),
     ],
   },
+
+  /* ──────── Neue Provider-Generationen: vorbereitet, GESPERRT (Phase E) ─────────
+   * Alle folgenden Specs: available = false, alle Tiers via newTier() =>
+   * grandfathered false, parityStatus UNVERIFIED, kein Smoke-Test-Beleg.
+   * Sie sind damit weder in der UI wählbar noch server-seitig startbar und
+   * dienen ausschließlich als maschinenlesbarer Audit-Stand.
+   * ------------------------------------------------------------------------- */
+  {
+    id: 'hailuo-h3',
+    displayName: 'Hailuo H3',
+    family: 'hailuo',
+    generation: '3.0',
+    provider: 'MiniMax',
+    providerModelSlug: 'minimax/h3',
+    apiRoute: 'replicate:/v1/predictions',
+    region: 'global',
+    apiVersion: 'v1',
+    edgeFunction: 'generate-hailuo-video',
+    releaseStatus: 'preview',
+    deprecated: false,
+    uiGroup: 'flagship',
+    available: false,
+    providerDocsVersion: 'Replicate 07.09.2026',
+    verificationSourceUrl: 'https://replicate.com/minimax/h3',
+    verificationNotes:
+      'Aktuelle MiniMax-Generation. Routen-dokumentiert: T2V/I2V, first_frame_image + last_frame_image, resolution 768p|1080p, duration 6|10, aspect_ratio 16:9|9:16|1:1. ' +
+      'GESPERRT bis Pricing hinterlegt und bezahlter Smoke-Test bestanden ist.',
+    ...UNAUDITED,
+    modes: [
+      mode('t2v', {
+        resolutions: [newTier('768p', 768, 'hailuo-h3'), newTier('1080p', 1080, 'hailuo-h3')],
+        durations: [6, 10],
+        aspectRatios: ['16:9', '9:16', '1:1'],
+        audio: false,
+        controls: {},
+        inputs: {},
+      }),
+      mode('i2v', {
+        resolutions: [newTier('768p', 768, 'hailuo-h3'), newTier('1080p', 1080, 'hailuo-h3')],
+        durations: [6, 10],
+        aspectRatios: ['16:9', '9:16', '1:1'],
+        audio: false,
+        controls: {},
+        inputs: { firstFrame: true },
+      }),
+      mode('firstLast', {
+        resolutions: [newTier('768p', 768, 'hailuo-h3'), newTier('1080p', 1080, 'hailuo-h3')],
+        durations: [6, 10],
+        aspectRatios: ['16:9', '9:16', '1:1'],
+        audio: false,
+        controls: {},
+        inputs: { firstFrame: true, lastFrame: true, lastFrameRequiresFirstFrame: true },
+      }),
+    ],
+  },
+  {
+    id: 'seedance-2-0-mini',
+    displayName: 'Seedance 2.0 Mini',
+    family: 'seedance',
+    generation: '2.0',
+    provider: 'ByteDance',
+    providerModelSlug: 'bytedance/seedance-2.0-mini',
+    apiRoute: 'replicate:/v1/predictions',
+    region: 'global',
+    apiVersion: 'v1',
+    edgeFunction: 'generate-seedance-video',
+    releaseStatus: 'preview',
+    deprecated: false,
+    uiGroup: 'economy',
+    available: false,
+    providerDocsVersion: 'Replicate 07.09.2026',
+    verificationSourceUrl: 'https://replicate.com/bytedance/seedance-2.0-mini',
+    verificationNotes:
+      'Aktuelle günstige Seedance-Generation (löst Seedance 1 Lite NICHT ab — eigener Spec, alte ID bleibt für historische Runs). ' +
+      'Routen-dokumentiert: T2V/I2V, Referenzbilder, native Audio, bis 720p ("for 1080p and 4K use seedance-2.0"). GESPERRT bis Pricing + Smoke-Test.',
+    ...UNAUDITED,
+    modes: [
+      mode('t2v', {
+        resolutions: [newTier('480p', 480, 'seedance-2-0-mini'), newTier('720p', 720, 'seedance-2-0-mini')],
+        durations: [3, 5, 8, 10, 12, 15],
+        aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21'],
+        audio: false,
+        controls: { seed: true },
+        inputs: {},
+      }),
+      mode('i2v', {
+        resolutions: [newTier('480p', 480, 'seedance-2-0-mini'), newTier('720p', 720, 'seedance-2-0-mini')],
+        durations: [3, 5, 8, 10, 12, 15],
+        aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21'],
+        audio: false,
+        controls: { seed: true },
+        inputs: { firstFrame: true },
+      }),
+    ],
+  },
+  {
+    id: 'ltx-2-5-fast',
+    displayName: 'LTX-2.5 Fast',
+    family: 'ltx',
+    generation: '2.5',
+    provider: 'Lightricks',
+    providerModelSlug: 'lightricks/ltx-2.5-fast',
+    apiRoute: 'replicate:/v1/predictions',
+    region: 'global',
+    apiVersion: 'v1',
+    edgeFunction: 'generate-ltx-video',
+    releaseStatus: 'preview',
+    deprecated: false,
+    uiGroup: 'fast',
+    available: false,
+    providerDocsVersion: 'Replicate 07.09.2026',
+    verificationSourceUrl: 'https://replicate.com/lightricks/ltx-2.5-fast',
+    verificationNotes:
+      'Neue LTX-Generation, ersetzt LTX 2.3 NICHT automatisch. DOCS_CONFLICT: die Replicate-Route nennt Auflösungen bis 4K und 25/30/50 fps, die Lightricks-eigene Doku beschreibt für 2.5 abweichende Limits. ' +
+      'Alle Tiers bleiben gesperrt, bis der Konflikt auf der exakten Route geklärt und ein Smoke-Test bestanden ist.',
+    ...UNAUDITED,
+    modes: [
+      mode('t2v', {
+        resolutions: [newTier('1080p', 1080, 'ltx-2-5-fast'), newTier('4K', 2160, 'ltx-2-5-fast')],
+        durations: [6, 8, 10],
+        aspectRatios: ['16:9', '9:16', '1:1'],
+        audio: false,
+        controls: {},
+        inputs: {},
+      }),
+      mode('i2v', {
+        resolutions: [newTier('1080p', 1080, 'ltx-2-5-fast'), newTier('4K', 2160, 'ltx-2-5-fast')],
+        durations: [6, 8, 10],
+        aspectRatios: ['16:9', '9:16', '1:1'],
+        audio: false,
+        controls: {},
+        inputs: { firstFrame: true },
+      }),
+    ],
+  },
+  {
+    id: 'happyhorse-1-1',
+    displayName: 'HappyHorse 1.1',
+    family: 'happyhorse',
+    generation: '1.1',
+    provider: 'Alibaba',
+    providerModelSlug: 'alibaba/happyhorse-1.1',
+    apiRoute: 'replicate:/v1/predictions',
+    region: 'global',
+    apiVersion: 'v1',
+    edgeFunction: 'generate-happyhorse-video',
+    releaseStatus: 'preview',
+    deprecated: false,
+    uiGroup: 'flagship',
+    available: false,
+    providerDocsVersion: 'Replicate 07.09.2026',
+    verificationSourceUrl: 'https://replicate.com/alibaba/happyhorse-1.1',
+    verificationNotes:
+      'Aktuelle HappyHorse-Generation mit Multi-Referenz (bis zu 9 Referenzbildern). Eigener Spec, HappyHorse 1.0 bleibt für historische Runs bestehen. GESPERRT bis Pricing + Smoke-Test.',
+    ...UNAUDITED,
+    modes: [
+      mode('t2v', {
+        resolutions: [newTier('720p', 720, 'happyhorse-1-1'), newTier('1080p', 1080, 'happyhorse-1-1')],
+        durations: [5, 10],
+        aspectRatios: ['16:9', '9:16', '1:1'],
+        audio: false,
+        controls: { seed: true },
+        inputs: {},
+      }),
+      mode('i2v', {
+        resolutions: [newTier('720p', 720, 'happyhorse-1-1'), newTier('1080p', 1080, 'happyhorse-1-1')],
+        durations: [5, 10],
+        aspectRatios: ['16:9', '9:16', '1:1'],
+        audio: false,
+        controls: { seed: true },
+        inputs: { firstFrame: true },
+      }),
+      mode('reference', {
+        resolutions: [newTier('720p', 720, 'happyhorse-1-1'), newTier('1080p', 1080, 'happyhorse-1-1')],
+        durations: [5, 10],
+        aspectRatios: ['16:9', '9:16', '1:1'],
+        audio: false,
+        controls: { seed: true },
+        inputs: { images: { min: 1, max: 9 } },
+      }),
+    ],
+  },
   /* ───────────────── Historical / removed (ids stay resolvable) ──────────── */
   {
     id: 'sora-2',
-    displayName: 'Sora 2 (nicht mehr verfügbar)',
+    displayName: 'Sora 2 (no longer available)',
     family: 'sora',
     generation: '2',
     provider: 'OpenAI',

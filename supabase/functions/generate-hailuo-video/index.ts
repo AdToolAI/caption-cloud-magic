@@ -201,7 +201,9 @@ serve(async (req) => {
 
     if (isImageToVideo) {
       replicateInput.first_frame_image = startImageUrl;
-      if (endImageUrl) replicateInput.last_frame_image = endImageUrl;
+      // minimax/hailuo-2.3 has NO `last_frame_image` field in its schema.
+      // Sending it was a silent no-op; the capability gate now rejects
+      // first+last on this route before wallet/provider instead.
     }
 
     if (promptOptimizer !== false) {
