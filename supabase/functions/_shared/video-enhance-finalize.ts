@@ -445,11 +445,17 @@ export async function finalizeFailure(
     amountEur: Number(run.user_price_eur),
     note: errorCode,
   });
-  await setStatus(admin, run.id, 'provider_failed', {
+  // The provider verdict and OUR storage verdict are two different facts. A
+  // run whose provider finished but whose file we could not keep terminates as
+  // `output_lost`, never as `provider_failed`.
+  const terminal = stage === 'persist' ? 'output_lost' : 'provider_failed';
+  await setStatus(admin, run.id, terminal, {
     error_code: errorCode,
     error_message: errorMessage,
     failure_stage: stage,
     persist_last_error: stage === 'persist' ? errorMessage.slice(0, 500) : undefined,
+    // Provider success stays recorded on the row (provider_completed_at,
+    // provider_job_id) — it is never cleared by a storage failure.
     next_reconcile_at: null,
     next_persist_at: null,
     persist_lease_until: null,
@@ -457,7 +463,7 @@ export async function finalizeFailure(
   if (run.staging_key) {
     await admin.storage.from(STAGING_BUCKET).remove([run.staging_key]).catch(() => undefined);
   }
-  return { ok: false, status: 'provider_failed', error: errorMessage };
+  return { ok: false, status: terminal, error: errorMessage };
 }
 
 
