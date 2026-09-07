@@ -322,7 +322,12 @@ export function EnhanceVideoPanel({
   const interpolationApplies = topazEngine && topazInterpolationAppliesView(sourceFps, fps);
 
 
-  const config: EnhanceConfig | null = model
+  // A mode always belongs to ONE engine. Right after an engine switch the mode
+  // state still holds the previous engine's value for one render — no order is
+  // built from that, so no estimate is ever sent for an impossible pair.
+  const modeBelongsToModel = !!model && model.processingModes.some((m) => m.id === mode);
+
+  const config: EnhanceConfig | null = model && modeBelongsToModel
     ? {
         modelId: model.id,
         mode,
@@ -337,6 +342,7 @@ export function EnhanceVideoPanel({
 
       }
     : null;
+
 
 
   useEffect(() => {
@@ -434,8 +440,13 @@ export function EnhanceVideoPanel({
   const executionModeLabel =
     getVideoEnhanceModel(executionModelId ?? model.id)?.processingModes.find((m) => m.id === executionMode)
       ?.label[lang] ?? executionMode;
+  // Topaz already names its model in its own row — no second "footage type"
+  // row that would repeat the same value under a wrong label.
   const showFootageRow =
-    !!executionModelId && (getVideoEnhanceModel(executionModelId)?.processingModes.length ?? 0) > 1;
+    !isTopaz &&
+    !!executionModelId &&
+    (getVideoEnhanceModel(executionModelId)?.processingModes.length ?? 0) > 1;
+
 
   const completed = run?.status === 'completed' && !!run.output_url;
   const match = completed && run ? targetMatchOf(run) : null;
