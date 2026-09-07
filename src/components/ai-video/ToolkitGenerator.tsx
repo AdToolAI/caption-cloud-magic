@@ -978,10 +978,18 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         }).catch(() => {});
       }
 
+      resetInputsAfterStart();
+
       toast.success(
         language === 'de'
           ? tx({ de: `Video wird generiert (${model.name}). Kosten: ${symbol}${cost.toFixed(2)}`, en: `Video is generated (${model.name}). Cost: ${symbol}${cost.toFixed(2)}`, es: `Se genera el vídeo (${model.name}). Costo: ${symbol}${cost.toFixed(2)}` })
           : `Video generation started (${model.name}). Cost: ${symbol}${cost.toFixed(2)}`,
+        {
+          action: {
+            label: tx({ de: 'Rückgängig', en: 'Undo', es: 'Deshacer' }),
+            onClick: () => restoreLastInputs(),
+          },
+        },
       );
       refetchWallet();
       onAfterGenerate?.();
