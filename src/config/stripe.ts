@@ -1,45 +1,55 @@
 import { PlanId, Currency } from './pricing';
 
 /**
- * Stripe Price ID mapping for multi-currency support
- * 
- * IMPORTANT: User must create these prices in Stripe Dashboard first!
- * Then update these IDs with the actual Price IDs from Stripe
+ * Stripe-Katalog des Kontos „AdTool AI" (acct_1SLqO0DRu4kfSFxj).
+ *
+ * Multi-Währung: EUR ist Basis-/Abrechnungswährung (deutsches Stripe-Konto),
+ * USD und GBP sind eigene, fest definierte Verkaufspreise. Die Zahlungswährung
+ * ist strikt getrennt von der internen Credit-Verrechnung — ein Paket schreibt
+ * in jeder Währung dieselbe Credit-Menge gut.
  */
-export const STRIPE_PRICE_MAP: Record<PlanId, Record<Currency, string>> = {
+export type PaymentCurrency = Currency | 'GBP';
+
+export const STRIPE_PRICE_MAP: Record<PlanId, Record<PaymentCurrency, string>> = {
   free: {
     EUR: '', // Free plan has no price
-    USD: '' // Free plan has no price
+    USD: '',
+    GBP: ''
   },
   basic: {
-    EUR: 'price_1TzLNc1xgyPAUyx6exJw3ihw', // Beta-Basic €14.99/month
-    USD: 'price_1U6vHG1xgyPAUyx68LGgwoij'  // Beta-Basic $14.99/month (1:1)
+    EUR: 'price_1SLqZyDRu4kfSFxjfhMnx186', // Beta-Basic 14,95 €/Monat
+    USD: 'price_1UDAkPDRu4kfSFxj4sINBGEZ', // Beta-Basic $14.95/month
+    GBP: 'price_1UDAkPDRu4kfSFxjuSnWYGY4'  // Beta-Basic £14.95/month
   },
   pro: {
-    EUR: 'price_1TzLNc1xgyPAUyx6exJw3ihw', // Beta-Basic (Pro tier disabled during Beta)
-    USD: 'price_1U6vHG1xgyPAUyx68LGgwoij'
+    EUR: 'price_1SLqZyDRu4kfSFxjfhMnx186', // Alias während der Beta
+    USD: 'price_1UDAkPDRu4kfSFxj4sINBGEZ',
+    GBP: 'price_1UDAkPDRu4kfSFxjuSnWYGY4'
   },
   enterprise: {
-    EUR: 'price_1TzLNc1xgyPAUyx6exJw3ihw',
-    USD: 'price_1U6vHG1xgyPAUyx68LGgwoij'
+    EUR: 'price_1SLqZyDRu4kfSFxjfhMnx186',
+    USD: 'price_1UDAkPDRu4kfSFxj4sINBGEZ',
+    GBP: 'price_1UDAkPDRu4kfSFxjuSnWYGY4'
   }
 };
 
 /**
- * Stripe Product ID mapping (remains unchanged)
+ * Stripe Product ID mapping.
+ * Wird nur noch für Alt-Zuordnungen genutzt; die Plan-Erkennung läuft über
+ * das aktive Abo, nicht über eine fest verdrahtete Produkt-ID.
  */
 export const STRIPE_PRODUCT_MAP: Record<PlanId, string> = {
   free: '',
-  basic: 'prod_UyE4edZ94ktyOt',
-  pro: 'prod_UyE4edZ94ktyOt',
-  enterprise: 'prod_UyE4edZ94ktyOt'
+  basic: '',
+  pro: '',
+  enterprise: ''
 };
 
 /**
- * Get Stripe Price ID for a plan and currency
+ * Get Stripe Price ID for a plan and payment currency
  */
-export const getStripePriceId = (plan: PlanId, currency: Currency): string => {
-  return STRIPE_PRICE_MAP[plan][currency];
+export const getStripePriceId = (plan: PlanId, currency: PaymentCurrency): string => {
+  return STRIPE_PRICE_MAP[plan][currency] ?? STRIPE_PRICE_MAP[plan].EUR;
 };
 
 /**
@@ -51,7 +61,7 @@ export const getStripeProductId = (plan: PlanId): string => {
 
 /**
  * Founders-Programm
- *  - Es gibt genau EIN Abomodell: Beta-Basic 14,99 €/Monat, ohne Rabatt.
+ *  - Es gibt genau EIN Abomodell: Beta-Basic 14,95 €/Monat, ohne Rabatt.
  *  - Der Founders-Vorteil ist ein 20-%-Rabatt auf JEDEN Credit-Kauf
  *    (Stripe-Coupon `FOUNDERS_VIDEO_20`), gültig 24 Monate ab Slot-Claim.
  *    Angewendet wird er in der Edge-Function `ai-video-purchase-credits`.
@@ -60,4 +70,4 @@ export const FOUNDERS_MAX_SLOTS = 1000;
 export const FOUNDERS_CREDIT_COUPON = 'FOUNDERS_VIDEO_20';
 export const FOUNDERS_CREDIT_DISCOUNT_PERCENT = 20;
 export const FOUNDERS_DISCOUNT_MONTHS = 24;
-export const BETA_BASIC_PRICE_EUR = 14.99;
+export const BETA_BASIC_PRICE_EUR = 14.95;
