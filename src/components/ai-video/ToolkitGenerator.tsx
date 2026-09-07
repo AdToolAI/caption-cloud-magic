@@ -48,6 +48,9 @@ import { QuickSettingsBar } from './generate/QuickSettingsBar';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
+import { extractEdgeErrorMessage } from '@/lib/edgeFunctionError';
+import { friendlyVideoErrorMessage } from '@/lib/videoErrorMessages';
+
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters } from '@/hooks/useBrandCharacters';
 import type { ShotSelection } from '@/config/shotDirector';
