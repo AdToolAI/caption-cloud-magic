@@ -24,6 +24,12 @@ export type RunStatus =
   | 'asset_persisting'
   | 'completed'
   | 'provider_failed'
+  /**
+   * Provider SUCCEEDED, but the finished file is provably unrecoverable
+   * (link expired / output no longer matches the order). Money is released,
+   * yet the provider is never recorded as having failed.
+   */
+  | 'output_lost'
   | 'cancel_requested'
   | 'provider_cancelled_confirmed'
   | 'local_poll_timeout'
@@ -33,6 +39,7 @@ export type RunStatus =
 export const TERMINAL_STATUSES: RunStatus[] = [
   'completed',
   'provider_failed',
+  'output_lost',
   'provider_cancelled_confirmed',
 ];
 
