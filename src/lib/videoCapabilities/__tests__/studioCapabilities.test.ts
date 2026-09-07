@@ -221,7 +221,7 @@ describe('studio capability selector = canonical registry', () => {
     expect(meta.capabilities.refRequires).toEqual({ aspectRatios: ['16:9'], durations: [8] });
     expect(meta.capabilities.maxReferences).toBe(3);
   });
-}
+
   /* ── Truth gap 1: a single END image is its own mode ── */
 
   it('an end image without a start image resolves to the lastFrame mode', () => {
