@@ -328,6 +328,43 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     };
   }, [writeSetupDraft]);
 
+  /* ── Eingaben nach erfolgreichem Start leeren (mit Undo) ── */
+  type LastInputsSnapshot = {
+    prompt: string;
+    startImageUrl: string | null;
+    referenceVideoUrl: string | null;
+    viduReferences: ViduReferenceSlot[];
+    omniLines: OmniLine[];
+  };
+  const lastInputsRef = useRef<LastInputsSnapshot | null>(null);
+  const resetInputsAfterStart = useCallback(() => {
+    lastInputsRef.current = {
+      prompt,
+      startImageUrl,
+      referenceVideoUrl,
+      viduReferences,
+      omniLines,
+    };
+    setPrompt('');
+    setStartImageUrl(null);
+    setReferenceVideoUrl(null);
+    setViduReferences([]);
+    setOmniLines([]);
+    try { localStorage.removeItem(PROMPT_DRAFT_KEY); } catch { /* noop */ }
+  }, [prompt, startImageUrl, referenceVideoUrl, viduReferences, omniLines]);
+  const restoreLastInputs = useCallback(() => {
+    const snap = lastInputsRef.current;
+    if (!snap) return;
+    setPrompt(snap.prompt);
+    setStartImageUrl(snap.startImageUrl);
+    setReferenceVideoUrl(snap.referenceVideoUrl);
+    setViduReferences(snap.viduReferences);
+    setOmniLines(snap.omniLines);
+    lastInputsRef.current = null;
+  }, []);
+
+
+
 
   const castCharacters = useMemo(
     () => castCharacterIds.map((id) => libCharacters.find((c) => c.id === id)).filter((c): c is NonNullable<typeof c> => !!c),
@@ -941,10 +978,18 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         }).catch(() => {});
       }
 
+      resetInputsAfterStart();
+
       toast.success(
         language === 'de'
           ? tx({ de: `Video wird generiert (${model.name}). Kosten: ${symbol}${cost.toFixed(2)}`, en: `Video is generated (${model.name}). Cost: ${symbol}${cost.toFixed(2)}`, es: `Se genera el vídeo (${model.name}). Costo: ${symbol}${cost.toFixed(2)}` })
           : `Video generation started (${model.name}). Cost: ${symbol}${cost.toFixed(2)}`,
+        {
+          action: {
+            label: tx({ de: 'Rückgängig', en: 'Undo', es: 'Deshacer' }),
+            onClick: () => restoreLastInputs(),
+          },
+        },
       );
       refetchWallet();
       onAfterGenerate?.();
