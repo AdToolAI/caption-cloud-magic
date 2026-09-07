@@ -1450,6 +1450,22 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         )
       )}
 
+      {/* ── Provider privacy gate: ByteDance/Seedance rejects photos of real
+             people as image input. Warn up-front instead of after the run. ── */}
+      {model.family === 'seedance' && (!!startImageUrl || viduReferences.length > 0) && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            {tx({
+              de: `${model.name} lehnt Fotos echter Personen als Bildvorlage ab. Nutze ein KI-erzeugtes Charakterbild aus deiner Library — sonst bricht der Anbieter den Auftrag ab (ohne Kosten).`,
+              en: `${model.name} rejects photos of real people as image input. Use an AI-generated character image from your library — otherwise the provider cancels the job (at no cost).`,
+              es: `${model.name} rechaza fotos de personas reales como imagen de referencia. Usa una imagen de personaje generada por IA de tu biblioteca; de lo contrario el proveedor cancela el trabajo (sin coste).`,
+            })}
+          </span>
+        </div>
+      )}
+
+
       {/* ── Image upload (only for I2V) ── */}
       {model.capabilities.i2v && !omniMediaLock &&
         !(model.capabilities.refExclusive && viduReferences.length > 0) && (
