@@ -62,11 +62,15 @@ describe('spec completeness (Phase 7 hard gates)', () => {
     }
   });
 
-  it('every deprecated model names its successor', () => {
+  it('every deprecated model names its successor (spec or candidate)', () => {
     for (const spec of VIDEO_MODEL_SPECS) {
       if (!spec.deprecated) continue;
-      expect(spec.supersededBy, `${spec.id} is deprecated without supersededBy`).toBeTruthy();
-      expect(getVideoModelSpec(spec.supersededBy!), `${spec.id}: unknown successor`).toBeTruthy();
+      const successor = spec.supersededBy ?? spec.supersededByCandidate;
+      expect(successor, `${spec.id} is deprecated without successor`).toBeTruthy();
+      const resolved = spec.supersededBy
+        ? getVideoModelSpec(spec.supersededBy)
+        : getVideoModelCandidate(spec.supersededByCandidate!);
+      expect(resolved, `${spec.id}: unknown successor`).toBeTruthy();
     }
   });
 
