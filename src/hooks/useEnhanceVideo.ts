@@ -90,7 +90,7 @@ export interface EnhanceSource {
   url?: string;
 }
 
-const TERMINAL = ['completed', 'provider_failed', 'provider_cancelled_confirmed', 'manual_review'];
+const TERMINAL = ['completed', 'provider_failed', 'output_lost', 'provider_cancelled_confirmed', 'manual_review'];
 const POLL_INTERVAL_MS = 5_000;
 
 /**

@@ -178,13 +178,14 @@ serve(async (req) => {
         DETERMINISTIC_OUTPUT_FAILURES.has(claim.error_code) &&
         persistAttempts >= OUTPUT_VERDICT_CONFIRM_ATTEMPTS
       ) {
-        await finalizeFailure(
+        const verdict = await finalizeFailure(
           admin,
           claim,
           claim.error_code,
           claim.error_message ?? "provider output does not match the order",
+          "persist",
         );
-        return json({ ok: true, phase: "persist", result: "provider_failed" });
+        return json({ ok: true, phase: "persist", result: verdict.status });
       }
       // Retries exhausted: visible for recovery, WITHOUT refunding — the
       // provider file may still be there and is preserved on the row.
@@ -367,7 +368,7 @@ serve(async (req) => {
       .from("video_enhance_runs")
       .select("id, staging_key")
       .not("staging_key", "is", null)
-      .in("status", ["provider_failed", "provider_cancelled_confirmed", "manual_review"])
+      .in("status", ["provider_failed", "output_lost", "provider_cancelled_confirmed", "manual_review"])
       .lt("updated_at", cleanupBefore)
       .limit(BATCH_SIZE);
 
