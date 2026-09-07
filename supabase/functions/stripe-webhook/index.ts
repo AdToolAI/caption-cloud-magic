@@ -712,6 +712,78 @@ serve(withTelemetry('stripe-webhook', async (req) => {
       }
     }
 
+    // === Stripe-Erstattung: gekauftes AI-Guthaben anteilig zurückbuchen ===
+    if (event.type === 'charge.refunded' || event.type === 'charge.refund.updated') {
+      try {
+        let charge: Stripe.Charge | null = null;
+        let refundId: string | null = null;
+        let refundedMinor = 0;
+
+        if (event.type === 'charge.refunded') {
+          charge = event.data.object as Stripe.Charge;
+          const latest = charge.refunds?.data?.[0];
+          refundId = latest?.id ?? `charge:${charge.id}`;
+          refundedMinor = charge.amount_refunded ?? 0;
+        } else {
+          const refund = event.data.object as Stripe.Refund;
+          if (refund.status !== 'succeeded') {
+            console.log('[STRIPE-WEBHOOK] Refund not succeeded, skipping:', refund.id, refund.status);
+            return new Response(JSON.stringify({ received: true }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+          refundId = refund.id;
+          refundedMinor = refund.amount ?? 0;
+          const chargeId = typeof refund.charge === 'string' ? refund.charge : refund.charge?.id;
+          if (chargeId) charge = await stripe.charges.retrieve(chargeId);
+        }
+
+        const paymentIntentId = typeof charge?.payment_intent === 'string'
+          ? charge.payment_intent
+          : charge?.payment_intent?.id;
+
+        if (!paymentIntentId) {
+          console.warn('[STRIPE-WEBHOOK] Refund without payment_intent, nothing to reverse:', refundId);
+        } else {
+          const sessions = await stripe.checkout.sessions.list({ payment_intent: paymentIntentId, limit: 1 });
+          const session = sessions.data[0];
+
+          if (!session) {
+            console.warn('[STRIPE-WEBHOOK] No checkout session for refunded payment intent:', paymentIntentId);
+          } else if (session.mode === 'subscription') {
+            // Abo-Erstattungen berühren die Credit-Wallet nicht; Stripe/Portal steuert das Abo.
+            console.log('[STRIPE-WEBHOOK] Subscription refund — no wallet reversal:', session.id);
+          } else {
+            const { data: reversal, error: reversalError } = await supabaseAdmin.rpc(
+              'stripe_revoke_ai_video_credits_for_refund',
+              {
+                p_stripe_session_id: session.id,
+                p_refund_id: refundId,
+                p_refund_amount_minor: refundedMinor,
+                p_charge_amount_minor: charge?.amount ?? 0,
+              },
+            );
+
+            if (reversalError) {
+              console.error('[STRIPE-WEBHOOK] Credit reversal failed:', reversalError);
+              return new Response(JSON.stringify({ error: 'Credit reversal failed' }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            }
+
+            console.log('[STRIPE-WEBHOOK] Credit reversal result:', reversal);
+          }
+        }
+      } catch (refundError) {
+        console.error('[STRIPE-WEBHOOK] Refund handling error:', refundError);
+        return new Response(JSON.stringify({ error: 'Refund handling error' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
 
     return new Response(JSON.stringify({ received: true }), {
