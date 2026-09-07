@@ -12,7 +12,7 @@ export const CompetitorComparisonCard = () => {
     { label: t("landing.pricing.competitorBuffer"), price: fmt("25"), included: false },
     { label: t("landing.pricing.competitorHootsuite"), price: fmt("99"), included: false },
     { label: t("landing.pricing.competitorLater"), price: fmt("25"), included: false },
-    { label: t("landing.pricing.competitorOurLabel"), price: fmt("14.99"), included: true, highlight: true },
+    { label: t("landing.pricing.competitorOurLabel"), price: fmt("14.95"), included: true, highlight: true },
   ];
 
   return (

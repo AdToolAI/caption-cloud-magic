@@ -803,7 +803,7 @@ export const translationsFill: Record<'en' | 'de' | 'es', any> ={
     "basic": {
      "description": "Perfecto para creadores de contenido y pequeñas empresas",
      "name": "Basic",
-     "price": "14.99",
+     "price": "14.95",
      "currency": "$",
      "period": "mes",
      "credits": "800 créditos",

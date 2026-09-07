@@ -153,7 +153,7 @@ const Pricing = () => {
     brand: { "@type": "Brand", name: "AdTool AI" },
     offers: {
       "@type": "Offer",
-      price: "14.99",
+      price: "14.95",
       priceCurrency: "EUR",
       availability: "https://schema.org/OnlineOnly",
       url: "https://useadtool.ai/pricing",
@@ -202,7 +202,7 @@ const Pricing = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <SEO
-        title="Pricing — Pro €14.99/mo Launch"
+        title="Pricing — Pro €14.95/mo Launch"
         description="One simple plan. Captions, images, Director's Cut, posting & AI video credits. 14-day free trial. Cancel anytime."
         canonical="/pricing"
         lang={language}
@@ -341,7 +341,7 @@ const Pricing = () => {
                         Beta
                       </span>
                       <span className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-gold-dark bg-clip-text text-transparent tabular-nums">
-                        {currencySymbol}14.99
+                        {currencySymbol}14.95
                       </span>
                       <span className="text-muted-foreground">
                         {t("landing.pricing.perMonth")}

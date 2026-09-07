@@ -53,7 +53,7 @@ export const getCurrencyFromLocale = (locale: string): Currency => {
 /**
  * Get currency based on UI language.
  * Englische UI = USD, Deutsch/Spanisch = EUR. Alle Preise sind 1:1 gepflegt
- * (Beta-Basic 14,99 € / $14.99, Credit-Packs 10/50/100/250), es gibt für jede
+ * (Beta-Basic 14,95 € / $14.95, Credit-Packs 10/50/100/250), es gibt für jede
  * Währung einen eigenen Stripe-Preis — es wird also nie EUR abgebucht,
  * während USD angezeigt wird.
  */

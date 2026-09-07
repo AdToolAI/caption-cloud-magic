@@ -11,50 +11,46 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
+type PaymentCurrency = 'EUR' | 'USD' | 'GBP';
+
 interface PurchaseRequest {
   packId: 'starter' | 'standard' | 'pro' | 'enterprise';
-  currency: 'EUR' | 'USD';
+  currency: PaymentCurrency;
 }
 
-// Credit packs by currency.
-// `price` is what Stripe charges, `credits` is what the wallet receives —
-// they are NOT the same for the starter pack: fixed payment fees (method fee +
-// cross-border surcharge) eat a disproportionate share of a 10 purchase, so it
-// grants 9 units. Never derive the credited amount from the paid amount; it
-// must come from this table (mirror of src/config/aiVideoCredits.ts).
+// Credit packs — die Gutschrift hängt AUSSCHLIESSLICH am Paket, nie an der
+// Zahlungswährung oder am gezahlten Betrag. Ein Kauf in EUR, USD oder GBP
+// schreibt exakt dieselbe Credit-Menge gut.
+// (Mirror von src/config/aiVideoCredits.ts.)
 const CREDIT_PACKS = {
-  EUR: {
-    starter: { price: 10.00, credits: 9.00, bonus: 0, bonusPercent: 0 },
-    standard: { price: 50.00, credits: 50.00, bonus: 1.00, bonusPercent: 2 },
-    pro: { price: 100.00, credits: 100.00, bonus: 6.00, bonusPercent: 6 },
-    enterprise: { price: 250.00, credits: 250.00, bonus: 37.50, bonusPercent: 15 },
-  },
-  USD: {
-    starter: { price: 10.00, credits: 9.00, bonus: 0, bonusPercent: 0 },
-    standard: { price: 50.00, credits: 50.00, bonus: 1.00, bonusPercent: 2 },
-    pro: { price: 100.00, credits: 100.00, bonus: 6.00, bonusPercent: 6 },
-    enterprise: { price: 250.00, credits: 250.00, bonus: 37.50, bonusPercent: 15 },
-  }
-};
+  starter: { price: 10.00, credits: 9.00, bonus: 0, bonusPercent: 0 },
+  standard: { price: 50.00, credits: 50.00, bonus: 1.00, bonusPercent: 2 },
+  pro: { price: 100.00, credits: 100.00, bonus: 6.00, bonusPercent: 6 },
+  enterprise: { price: 250.00, credits: 250.00, bonus: 37.50, bonusPercent: 15 },
+} as const;
 
-// Stripe Price IDs mapping
-const STRIPE_PRICE_IDS = {
+// Stripe Price IDs — Konto „AdTool AI" (acct_1SLqO0DRu4kfSFxj)
+const STRIPE_PRICE_IDS: Record<PurchaseRequest['packId'], Record<PaymentCurrency, string>> = {
   starter: {
-    EUR: 'price_1TzLPV1xgyPAUyx6NqoJ9nIK', // Deutsch - 10€
-    USD: 'price_1TzLRH1xgyPAUyx6q00iYt0M'  // English - $10
+    EUR: 'price_1SWOEBDRu4kfSFxjUBaTMzcY', // 10,00 €
+    USD: 'price_1UDAYsDRu4kfSFxjEnz03Hef', // $10.00
+    GBP: 'price_1UDAYsDRu4kfSFxjkUZmMpGc', // £10.00
   },
   standard: {
-    EUR: 'price_1TzLQ11xgyPAUyx6orEA7320', // Deutsch - 50€
-    USD: 'price_1TzLRv1xgyPAUyx6b903vSQ8'  // English - $50
+    EUR: 'price_1SWOFXDRu4kfSFxjX6amIvWL', // 50,00 €
+    USD: 'price_1UDAciDRu4kfSFxjZzvztB3n', // $50.00
+    GBP: 'price_1UDAciDRu4kfSFxjBlIx9eMA', // £50.00
   },
   pro: {
-    EUR: 'price_1TzLQZ1xgyPAUyx6L7pojKRa', // Deutsch - 100€
-    USD: 'price_1TzLSF1xgyPAUyx6Lu2s3dz2'  // English - $100
+    EUR: 'price_1SWOHkDRu4kfSFxjxURoJ2JP', // 100,00 €
+    USD: 'price_1UDAfdDRu4kfSFxjlkHaKdkI', // $100.00
+    GBP: 'price_1UDAfdDRu4kfSFxjw46PwUY4', // £100.00
   },
   enterprise: {
-    EUR: 'price_1TzLQp1xgyPAUyx6iF7LIwKm', // Deutsch - 250€
-    USD: 'price_1TzLSe1xgyPAUyx6rcWxqFo2'  // English - $250
-  }
+    EUR: 'price_1SWOJGDRu4kfSFxj03qDB5Fj', // 250,00 €
+    USD: 'price_1UDAi8DRu4kfSFxj8rhhmDUK', // $250.00
+    GBP: 'price_1UDAi8DRu4kfSFxjULeSYc7c', // £250.00
+  },
 };
 
 serve((req: Request) => withLang(req, () => (async (req) => {
@@ -120,7 +116,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const checkoutLocale: 'en' | 'de' | 'es' =
       body.locale === 'de' ? 'de' : body.locale === 'es' ? 'es' : 'en';
 
-    const validCurrency = currency === 'EUR' || currency === 'USD';
+    const validCurrency = currency === 'EUR' || currency === 'USD' || currency === 'GBP';
     const validPack = !!packId && ['starter', 'standard', 'pro', 'enterprise'].includes(packId);
     if (!validCurrency || !validPack) {
       return new Response(
@@ -129,7 +125,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
     }
 
-    const pack = CREDIT_PACKS[currency][packId];
+    // Gutschrift kommt aus dem Paket, nicht aus der Zahlungswährung.
+    const pack = CREDIT_PACKS[packId];
     const priceId = STRIPE_PRICE_IDS[packId][currency];
 
 

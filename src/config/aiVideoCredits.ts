@@ -1,5 +1,6 @@
 import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
+import type { PaymentCurrency } from './stripe';
 
 export const AI_VIDEO_CREDIT_PACKS = {
   starter: {
@@ -117,29 +118,38 @@ export const AI_VIDEO_CREDIT_PACKS = {
 
 export type AIVideoCreditPackId = keyof typeof AI_VIDEO_CREDIT_PACKS;
 
-// Stripe Price ID Mapping
-export const AI_VIDEO_STRIPE_PRICE_MAP: Record<AIVideoCreditPackId, Record<Currency, string>> = {
+// Stripe Price ID Mapping — Konto „AdTool AI" (acct_1SLqO0DRu4kfSFxj).
+// Zahlungswährung ist unabhängig von der Gutschrift: jedes Paket schreibt in
+// jeder Währung exakt dieselbe Credit-Menge gut (siehe totalCredits oben).
+export const AI_VIDEO_STRIPE_PRICE_MAP: Record<AIVideoCreditPackId, Record<PaymentCurrency, string>> = {
   starter: {
-    EUR: 'price_1TzLPV1xgyPAUyx6NqoJ9nIK', // Deutsch - 10€
-    USD: 'price_1TzLRH1xgyPAUyx6q00iYt0M', // English - $10
+    EUR: 'price_1SWOEBDRu4kfSFxjUBaTMzcY', // 10,00 €
+    USD: 'price_1UDAYsDRu4kfSFxjEnz03Hef', // $10.00
+    GBP: 'price_1UDAYsDRu4kfSFxjkUZmMpGc', // £10.00
   },
   standard: {
-    EUR: 'price_1TzLQ11xgyPAUyx6orEA7320', // Deutsch - 50€
-    USD: 'price_1TzLRv1xgyPAUyx6b903vSQ8', // English - $50
+    EUR: 'price_1SWOFXDRu4kfSFxjX6amIvWL', // 50,00 €
+    USD: 'price_1UDAciDRu4kfSFxjZzvztB3n', // $50.00
+    GBP: 'price_1UDAciDRu4kfSFxjBlIx9eMA', // £50.00
   },
   pro: {
-    EUR: 'price_1TzLQZ1xgyPAUyx6L7pojKRa', // Deutsch - 100€
-    USD: 'price_1TzLSF1xgyPAUyx6Lu2s3dz2', // English - $100
+    EUR: 'price_1SWOHkDRu4kfSFxjxURoJ2JP', // 100,00 €
+    USD: 'price_1UDAfdDRu4kfSFxjlkHaKdkI', // $100.00
+    GBP: 'price_1UDAfdDRu4kfSFxjw46PwUY4', // £100.00
   },
   enterprise: {
-    EUR: 'price_1TzLQp1xgyPAUyx6iF7LIwKm', // Deutsch - 250€
-    USD: 'price_1TzLSe1xgyPAUyx6rcWxqFo2', // English - $250
+    EUR: 'price_1SWOJGDRu4kfSFxj03qDB5Fj', // 250,00 €
+    USD: 'price_1UDAi8DRu4kfSFxj8rhhmDUK', // $250.00
+    GBP: 'price_1UDAi8DRu4kfSFxjULeSYc7c', // £250.00
   },
 };
 
 // Helper function to get Stripe Price ID
-export const getAIVideoStripePriceId = (packId: AIVideoCreditPackId, currency: Currency): string => {
-  return AI_VIDEO_STRIPE_PRICE_MAP[packId][currency];
+export const getAIVideoStripePriceId = (
+  packId: AIVideoCreditPackId,
+  currency: PaymentCurrency,
+): string => {
+  return AI_VIDEO_STRIPE_PRICE_MAP[packId][currency] ?? AI_VIDEO_STRIPE_PRICE_MAP[packId].EUR;
 };
 
 export const AI_VIDEO_PRICING = {

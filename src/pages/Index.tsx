@@ -122,7 +122,7 @@ const Index = () => {
           <UDCShowcase />
 
 
-          {/* Pricing — was 14,99 € konkret enthält */}
+          {/* Pricing — was 14,95 € konkret enthält */}
           <PricingSection />
 
           {/* Testimonial Spotlight hidden during Beta — will return with real user quotes */}

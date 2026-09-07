@@ -65,11 +65,11 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     id: 'basic',
     label: 'Beta-Basic',
     name: 'Beta-Basic',
-    price: { EUR: 14.99, USD: 14.99 },
+    price: { EUR: 14.95, USD: 14.95 },
     currency: '€',
     credits: 800,
-    priceId: 'price_1TzLNc1xgyPAUyx6exJw3ihw',
-    productId: 'prod_UyE4edZ94ktyOt',
+    priceId: 'price_1SLqZyDRu4kfSFxjfhMnx186',
+    productId: '',
     checkoutUrl: '',
     features: {
       posting: true,
@@ -97,11 +97,11 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     id: 'pro',
     label: 'Beta-Basic',
     name: 'Beta-Basic',
-    price: { EUR: 14.99, USD: 14.99 },
+    price: { EUR: 14.95, USD: 14.95 },
     currency: '€',
     credits: 800,
-    priceId: 'price_1TzLNc1xgyPAUyx6exJw3ihw',
-    productId: 'prod_UyE4edZ94ktyOt',
+    priceId: 'price_1SLqZyDRu4kfSFxjfhMnx186',
+    productId: '',
     checkoutUrl: '',
     features: {
       posting: true,
@@ -125,11 +125,11 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     id: 'enterprise',
     label: 'Beta-Basic',
     name: 'Beta-Basic',
-    price: { EUR: 14.99, USD: 14.99 },
+    price: { EUR: 14.95, USD: 14.95 },
     currency: '€',
     credits: 800,
-    priceId: 'price_1TzLNc1xgyPAUyx6exJw3ihw',
-    productId: 'prod_UyE4edZ94ktyOt',
+    priceId: 'price_1SLqZyDRu4kfSFxjfhMnx186',
+    productId: '',
     checkoutUrl: '',
     features: {
       posting: true,
@@ -172,8 +172,8 @@ export type PlanType = PlanId;
 // plan (legacy Basic/Pro/Enterprise) is normalized to Beta-Basic so past
 // subscribers keep full access.
 const LEGACY_PAID_PRODUCT_IDS = new Set<string>([
-  'prod_UyE4edZ94ktyOt', // Beta-Basic 14,99 € (canonical)
-  'prod_TIRSoTyzmRpbpT', // legacy Beta-Basic 14,99 €
+  'prod_UyE4edZ94ktyOt', // Beta-Basic 14,95 € (canonical)
+  'prod_TIRSoTyzmRpbpT', // legacy Beta-Basic 14,95 €
   'prod_TDoWFAZjKKUnA2', // legacy Basic
   'prod_TDoYdYP1nOOWsN', // legacy Pro
   'prod_TIRWOmhxlzFCwW', // legacy Pro
@@ -186,7 +186,7 @@ const LEGACY_PAID_PRODUCT_IDS = new Set<string>([
 export const getProductInfo = (productId: string | null) => {
   if (!productId) return { name: 'Free', price: 0, currency: '€' };
   if (LEGACY_PAID_PRODUCT_IDS.has(productId)) {
-    return { name: 'Beta-Basic', price: 14.99, currency: '€' };
+    return { name: 'Beta-Basic', price: 14.95, currency: '€' };
   }
   return { name: 'Free', price: 0, currency: '€' };
 };
