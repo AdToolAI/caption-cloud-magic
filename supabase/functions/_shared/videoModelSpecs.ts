@@ -177,7 +177,40 @@ export interface ModeSpec {
   controls: ModeControls;
   inputs: ModeInputs;
   constraints?: ModeConstraint[];
+  /**
+   * ROUTE-SCOPED OVERRIDE. Some providers split one product across task
+   * specific routes (Wan 2.7 = `…-t2v` vs `…-i2v`). Those are DIFFERENT
+   * provider contracts, so the mode carries its own concrete slug/route.
+   * A composite string ("a|b") is never allowed anywhere — see
+   * `assertSingleProviderSlug`.
+   */
+  providerModelSlug?: string;
+  apiRoute?: string;
+  region?: string;
 }
+
+/** The concrete provider contract actually executed for (spec x mode). */
+export interface RouteIdentity {
+  providerModelSlug: string;
+  apiRoute: string;
+  region: string;
+}
+
+const MULTI_SLUG = /[|,;]|\s{2,}/;
+
+/** True when the string names exactly ONE concrete provider slug. */
+export function isSingleProviderSlug(slug: string): boolean {
+  return slug.trim().length > 0 && !MULTI_SLUG.test(slug);
+}
+
+export function assertSingleProviderSlug(slug: string, context: string): void {
+  if (!isSingleProviderSlug(slug)) {
+    throw new Error(
+      `providerModelSlug must name exactly one provider contract (${context}): "${slug}".`,
+    );
+  }
+}
+
 
 export interface SmokeTestRecord {
   runId: string;
