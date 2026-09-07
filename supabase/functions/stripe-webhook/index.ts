@@ -74,7 +74,19 @@ serve(withTelemetry('stripe-webhook', async (req) => {
     );
 
     const body = await req.text();
-    const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
+    // Ungültige Signatur ist ein Client-Fehler (400), kein Serverfehler (500).
+    // Stripe wiederholt 500er endlos und markiert den Endpunkt als defekt.
+    let event: Stripe.Event;
+    try {
+      event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
+    } catch (sigError) {
+      const message = sigError instanceof Error ? sigError.message : String(sigError);
+      console.warn('[STRIPE-WEBHOOK] Signature verification failed:', message);
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     console.log('[STRIPE-WEBHOOK] Event type:', event.type);
 
