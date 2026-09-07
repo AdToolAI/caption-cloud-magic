@@ -353,6 +353,29 @@ export function useEnhanceVideo() {
     [pollUntilDone, clearFailure, recordFailure],
   );
 
+  /**
+   * Re-attaches to the job the BACKEND already owns.
+   *
+   * A run does not live in this tab: after a reload, a crash or a device
+   * switch the server still has it, so the panel asks for the newest
+   * unfinished run of the signed-in user and keeps watching it. Nothing is
+   * started here — this only observes.
+   */
+  const resumeOpenRun = useCallback(async () => {
+    try {
+      const data = await callEngine({ action: 'open_run' });
+      const open = data?.run as EnhanceRunRow | undefined;
+      if (open && !TERMINAL.includes(open.status)) {
+        setRun(open);
+        pollUntilDone(open.id);
+        return open;
+      }
+    } catch {
+      // No session or a transient hiccup: the panel simply starts empty.
+    }
+    return undefined;
+  }, [pollUntilDone]);
+
   /** Records a cancel wish. Money only moves when the provider confirms. */
   const cancelEnhance = useCallback(async (runId: string) => {
     try {
@@ -363,6 +386,7 @@ export function useEnhanceVideo() {
       recordFailure(e);
     }
   }, [recordFailure]);
+
 
   const reset = useCallback(() => {
     stopPolling();
@@ -385,6 +409,7 @@ export function useEnhanceVideo() {
     errorReason,
     previewPrice,
     startEnhance,
+    resumeOpenRun,
     cancelEnhance,
     reset,
   };

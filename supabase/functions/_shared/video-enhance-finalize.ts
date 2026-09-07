@@ -2,10 +2,14 @@
  * One finalisation path for every caller (submit poll, webhook, reconciler).
  *
  * Order is not negotiable:
- *   provider output -> staging copy -> server-side validation -> asset row
- *   -> capture -> staging cleanup
+ *   provider output -> resumable transfer into OUR storage -> validation
+ *   -> asset row -> capture
  *
  * The provider file is temporary run data, never the URL of a finished asset.
+ * The transfer itself is memory bounded and restart safe: nothing larger than
+ * one chunk is ever held in RAM and a dead worker resumes at its byte offset
+ * (see `video-enhance-transfer.ts`). A failure while STORING the file is a
+ * persistence failure — never a provider failure.
  */
 
 import { probeRemoteVideo } from './mp4-probe.ts';
@@ -17,14 +21,21 @@ import {
 } from './video-enhance-models.ts';
 
 import {
-  outputKey,
+  createUploadSession,
+  destinationObjectPath,
+  headProviderOutput,
+  nextPersistAt,
+  sessionOffset,
+  storedObjectSize,
+  transferChunks,
+} from './video-enhance-transfer.ts';
+
+import {
   outputMatchesOrder,
   type ProviderCostReading,
   reconcileCost,
   setStatus,
   STAGING_BUCKET,
-  stagingKey,
-  validateStagedOutput,
   walletOperation,
 } from './video-enhance-runtime.ts';
 
@@ -43,6 +54,32 @@ export interface FinalizeResult {
 
 const TAG = '[video-enhance]';
 
+/**
+ * Our storage failed, the provider did NOT. The provider reference is kept so
+ * the next cycle (or an admin) can still recover the finished video; money is
+ * never released here.
+ */
+async function persistFailure(
+  admin: Admin,
+  run: Run,
+  attempts: number,
+  code: string,
+  message: string,
+  extra: Record<string, unknown> = {},
+): Promise<FinalizeResult> {
+  await setStatus(admin, run.id, 'asset_persist_failed', {
+    error_code: code,
+    error_message: message,
+    failure_stage: 'persist',
+    persist_last_error: message.slice(0, 500),
+    persist_attempts: attempts,
+    next_persist_at: nextPersistAt(attempts),
+    persist_lease_until: null,
+    ...extra,
+  });
+  return { ok: false, status: 'asset_persist_failed', error: message };
+}
+
 export async function finalizeSuccess(
   admin: Admin,
   run: Run,
@@ -53,67 +90,138 @@ export async function finalizeSuccess(
     return { ok: true, status: 'completed', outputUrl: run.output_url, assetId: run.output_asset_id };
   }
 
-  const staging = run.staging_key ?? stagingKey(run.user_id, run.id);
+  // Read through globalThis so the shared app typecheck (no Deno typings) passes.
+  const env = (globalThis as any).Deno?.env;
+  const supabaseUrl = (env?.get('SUPABASE_URL') as string) ?? '';
+  const serviceKey = (env?.get('SUPABASE_SERVICE_ROLE_KEY') as string) ?? '';
+  const destKey = run.destination_object_path ?? destinationObjectPath(run.user_id, run.id);
+  const attempts = Number(run.persist_attempts ?? 0) + 1;
+
   await setStatus(admin, run.id, 'asset_staging', {
     provider_output_url: providerOutputUrl,
-    staging_key: staging,
-    persist_attempts: (run.persist_attempts ?? 0) + 1,
+    destination_object_path: destKey,
+    persist_attempts: attempts,
   });
 
-  // 1. copy the provider file into our own storage IMMEDIATELY.
-  let buffer: ArrayBuffer;
-  let contentType = 'video/mp4';
-  try {
-    const res = await fetch(providerOutputUrl);
-    if (!res.ok) throw new Error(`provider fetch ${res.status}`);
-    contentType = res.headers.get('content-type') ?? contentType;
-    buffer = await res.arrayBuffer();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await setStatus(admin, run.id, 'asset_persist_failed', { error_code: 'PROVIDER_FETCH_FAILED', error_message: message });
-    return { ok: false, status: 'asset_persist_failed', error: message };
-  }
+  // 1. bring the file into OUR storage, resuming whatever is already there.
+  let size = Number(run.expected_content_length) || 0;
+  let contentType = String(run.expected_content_type ?? 'video/mp4');
+  const stored = await storedObjectSize(admin, STAGING_BUCKET, destKey);
+  const alreadyComplete = stored !== null && stored > 0 && (size === 0 || stored >= size);
 
-  const basicCheck = validateStagedOutput(buffer, contentType, {});
-  if (!basicCheck.ok) {
-    await setStatus(admin, run.id, 'asset_persist_failed', {
-      error_code: 'OUTPUT_INVALID',
-      error_message: basicCheck.reason ?? 'invalid output',
+  if (!alreadyComplete) {
+    const head = await headProviderOutput(providerOutputUrl);
+    if (!head.ok) {
+      // Provider link permanently gone: nothing left to recover. This is the
+      // ONLY path that hands the run to the terminal provider-failure route.
+      if (head.gone) {
+        return await finalizeFailure(
+          admin,
+          run,
+          'PROVIDER_OUTPUT_GONE',
+          `provider output no longer available (${head.status})`,
+          'persist',
+        );
+      }
+      return await persistFailure(admin, run, attempts, 'PROVIDER_FETCH_FAILED', `provider head ${head.status}`);
+    }
+    size = head.contentLength ?? size;
+    contentType = head.contentType ?? contentType;
+    const ct = contentType.toLowerCase();
+    if (!ct.startsWith('video/') && !ct.includes('octet-stream')) {
+      return await persistFailure(admin, run, attempts, 'OUTPUT_INVALID', `unexpected content type ${contentType}`);
+    }
+    if (!size) {
+      return await persistFailure(admin, run, attempts, 'PROVIDER_NO_LENGTH', 'provider did not report a size');
+    }
+
+    // Resume an existing session, or open a new one for the deterministic key.
+    let uploadUrl: string | null = run.resumable_upload_url ?? null;
+    let offset = Number(run.resumable_upload_offset ?? 0);
+    if (uploadUrl) {
+      const known = await sessionOffset(uploadUrl, serviceKey);
+      if (known === null) {
+        uploadUrl = null;
+        offset = 0;
+      } else {
+        offset = known;
+      }
+    }
+    if (!uploadUrl) {
+      const created = await createUploadSession({
+        supabaseUrl,
+        serviceKey,
+        bucket: STAGING_BUCKET,
+        objectKey: destKey,
+        contentType: 'video/mp4',
+        size,
+      });
+      if (!created.ok) {
+        return await persistFailure(admin, run, attempts, 'STAGING_FAILED', created.error ?? 'tus create failed');
+      }
+      uploadUrl = created.uploadUrl ?? null;
+      offset = 0;
+    }
+
+    if (!uploadUrl) {
+      return await persistFailure(admin, run, attempts, 'STAGING_FAILED', 'no upload session');
+    }
+
+    await admin.from('video_enhance_runs').update({
+      resumable_upload_url: uploadUrl,
+      resumable_upload_offset: offset,
+      resumable_upload_expires_at: new Date(Date.now() + 24 * 3_600_000).toISOString(),
+      expected_content_length: size,
+      expected_content_type: contentType,
+      destination_object_path: destKey,
+    }).eq('id', run.id);
+
+    const progress = await transferChunks({
+      admin,
+      runId: run.id,
+      providerUrl: providerOutputUrl,
+      uploadUrl,
+      serviceKey,
+      size,
+      startOffset: offset,
+      onProgress: async (bytes) => {
+        await admin.from('video_enhance_runs')
+          .update({ resumable_upload_offset: bytes })
+          .eq('id', run.id);
+      },
     });
-    return { ok: false, status: 'asset_persist_failed', error: basicCheck.reason };
+
+    if (!progress.done) {
+      await admin.from('video_enhance_runs')
+        .update({ resumable_upload_offset: progress.offset })
+        .eq('id', run.id);
+      if (progress.providerGone) {
+        return await finalizeFailure(
+          admin,
+          run,
+          'PROVIDER_OUTPUT_GONE',
+          'provider output disappeared mid-transfer',
+          'persist',
+        );
+      }
+      if (progress.error) {
+        return await persistFailure(admin, run, attempts, 'PERSIST_TRANSFER_FAILED', progress.error);
+      }
+      // Budget spent, no error: the bytes already stored stay, the next cycle
+      // resumes exactly here. This is progress, not a failure.
+      await setStatus(admin, run.id, 'asset_staging', {
+        persist_attempts: Number(run.persist_attempts ?? 0),
+        next_persist_at: new Date().toISOString(),
+        persist_lease_until: null,
+        failure_stage: null,
+      });
+      return { ok: false, status: 'asset_staging' };
+    }
   }
 
-  const { error: stageError } = await admin.storage
-    .from(STAGING_BUCKET)
-    .upload(staging, buffer, { contentType: 'video/mp4', upsert: true });
-  if (stageError) {
-    await setStatus(admin, run.id, 'asset_persist_failed', { error_code: 'STAGING_FAILED', error_message: stageError.message });
-    return { ok: false, status: 'asset_persist_failed', error: stageError.message };
-  }
-
-  // Validation-only: a run flagged by the allowlisted test account fails
-  // persistence EXACTLY once, after a real provider success and a real staged
-  // file. The flag is cleared here, so the reconciler's retry succeeds without
-  // a second provider job and without touching the normal storage path.
-  if (run.test_fail_persist_once) {
-    await admin
-      .from('video_enhance_runs')
-      .update({ test_fail_persist_once: false })
-      .eq('id', run.id);
-    await setStatus(admin, run.id, 'asset_persist_failed', {
-      error_code: 'TEST_PERSIST_FAILURE',
-      error_message: 'injected persistence failure (validation run)',
-      provider_output_url: providerOutputUrl,
-      staging_key: staging,
-    });
-    return { ok: false, status: 'asset_persist_failed', error: 'TEST_PERSIST_FAILURE' };
-  }
-
-
-  // 2. validate the staged file against what the user actually ordered, and
-  //    RECORD what was really delivered. The promised frame is orientation
-  //    aware: a portrait clip ordered at 4K owes 2160x3840.
-  const { data: stagedUrlData } = admin.storage.from(STAGING_BUCKET).getPublicUrl(staging);
+  // 2. validate what is now IN our storage against what the user ordered.
+  const { data: publicUrlData } = admin.storage.from(STAGING_BUCKET).getPublicUrl(destKey);
+  const publicUrl = publicUrlData.publicUrl;
   const target = run.target_width && run.target_height
     ? { width: Number(run.target_width), height: Number(run.target_height) }
     : resolveTargetFrame(
@@ -123,10 +231,10 @@ export async function finalizeSuccess(
     );
   const measurement: Record<string, unknown> = {};
   try {
-    const measured = await probeRemoteVideo(stagedUrlData.publicUrl);
+    const measured = await probeRemoteVideo(publicUrl);
     measurement.actual_width = measured.width;
     measurement.actual_height = measured.height;
-    measurement.output_size_bytes = measured.sizeBytes || buffer.byteLength;
+    measurement.output_size_bytes = measured.sizeBytes || size || stored || null;
     // codec, container and MIME type are three different facts. The codec
     // comes from the probed sample entry (h264 / hevc / av1) and is NEVER the
     // MIME type of the download.
@@ -155,67 +263,73 @@ export async function finalizeSuccess(
       await setStatus(admin, run.id, 'asset_persist_failed', {
         error_code: 'OUTPUT_MISMATCH',
         error_message: match.reason ?? 'output does not match order',
+        failure_stage: 'output',
+        persist_attempts: attempts,
+        next_persist_at: nextPersistAt(attempts),
+        persist_lease_until: null,
         ...measurement,
       });
       return { ok: false, status: 'asset_persist_failed', error: match.reason };
     }
   } catch (error) {
     // A probe failure is an infrastructure problem, not a verdict: keep the
-    // staged file and let the reconciler retry instead of failing the run.
-    console.warn(`${TAG} staged probe unavailable for ${run.id}:`, error);
+    // stored file and let the reconciler retry instead of failing the run.
+    console.warn(`${TAG} stored probe unavailable for ${run.id}:`, error);
   }
 
-
-  // 3. promote the staged file to its final key.
-  const finalKey = outputKey(run.user_id, run.id);
-  const { error: moveError } = await admin.storage.from(STAGING_BUCKET).move(staging, finalKey);
-  if (moveError) {
-    const { error: copyError } = await admin.storage
-      .from(STAGING_BUCKET)
-      .upload(finalKey, buffer, { contentType: 'video/mp4', upsert: true });
-    if (copyError) {
-      await setStatus(admin, run.id, 'asset_persist_failed', { error_code: 'PERSIST_FAILED', error_message: copyError.message });
-      return { ok: false, status: 'asset_persist_failed', error: copyError.message };
-    }
-  }
-  const { data: publicUrlData } = admin.storage.from(STAGING_BUCKET).getPublicUrl(finalKey);
-  const publicUrl = publicUrlData.publicUrl;
 
   // 4. asset row (non-destructive: the source stays, this is a child asset).
+  //    Idempotent: a second worker reuses the existing row instead of
+  //    creating a duplicate library entry for the same run.
   await setStatus(admin, run.id, 'asset_persisting', {});
-  const { data: asset, error: assetError } = await admin
-    .from('video_creations')
-    .insert({
-      user_id: run.user_id,
-      output_url: publicUrl,
-      status: 'completed',
-      framerate: Number(run.fps),
-      metadata: {
-        videoEnhance: true,
-        runId: run.id,
-        parentAssetId: run.source_asset_id,
-        modelId: run.model_id,
-        mode: run.mode,
-        resolution: run.resolution,
-        fps: run.fps,
-        tier: run.tier,
-        durationSeconds: Number(run.source_duration_seconds),
-        priceEur: Number(run.user_price_eur),
-        label: `Enhanced with ${run.model_id} (${run.resolution}/${run.fps}fps)`,
-      },
-    })
-
-    .select('id')
-    .maybeSingle();
-
-  if (assetError || !asset) {
-    await setStatus(admin, run.id, 'asset_persist_failed', {
-      error_code: 'ASSET_ROW_FAILED',
-      error_message: assetError?.message ?? 'no asset row',
-      output_url: publicUrl,
-    });
-    return { ok: false, status: 'asset_persist_failed', error: assetError?.message };
+  let assetId: string | null = run.output_asset_id ?? null;
+  if (!assetId) {
+    const { data: existingAsset } = await admin
+      .from('video_creations')
+      .select('id')
+      .eq('user_id', run.user_id)
+      .eq('metadata->>runId', run.id)
+      .maybeSingle();
+    assetId = existingAsset?.id ?? null;
   }
+  if (!assetId) {
+    const { data: asset, error: assetError } = await admin
+      .from('video_creations')
+      .insert({
+        user_id: run.user_id,
+        output_url: publicUrl,
+        status: 'completed',
+        framerate: Number(run.fps),
+        metadata: {
+          videoEnhance: true,
+          runId: run.id,
+          parentAssetId: run.source_asset_id,
+          modelId: run.model_id,
+          mode: run.mode,
+          resolution: run.resolution,
+          fps: run.fps,
+          tier: run.tier,
+          durationSeconds: Number(run.source_duration_seconds),
+          priceEur: Number(run.user_price_eur),
+          label: `Enhanced with ${run.model_id} (${run.resolution}/${run.fps}fps)`,
+        },
+      })
+      .select('id')
+      .maybeSingle();
+
+    if (assetError || !asset) {
+      return await persistFailure(
+        admin,
+        run,
+        attempts,
+        'ASSET_ROW_FAILED',
+        assetError?.message ?? 'no asset row',
+        { output_url: publicUrl },
+      );
+    }
+    assetId = asset.id;
+  }
+
 
   // 5. capture the frozen amount (idempotent, never a second debit).
   await walletOperation(admin, {
@@ -279,11 +393,20 @@ export async function finalizeSuccess(
     : null;
 
   await setStatus(admin, run.id, 'completed', {
-    output_asset_id: asset.id,
+    output_asset_id: assetId,
     output_url: publicUrl,
-    provider_output_url: null,
+    // The provider reference is kept as evidence of where the file came from;
+    // it is never rewritten to make a storage problem look like a model run.
     staging_key: null,
-    provider_completed_at: new Date().toISOString(),
+    resumable_upload_url: null,
+    resumable_upload_offset: 0,
+    persist_lease_owner: null,
+    persist_lease_until: null,
+    next_persist_at: null,
+    failure_stage: null,
+    persist_last_error: null,
+    // Never overwrite when the provider's real completion time is known.
+    provider_completed_at: run.provider_completed_at ?? new Date().toISOString(),
     next_reconcile_at: null,
     error_code: null,
     error_message: null,
@@ -291,20 +414,29 @@ export async function finalizeSuccess(
     ...costPatch,
   });
 
+  // 5. cleanup — any legacy staging copy must not pile up. The delivered file
+  //    lives at the deterministic destination key and is never removed here.
+  if (run.staging_key) {
+    await admin.storage.from(STAGING_BUCKET).remove([run.staging_key]).catch(() => undefined);
+  }
 
-
-  // 6. cleanup — big video files must not pile up in staging.
-  await admin.storage.from(STAGING_BUCKET).remove([staging]).catch(() => undefined);
-
-  return { ok: true, status: 'completed', outputUrl: publicUrl, assetId: asset.id };
+  return { ok: true, status: 'completed', outputUrl: publicUrl, assetId: assetId ?? undefined };
 }
 
-/** Terminal provider failure: exactly one release, no automatic retry. */
+/**
+ * Terminal failure with exactly one release.
+ *
+ * `stage` records WHERE it failed: `provider` (the model/provider did not
+ * deliver) or `persist` (the provider delivered, but the result is proven
+ * unrecoverable — e.g. its link expired). The provider status is never
+ * rewritten to look like a model failure.
+ */
 export async function finalizeFailure(
   admin: Admin,
   run: Run,
   errorCode: string,
   errorMessage: string,
+  stage: 'provider' | 'persist' = 'provider',
 ): Promise<FinalizeResult> {
   await walletOperation(admin, {
     runId: run.id,
@@ -316,13 +448,18 @@ export async function finalizeFailure(
   await setStatus(admin, run.id, 'provider_failed', {
     error_code: errorCode,
     error_message: errorMessage,
+    failure_stage: stage,
+    persist_last_error: stage === 'persist' ? errorMessage.slice(0, 500) : undefined,
     next_reconcile_at: null,
+    next_persist_at: null,
+    persist_lease_until: null,
   });
   if (run.staging_key) {
     await admin.storage.from(STAGING_BUCKET).remove([run.staging_key]).catch(() => undefined);
   }
   return { ok: false, status: 'provider_failed', error: errorMessage };
 }
+
 
 /** Provider CONFIRMED the cancellation — only here money moves back. */
 export async function finalizeCancelConfirmed(

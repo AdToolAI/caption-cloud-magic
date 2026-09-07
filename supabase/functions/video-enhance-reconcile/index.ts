@@ -13,7 +13,9 @@ import {
   setStatus,
   STAGING_BUCKET,
 } from "../_shared/video-enhance-runtime.ts";
+import { MAX_PERSIST_ATTEMPTS } from "../_shared/video-enhance-transfer.ts";
 import { decideCycle, isInternalCaller } from "../_shared/video-enhance-reconcile-guard.ts";
+
 import {
   getTopazVideoStatus,
   topazBilledCredits,
@@ -111,18 +113,21 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+/**
+ * Statuses handled by the PROVIDER loop below. The persistence statuses
+ * (`asset_*`) are deliberately NOT in this list: storing a finished file is
+ * heavy work and runs exclusively through the atomic claim path, at most one
+ * per invocation.
+ */
 const OPEN_STATUSES = [
   "credits_reserved",
   "provider_submitting",
   "provider_submitted",
   "provider_processing",
-  "provider_output_ready",
-  "asset_staging",
-  "asset_persisting",
-  "asset_persist_failed",
   "cancel_requested",
   "local_poll_timeout",
 ];
+
 
 // Per-isolate burst protection. Not a distributed lock — the per-run
 // timestamps below are what make concurrent cycles harmless; this only keeps
@@ -154,9 +159,52 @@ serve(async (req) => {
       return json({ error: "no provider API key configured" }, 500);
     }
 
+    // ---- persistence phase: at most ONE heavy transfer per invocation -------
+    // The claim is a single atomic statement (state + due time + free lease in
+    // one UPDATE ... RETURNING), so two concurrent cycles can never pick the
+    // same run and never fetch the same large file twice.
+    const worker = crypto.randomUUID();
+    const { data: claimedRows, error: claimError } = await admin.rpc(
+      "video_enhance_claim_persist_run",
+      { p_worker: worker, p_lease_seconds: 240 },
+    );
+    if (claimError) console.error(`${TAG} persist claim failed:`, claimError.message);
+    const claim = Array.isArray(claimedRows) ? claimedRows[0] : claimedRows;
+    if (claim) {
+      const persistAttempts = Number(claim.persist_attempts ?? 0);
+      // A verdict about the provider FILE is deterministic — re-fetching it can
+      // never change it. That is a provider failure (with release), not ours.
+      if (
+        DETERMINISTIC_OUTPUT_FAILURES.has(claim.error_code) &&
+        persistAttempts >= OUTPUT_VERDICT_CONFIRM_ATTEMPTS
+      ) {
+        await finalizeFailure(
+          admin,
+          claim,
+          claim.error_code,
+          claim.error_message ?? "provider output does not match the order",
+        );
+        return json({ ok: true, phase: "persist", result: "provider_failed" });
+      }
+      // Retries exhausted: visible for recovery, WITHOUT refunding — the
+      // provider file may still be there and is preserved on the row.
+      if (persistAttempts >= MAX_PERSIST_ATTEMPTS) {
+        await setStatus(admin, claim.id, "manual_review", {
+          failure_stage: "persist",
+          next_persist_at: null,
+          next_reconcile_at: null,
+          persist_lease_until: null,
+        });
+        return json({ ok: true, phase: "persist", result: "manual_review" });
+      }
+      const persisted = await finalizeSuccess(admin, claim, claim.provider_output_url);
+      return json({ ok: true, phase: "persist", result: persisted.status });
+    }
+
     const nowIso = new Date().toISOString();
     // Configurable, so a slow provider queue can be absorbed without a deploy.
     const horizonMinutes = manualReviewAfterMinutes((key) => Deno.env.get(key));
+
     const { data: runs } = await admin
       .from("video_enhance_runs")
       .select("*")
@@ -172,43 +220,10 @@ serve(async (req) => {
       const attempts = (run.reconciliation_attempts ?? 0) + 1;
       const ageMinutes = (Date.now() - Date.parse(run.created_at)) / 60_000;
 
-      // Persistence retry — the provider already succeeded, no second job.
-      if (run.status === "asset_persist_failed" && run.provider_output_url) {
-        // A verdict on the provider FILE is deterministic: the same bytes give
-        // the same measurement on every retry. After one confirming re-measure
-        // such a run is closed as a provider failure (reservation released),
-        // instead of re-downloading the file every cycle forever.
-        if (
-          DETERMINISTIC_OUTPUT_FAILURES.has(run.error_code) &&
-          (run.persist_attempts ?? 0) >= OUTPUT_VERDICT_CONFIRM_ATTEMPTS
-        ) {
-          await finalizeFailure(
-            admin,
-            run,
-            run.error_code,
-            run.error_message ?? "provider output does not match the order",
-          );
-          summary.failed++;
-          continue;
-        }
-        // Transient persistence problems (fetch, staging, asset row) are
-        // retried with backoff — but only up to the horizon. Past it the run
-        // becomes visible to admins instead of looping silently.
-        if (ageMinutes > horizonMinutes) {
-          await setStatus(admin, run.id, "manual_review", {
-            reconciliation_attempts: attempts,
-            last_reconciled_at: nowIso,
-            next_reconcile_at: null,
-          });
-          summary.manualReview++;
-          continue;
-        }
-        const result = await finalizeSuccess(admin, run, run.provider_output_url);
-        if (result.ok) summary.completed++;
-        else summary.pending++;
-        await bump(admin, run.id, attempts);
-        continue;
-      }
+      // Persistence is NOT handled here — it runs through the atomic claim
+      // phase above, one heavy transfer per invocation.
+
+
 
       if (!run.provider_prediction_id) {
         // No prediction id and no webhook yet: nothing authoritative to read.
@@ -246,13 +261,24 @@ serve(async (req) => {
                 ? output.url
                 : null;
         if (outputUrl) {
-          const result = await finalizeSuccess(admin, run, outputUrl, providerCost);
-          if (result.ok) summary.completed++;
-          else summary.pending++;
+          // The provider is done. Storing the file is separate, heavy work:
+          // hand the run to the persistence phase instead of transferring it
+          // inside the provider loop.
+          await setStatus(admin, run.id, "provider_output_ready", {
+            provider_output_url: outputUrl,
+            provider_status: "succeeded",
+            provider_completed_at: run.provider_completed_at ?? nowIso,
+            next_persist_at: nowIso,
+            next_reconcile_at: null,
+            reconciliation_attempts: attempts,
+            last_reconciled_at: nowIso,
+          });
+          summary.pending++;
         } else {
           await finalizeFailure(admin, run, "NO_OUTPUT", "provider returned no video");
           summary.failed++;
         }
+
       } else if (prediction.status === "failed") {
         await finalizeFailure(admin, run, "PROVIDER_FAILED", String(prediction.error ?? "provider failed"));
         summary.failed++;

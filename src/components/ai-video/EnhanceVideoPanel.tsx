@@ -231,8 +231,15 @@ export function EnhanceVideoPanel({
     errorReason,
     previewPrice,
     startEnhance,
+    resumeOpenRun,
     cancelEnhance,
   } = useEnhanceVideo();
+
+  // The job belongs to the backend, not to this tab: on mount we re-attach to
+  // an unfinished run so a reload never makes a running upscale "disappear".
+  useEffect(() => {
+    void resumeOpenRun();
+  }, [resumeOpenRun]);
 
   const legacySource = !asset && !!initialSourceAssetId;
   const hasSource = !!asset || legacySource || (!asset && !!initialSourceUrl);

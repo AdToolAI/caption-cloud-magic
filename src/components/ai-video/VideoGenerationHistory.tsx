@@ -16,6 +16,14 @@ import { formatPrice, getCurrencyForLanguage } from '@/lib/currency';
 import { friendlyVideoErrorMessage } from '@/lib/videoErrorMessages';
 import { useVideoModelRuntimeStats } from '@/hooks/useVideoModelRuntimeStats';
 import { VideoRunProgress } from '@/components/ai-video/VideoRunProgress';
+import {
+  enhanceRunToHistoryItem,
+  generationToHistoryItem,
+  mergeHistory,
+  type VideoHistoryItem,
+} from '@/lib/videoHistory/model';
+import { runPhaseLabel } from '@/lib/videoEnhance/runPresentation';
+import type { EnhanceLang } from '@/lib/videoEnhance/engineErrors';
 
 const MODEL_DISPLAY_NAMES: Record<string, string> = {
   'sora-2-standard': 'Sora 2 Standard',
@@ -100,6 +108,31 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
   });
 
   /**
+   * Upscales are jobs of the same customer, produced by a different pipeline.
+   * They are read here as well, so a running or finished upscale can never be
+   * missing from the history just because it lives in another table.
+   */
+  const { data: enhanceRuns, refetch: refetchEnhance } = useQuery({
+    queryKey: ['video-enhance-runs', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from('video_enhance_runs')
+        .select(
+          'id, model_id, status, output_url, error_message, source_duration_seconds, user_price_eur, created_at, failure_stage',
+        )
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) return [];
+      return data ?? [];
+    },
+    enabled: !!user,
+    // A save in progress finishes server-side; keep the row fresh without a reload.
+    refetchInterval: 15000,
+  });
+
+  /**
    * Seedance 2.5 runs on ByteDance ModelArk, which has no webhook. If a job is
    * still "processing", nudge the poller so the row gets finalized even when a
    * background task on the server was cut short.
@@ -130,7 +163,7 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
     return () => { supabase.removeChannel(channel); };
   }, [user, refetch, queryClient]);
 
-  const getStatusBadge = (status: VideoGeneration['status']) => {
+  const getStatusBadge = (status: VideoHistoryItem['status']) => {
     const variants = { pending: 'secondary', processing: 'default', completed: 'default', failed: 'destructive' } as const;
     const labels = {
       pending: t('aiVid.statusPending'),
@@ -150,9 +183,9 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
     friendlyVideoErrorMessage(errorMessage);
 
 
-  const handleRetry = (gen: VideoGeneration) => {
+  const handleRetry = (gen: VideoHistoryItem) => {
     if (onRetryGeneration) {
-      onRetryGeneration({ prompt: gen.prompt, model: gen.model, duration: gen.duration_seconds });
+      onRetryGeneration({ prompt: gen.title, model: gen.model, duration: gen.durationSeconds });
       toast({ title: t('aiVid.formPrefilled'), description: t('aiVid.formPrefilledDesc') });
     }
   };
@@ -223,6 +256,17 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
 
   const isVideoSaved = (generationId: string): boolean => savedGenerationIds?.has(generationId) ?? false;
 
+  const lang = (['de', 'en', 'es'].includes(language) ? language : 'en') as EnhanceLang;
+  const upscaleTitle = tx({
+    de: 'Video-Hochskalierung',
+    en: 'Video upscale',
+    es: 'Escalado de vídeo',
+  });
+  const items: VideoHistoryItem[] = mergeHistory([
+    ...(generations ?? []).map(generationToHistoryItem),
+    ...(enhanceRuns ?? []).map((row: any) => enhanceRunToHistoryItem(row, upscaleTitle)),
+  ]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -231,7 +275,7 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
     );
   }
 
-  if (!generations || generations.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground mb-4">{t('aiVid.noVideosYet')}</p>
@@ -243,8 +287,8 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold">{t('aiVid.yourVideos')} ({generations.length})</h3>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
+        <h3 className="text-lg font-semibold">{t('aiVid.yourVideos')} ({items.length})</h3>
+        <Button variant="outline" size="sm" onClick={() => { refetch(); refetchEnhance(); }}>
           <RefreshCw className="w-4 h-4 mr-2" />
           {t('aiVid.refresh')}
         </Button>
@@ -267,14 +311,14 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
       </div>
 
       <div className="grid grid-cols-1 gap-4 w-full">
-        {generations.map((gen) => (
+        {items.map((gen) => (
           <Card key={gen.id} className="p-4 w-full overflow-hidden">
             <div className="flex gap-4 w-full overflow-hidden">
               <div className="flex-shrink-0 w-48 h-32 bg-muted rounded-lg overflow-hidden relative">
-                {gen.video_url && gen.status === 'completed' ? (
+                {gen.videoUrl && gen.status === 'completed' ? (
                   <>
                     {selectedVideo === gen.id ? (
-                      <video src={gen.video_url} controls autoPlay className="w-full h-full object-cover" />
+                      <video src={gen.videoUrl} controls autoPlay className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full cursor-pointer flex items-center justify-center bg-black/50" onClick={() => setSelectedVideo(gen.id)}>
                         <Play className="w-12 h-12 text-white" />
@@ -293,39 +337,47 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
               <div className="flex-1 min-w-0 overflow-hidden">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium line-clamp-2 break-words mb-1">{gen.prompt}</h4>
+                    <h4 className="font-medium line-clamp-2 break-words mb-1">{gen.title}</h4>
                     <p className="text-sm text-muted-foreground">
                       {MODEL_DISPLAY_NAMES[gen.model] || gen.model}
-                      {' · '}{gen.duration_seconds}s{' · '}{formatPrice(gen.total_cost_euros, currency)}
+                      {' · '}{gen.durationSeconds}s{' · '}{formatPrice(gen.costEuros, currency)}
                     </p>
                   </div>
                   {getStatusBadge(gen.status)}
                 </div>
 
                 <p className="text-xs text-muted-foreground mb-3">
-                  {formatDistanceToNow(new Date(gen.created_at), { addSuffix: true, locale: dateLocale })}
+                  {formatDistanceToNow(new Date(gen.createdAt), { addSuffix: true, locale: dateLocale })}
                 </p>
 
                 {(gen.status === 'processing' || gen.status === 'pending') && (
-                  <VideoRunProgress createdAt={gen.created_at} stat={runtimeStats?.[gen.model]} />
+                  gen.kind === 'enhancement' ? (
+                    // Says exactly which step is running — an upscale whose file
+                    // is still being stored must not look like a hang.
+                    <p className="text-xs text-muted-foreground mb-2">
+                      {runPhaseLabel(gen.rawStatus, lang)}
+                    </p>
+                  ) : (
+                    <VideoRunProgress createdAt={gen.createdAt} stat={runtimeStats?.[gen.model]} />
+                  )
                 )}
 
-                {gen.error_message && (
+                {gen.errorMessage && (
                   <div className="mb-3">
-                    <p className="text-sm text-destructive">{getFriendlyErrorMessage(gen.error_message)}</p>
+                    <p className="text-sm text-destructive">{getFriendlyErrorMessage(gen.errorMessage)}</p>
                   </div>
                 )}
 
                 <div className="flex gap-2 flex-wrap w-full">
-                  {gen.status === 'completed' && gen.video_url && (
+                  {gen.status === 'completed' && gen.videoUrl && (
                     <>
                       <Button size="sm" variant="outline" onClick={() => setSelectedVideo(gen.id)}>
                         <Play className="w-4 h-4 mr-2" />{t('aiVid.play')}
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleDownload(gen.video_url!, gen.prompt)}>
+                      <Button size="sm" variant="outline" onClick={() => handleDownload(gen.videoUrl!, gen.title)}>
                         <Download className="w-4 h-4 mr-2" />{t('aiVid.download')}
                       </Button>
-                      {isVideoSaved(gen.id) ? (
+                      {gen.kind !== 'generation' ? null : isVideoSaved(gen.id) ? (
                         <span className="inline-flex items-center text-xs text-green-600 dark:text-green-400">
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" />{t('aiVid.savedToLibrary')}
                         </span>
@@ -345,7 +397,7 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
                       <span className="text-xs text-muted-foreground animate-pulse">{t('aiVid.bgRunning')}</span>
                     </div>
                   )}
-                  {gen.status === 'failed' && onRetryGeneration && (
+                  {gen.status === 'failed' && gen.kind === 'generation' && onRetryGeneration && (
                     <Button size="sm" variant="outline" onClick={() => handleRetry(gen)} className="border-primary text-primary hover:bg-primary/10">
                       <RotateCcw className="w-4 h-4 mr-2" />{t('aiVid.retryGenerate')}
                     </Button>

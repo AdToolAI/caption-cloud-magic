@@ -1,6 +1,7 @@
 # Roadmap
 
 ## Erledigt
+- Video-Hochskalierung Persistenz-Härtung (07.09.): kein Laden ganzer Dateien in den Speicher mehr (fortsetzbarer Chunk-Transfer mit Zeitbudget), Anbieter-Erfolg und Dateisicherung sind getrennte Zustände, genau ein schwerer Sicherungsvorgang je Durchlauf über atomaren Anspruch/Lease, erschöpfte Versuche gehen in Prüfung statt in stille Erstattung, Aufträge gehören dem Backend (Fortsetzen nach Neuladen über `open_run`), Hochskalierungen erscheinen im Verlauf, Statustexte in DE/EN/ES.
 - Video-Enhance Full Production Release: Topaz + ByteDance global live, Kalibrierung vom Preis-Gate getrennt, unbefristete Nachkorrektur später eintreffender Kosten, Admin-Kostenabschluss mit Audit.
 - Video-Enhance Härtung (06.09.): Upscale-Gate (kein Downscale/No-op, auch im Preis-Preview), Hochkant-4K nur über ByteDance, Scene nach Herkunft (aigc/ugc/common), beidseitige Output-Prüfung (0.98), Codec/Container/FPS/Dauer getrennt gespeichert, keine Rekodierung (Regressionstest), Reconciler alle 5 min mit terminalem Abschluss deterministischer Output-Verdikte + Horizon → manual_review, Anzeige vor/während/nach dem Lauf. Server-Codes lesen sich in EN/DE/ES als Sätze (gemeinsames Modul `engineErrors`), beide Oberflächen (AI Video Studio + Director's Cut) zeigen Quelle→Ziel, Engine-Routing, Status und gelieferte Messwerte; Materialart-Labels folgen der UI-Sprache.
 

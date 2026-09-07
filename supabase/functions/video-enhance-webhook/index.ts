@@ -4,7 +4,6 @@ import {
   applyLateCostTrueUp,
   finalizeCancelConfirmed,
   finalizeFailure,
-  finalizeSuccess,
 } from "../_shared/video-enhance-finalize.ts";
 import { setStatus, backoffMinutes, extractProviderCost } from "../_shared/video-enhance-runtime.ts";
 import { VIDEO_ENHANCE_SPECS } from "../_shared/video-enhance-models.ts";
@@ -202,8 +201,23 @@ serve(async (req) => {
               ? output.url
               : null;
       if (!outputUrl) return await asFailure(admin, run, "NO_OUTPUT", "provider returned no video");
-      const result = await finalizeSuccess(admin, run, outputUrl, providerCost);
-      return json(result, result.ok ? 200 : 500);
+      // Record the provider success and hand the (heavy, resumable) storing of
+      // the file to the persistence phase of the reconciler. A webhook request
+      // must never carry a multi-hundred-MB transfer.
+      await admin
+        .from("video_enhance_runs")
+        .update({
+          status: "provider_output_ready",
+          provider_output_url: outputUrl,
+          provider_status: "succeeded",
+          provider_completed_at: run.provider_completed_at ?? new Date().toISOString(),
+          next_persist_at: new Date().toISOString(),
+          next_reconcile_at: null,
+        })
+        .eq("id", run.id)
+        .not("status", "in", "(completed,provider_failed,provider_cancelled_confirmed)");
+      return json({ ok: true, status: "provider_output_ready" });
+
     }
 
     if (providerStatus === "failed") {
