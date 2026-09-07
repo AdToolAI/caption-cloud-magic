@@ -204,10 +204,12 @@ describe('output validation before asset and capture', () => {
 
 
 describe('lifecycle guarantees', () => {
-  it('treats only provider verdicts as terminal', () => {
+  it('treats only final verdicts as terminal and keeps storage loss separate', () => {
     expect(TERMINAL_STATUSES).toEqual([
       'completed',
       'provider_failed',
+      // provider succeeded, our copy is gone: never reported as a model failure
+      'output_lost',
       'provider_cancelled_confirmed',
     ]);
     expect(TERMINAL_STATUSES).not.toContain('cancel_requested');
