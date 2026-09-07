@@ -78,8 +78,16 @@ const PHASE_COPY: Record<RunPhase, Tri> = {
   preparing: { en: 'Preparing', de: 'Wird vorbereitet', es: 'Preparando' },
   submitted: { en: 'Sent to the engine', de: 'An die Engine übergeben', es: 'Enviado al motor' },
   processing: { en: 'Processing', de: 'Wird verarbeitet', es: 'Procesando' },
-  saving: { en: 'Saving the result', de: 'Ergebnis wird gespeichert', es: 'Guardando el resultado' },
-  retrying: { en: 'Retrying the save', de: 'Speichern wird wiederholt', es: 'Reintentando el guardado' },
+  saving: {
+    en: 'Video is ready — saving the file',
+    de: 'Video ist fertig — Datei wird gesichert',
+    es: 'El vídeo está listo: guardando el archivo',
+  },
+  retrying: {
+    en: 'Video is ready — saving again',
+    de: 'Video ist fertig — Sicherung wird wiederholt',
+    es: 'El vídeo está listo: reintentando el guardado',
+  },
   cancelling: { en: 'Cancelling', de: 'Wird abgebrochen', es: 'Cancelando' },
   done: { en: 'Finished', de: 'Fertig', es: 'Terminado' },
   failed: { en: 'Did not finish', de: 'Nicht abgeschlossen', es: 'No se completó' },

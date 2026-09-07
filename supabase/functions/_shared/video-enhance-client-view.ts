@@ -20,6 +20,11 @@ export const CLIENT_RUN_FIELDS = [
   'provider_submitted_at',
   'provider_completed_at',
   'cancel_requested_at',
+  // where a failure happened: 'provider' (model) vs 'persist' (our storage)
+  'failure_stage',
+  // storing progress, so the surface can say "generation done, saving file"
+  'expected_content_length',
+  'resumable_upload_offset',
   // what was ordered and what really runs
   'model_id',
   'requested_model_id',

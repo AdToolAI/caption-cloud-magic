@@ -48,6 +48,7 @@ import {
  *   estimate — authoritative price preview from server-measured source facts
  *   start    — idempotent run creation, reservation and provider submit
  *   status   — run state for polling
+ *   open_run — newest non-terminal run of the caller (reload / device switch)
  *   cancel   — records a cancel WISH; money only moves on provider confirmation
  */
 
@@ -68,7 +69,7 @@ const json = (body: unknown, status = 200) =>
 const env = (key: string) => Deno.env.get(key) ?? undefined;
 
 interface RequestBody {
-  action?: "estimate" | "start" | "status" | "cancel";
+  action?: "estimate" | "start" | "status" | "cancel" | "open_run";
   idempotencyKey?: string;
   /** Validation-only switch, honoured for allowlisted test accounts only. */
   testFailPersistOnce?: boolean;
@@ -272,6 +273,21 @@ serve(async (req) => {
     const body = (await req.json()) as RequestBody;
     const action = body.action ?? "start";
 
+    // ---- open_run: restore the UI after a reload / on another device -------
+    // The backend owns the job; the browser is only an observer. This returns
+    // the newest NON-TERMINAL run of the authenticated user, nothing else.
+    if (action === "open_run") {
+      const { data: open } = await admin
+        .from("video_enhance_runs")
+        .select("*")
+        .eq("user_id", user.id)
+        .not("status", "in", "(completed,provider_failed,provider_cancelled_confirmed,manual_review)")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return json({ run: toClientRun(open) });
+    }
+
     // ---- status ------------------------------------------------------------
     if (action === "status") {
       if (!body.runId) return json({ error: "runId required" }, 400);
@@ -285,6 +301,7 @@ serve(async (req) => {
       // Customer projection only: measured output facts in, internals out.
       return json({ run: toClientRun(run) });
     }
+
 
     // ---- cancel (a wish, never a refund) ------------------------------------
     if (action === "cancel") {

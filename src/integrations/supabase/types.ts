@@ -18638,11 +18638,15 @@ export type Database = {
           credits_reserved: number
           currency: string
           delivery_strategy: string | null
+          destination_object_path: string | null
           effective_multiplier: number | null
           error_code: string | null
           error_message: string | null
           estimated_units: number | null
           executing_topaz_model: string | null
+          expected_content_length: number | null
+          expected_content_type: string | null
+          failure_stage: string | null
           fps: number
           fx_rate_used: number
           fx_safety_buffer_used: number
@@ -18658,6 +18662,7 @@ export type Database = {
           multiplier_used: number | null
           net_revenue_eur: number | null
           next_late_check_at: string | null
+          next_persist_at: string | null
           next_reconcile_at: string | null
           output_asset_id: string | null
           output_bitrate_kbps: number | null
@@ -18671,6 +18676,9 @@ export type Database = {
           overcharge_refund_amount_eur: number | null
           overcharge_refund_at: string | null
           persist_attempts: number
+          persist_last_error: string | null
+          persist_lease_owner: string | null
+          persist_lease_until: string | null
           pricing_gate: string | null
           pricing_gate_reason: string | null
           pricing_version: string
@@ -18685,6 +18693,7 @@ export type Database = {
           provider_cost_source: string
           provider_cost_usd_actual: number | null
           provider_cost_usd_estimated: number
+          provider_output_expires_at: string | null
           provider_output_url: string | null
           provider_prediction_id: string | null
           provider_pricing_version: string
@@ -18696,6 +18705,9 @@ export type Database = {
           requested_model_id: string | null
           requested_output_quality: string | null
           resolution: string
+          resumable_upload_expires_at: string | null
+          resumable_upload_offset: number
+          resumable_upload_url: string | null
           source_asset_id: string | null
           source_container: string | null
           source_duration_seconds: number
@@ -18740,11 +18752,15 @@ export type Database = {
           credits_reserved?: number
           currency?: string
           delivery_strategy?: string | null
+          destination_object_path?: string | null
           effective_multiplier?: number | null
           error_code?: string | null
           error_message?: string | null
           estimated_units?: number | null
           executing_topaz_model?: string | null
+          expected_content_length?: number | null
+          expected_content_type?: string | null
+          failure_stage?: string | null
           fps: number
           fx_rate_used: number
           fx_safety_buffer_used: number
@@ -18760,6 +18776,7 @@ export type Database = {
           multiplier_used?: number | null
           net_revenue_eur?: number | null
           next_late_check_at?: string | null
+          next_persist_at?: string | null
           next_reconcile_at?: string | null
           output_asset_id?: string | null
           output_bitrate_kbps?: number | null
@@ -18773,6 +18790,9 @@ export type Database = {
           overcharge_refund_amount_eur?: number | null
           overcharge_refund_at?: string | null
           persist_attempts?: number
+          persist_last_error?: string | null
+          persist_lease_owner?: string | null
+          persist_lease_until?: string | null
           pricing_gate?: string | null
           pricing_gate_reason?: string | null
           pricing_version: string
@@ -18787,6 +18807,7 @@ export type Database = {
           provider_cost_source?: string
           provider_cost_usd_actual?: number | null
           provider_cost_usd_estimated: number
+          provider_output_expires_at?: string | null
           provider_output_url?: string | null
           provider_prediction_id?: string | null
           provider_pricing_version: string
@@ -18798,6 +18819,9 @@ export type Database = {
           requested_model_id?: string | null
           requested_output_quality?: string | null
           resolution: string
+          resumable_upload_expires_at?: string | null
+          resumable_upload_offset?: number
+          resumable_upload_url?: string | null
           source_asset_id?: string | null
           source_container?: string | null
           source_duration_seconds: number
@@ -18842,11 +18866,15 @@ export type Database = {
           credits_reserved?: number
           currency?: string
           delivery_strategy?: string | null
+          destination_object_path?: string | null
           effective_multiplier?: number | null
           error_code?: string | null
           error_message?: string | null
           estimated_units?: number | null
           executing_topaz_model?: string | null
+          expected_content_length?: number | null
+          expected_content_type?: string | null
+          failure_stage?: string | null
           fps?: number
           fx_rate_used?: number
           fx_safety_buffer_used?: number
@@ -18862,6 +18890,7 @@ export type Database = {
           multiplier_used?: number | null
           net_revenue_eur?: number | null
           next_late_check_at?: string | null
+          next_persist_at?: string | null
           next_reconcile_at?: string | null
           output_asset_id?: string | null
           output_bitrate_kbps?: number | null
@@ -18875,6 +18904,9 @@ export type Database = {
           overcharge_refund_amount_eur?: number | null
           overcharge_refund_at?: string | null
           persist_attempts?: number
+          persist_last_error?: string | null
+          persist_lease_owner?: string | null
+          persist_lease_until?: string | null
           pricing_gate?: string | null
           pricing_gate_reason?: string | null
           pricing_version?: string
@@ -18889,6 +18921,7 @@ export type Database = {
           provider_cost_source?: string
           provider_cost_usd_actual?: number | null
           provider_cost_usd_estimated?: number
+          provider_output_expires_at?: string | null
           provider_output_url?: string | null
           provider_prediction_id?: string | null
           provider_pricing_version?: string
@@ -18900,6 +18933,9 @@ export type Database = {
           requested_model_id?: string | null
           requested_output_quality?: string | null
           resolution?: string
+          resumable_upload_expires_at?: string | null
+          resumable_upload_offset?: number
+          resumable_upload_url?: string | null
           source_asset_id?: string | null
           source_container?: string | null
           source_duration_seconds?: number
@@ -21306,6 +21342,129 @@ export type Database = {
           revoked_at: string
           source_provider: string
         }[]
+      }
+      video_enhance_claim_persist_run: {
+        Args: { p_lease_seconds?: number; p_worker: string }
+        Returns: {
+          actual_contribution_eur: number | null
+          actual_height: number | null
+          actual_margin_pct: number | null
+          actual_units: number | null
+          actual_width: number | null
+          calibration_reason: string | null
+          calibration_status: string
+          callback_token: string
+          cancel_requested_at: string | null
+          contribution_eur: number | null
+          cost_closed_at: string | null
+          cost_closed_by: string | null
+          cost_closure_reason: string | null
+          cost_drift_ratio: number | null
+          created_at: string
+          credits_reserved: number
+          currency: string
+          delivery_strategy: string | null
+          destination_object_path: string | null
+          effective_multiplier: number | null
+          error_code: string | null
+          error_message: string | null
+          estimated_units: number | null
+          executing_topaz_model: string | null
+          expected_content_length: number | null
+          expected_content_type: string | null
+          failure_stage: string | null
+          fps: number
+          fx_rate_used: number
+          fx_safety_buffer_used: number
+          id: string
+          idempotency_key: string
+          interpolation_model: string | null
+          last_reconciled_at: string | null
+          late_cost_attempts: number
+          margin_pct: number | null
+          mode: string
+          model_id: string
+          multiplier_cap: number | null
+          multiplier_used: number | null
+          net_revenue_eur: number | null
+          next_late_check_at: string | null
+          next_persist_at: string | null
+          next_reconcile_at: string | null
+          output_asset_id: string | null
+          output_bitrate_kbps: number | null
+          output_codec: string | null
+          output_container: string | null
+          output_duration_seconds: number | null
+          output_fps: number | null
+          output_mime_type: string | null
+          output_size_bytes: number | null
+          output_url: string | null
+          overcharge_refund_amount_eur: number | null
+          overcharge_refund_at: string | null
+          persist_attempts: number
+          persist_last_error: string | null
+          persist_lease_owner: string | null
+          persist_lease_until: string | null
+          pricing_gate: string | null
+          pricing_gate_reason: string | null
+          pricing_version: string
+          processing_seconds: number | null
+          projected_height: number | null
+          projected_width: number | null
+          projection_confidence: string | null
+          projection_matched: boolean | null
+          projection_strategy: string | null
+          provider_completed_at: string | null
+          provider_cost_eur_buffered: number
+          provider_cost_source: string
+          provider_cost_usd_actual: number | null
+          provider_cost_usd_estimated: number
+          provider_output_expires_at: string | null
+          provider_output_url: string | null
+          provider_prediction_id: string | null
+          provider_pricing_version: string
+          provider_retry_count: number
+          provider_status: string | null
+          provider_submitted_at: string | null
+          rate_card_version: string
+          reconciliation_attempts: number
+          requested_model_id: string | null
+          requested_output_quality: string | null
+          resolution: string
+          resumable_upload_expires_at: string | null
+          resumable_upload_offset: number
+          resumable_upload_url: string | null
+          source_asset_id: string | null
+          source_container: string | null
+          source_duration_seconds: number
+          source_fps: number
+          source_height: number
+          source_model: string | null
+          source_size_bytes: number | null
+          source_url: string
+          source_width: number
+          staging_key: string | null
+          status: string
+          submit_lease_expires_at: string | null
+          submit_lease_owner: string | null
+          target_height: number | null
+          target_width: number | null
+          test_fail_persist_once: boolean
+          tier: string
+          unit_rate_checked_at: string | null
+          unit_rate_source: string | null
+          unit_rate_usd: number | null
+          updated_at: string
+          user_id: string
+          user_price_eur: number
+          verified_effective_multiplier: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "video_enhance_runs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       video_model_runtime_stats: {
         Args: never
