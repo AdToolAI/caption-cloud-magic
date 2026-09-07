@@ -54,6 +54,12 @@ interface Props {
   audioSupported: boolean;
   audioEnabled: boolean;
   audioDisabled?: boolean;
+  /**
+   * The current mode produces no sound at all. The chip stays visible while
+   * sound is still switched on so the user can switch it off — the request is
+   * blocked meanwhile, never silently muted.
+   */
+  audioUnsupported?: boolean;
   onAudioChange: (value: boolean) => void;
 }
 
@@ -136,6 +142,7 @@ export function QuickSettingsBar({
   audioSupported,
   audioEnabled,
   audioDisabled,
+  audioUnsupported,
   onAudioChange,
 }: Props) {
   const maxDuration = durations.length ? Math.max(...durations) : 0;
@@ -237,7 +244,9 @@ export function QuickSettingsBar({
           icon={audioEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
           active={audioEnabled}
           label={
-            audioEnabled
+            audioUnsupported
+              ? tx({ de: 'Ton nicht möglich', en: 'Sound not available', es: 'Sonido no disponible' })
+              : audioEnabled
               ? tx({ de: 'Ton an', en: 'Sound on', es: 'Sonido activado' })
               : tx({ de: 'Ton aus', en: 'Sound off', es: 'Sonido desactivado' })
           }

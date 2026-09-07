@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
       supabaseAdmin,
       {
         modelId: "seedance-2-5",
-        mode: inferMode({
+        mode: inferMode({ modelId: "seedance-2-5",
           startImageUrl,
           endImageUrl,
           referenceImageUrls: Array.isArray(referenceImageUrls) ? referenceImageUrls : null,

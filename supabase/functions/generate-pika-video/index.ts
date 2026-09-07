@@ -187,7 +187,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       {
         modelId: model,
         resolution: model === 'pika-2-2-pro' ? '1080p' : '720p',
-        mode: inferMode({ startImageUrl, endImageUrl }),
+        mode: inferMode({ modelId: model, startImageUrl, endImageUrl }),
         durationSeconds: Number(duration),
         aspectRatio,
       },

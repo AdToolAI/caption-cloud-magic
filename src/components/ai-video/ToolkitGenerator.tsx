@@ -33,7 +33,10 @@ import { ShotDirectorPanel } from './ShotDirectorPanel';
 import CinematicStylePresets from './CinematicStylePresets';
 import { MultiReferenceUploader, type ViduReferenceSlot } from './MultiReferenceUploader';
 import {
+  audioSupportedForMode,
   deriveStudioMode,
+  supportsEndOnlyPlacement,
+  supportsFirstLastPair,
   durationsFor,
   exactFrameLabel,
   getStudioCapabilities,
@@ -494,17 +497,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
    * `studioCapabilities` over the generated mirror of the server registry.
    * Nothing here re-derives provider knowledge locally. */
   /**
-   * The mode comes STRICTLY from the inputs actually attached. If the model
-   * does not offer that mode, `caps.supported` is false and the capability
-   * violation below names the real `mode` conflict — nothing is bent to t2v.
+   * The mode comes STRICTLY from the inputs actually attached AND from where
+   * the user placed them. A single image with placement "at the end" is an
+   * END-ONLY request (`lastFrame`), never `t2v` and never `i2v`: the canonical
+   * resolver in the registry mirror decides, so UI and edge function agree.
+   * If the model does not offer that mode, `caps.supported` is false and the
+   * capability violation below names the real `mode` conflict.
    */
+  const placedEndImage = !!startImageUrl && referencePlacement === 'end';
   const studioMode = useMemo(
     () => deriveStudioMode({
-      hasStartImage: !!startImageUrl,
+      modelId: model.id,
+      hasStartImage: !!startImageUrl && referencePlacement !== 'end',
+      hasEndImage: placedEndImage,
       hasReferenceImages: viduReferences.length > 0,
       hasReferenceVideo: !!referenceVideoUrl,
     }),
-    [startImageUrl, viduReferences.length, referenceVideoUrl],
+    [model.id, startImageUrl, placedEndImage, referencePlacement, viduReferences.length, referenceVideoUrl],
   );
   const caps = useMemo(() => getStudioCapabilities(model.id, studioMode), [model.id, studioMode]);
   const capDurations = useMemo(
@@ -514,6 +523,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const capPixelLabel = useMemo(
     () => exactFrameLabel(model.id, studioMode, resolution, aspectRatio),
     [model.id, studioMode, resolution, aspectRatio],
+  );
+  /**
+   * Canonical audio truth for the CURRENT mode — a model that makes sound in
+   * one mode does not automatically make sound in another. Requested sound on
+   * a silent mode blocks the start instead of being dropped on the way out.
+   */
+  const modeAudioSupported = useMemo(
+    () => audioSupportedForMode(model.id, studioMode),
+    [model.id, studioMode],
   );
   /** Mirror of the server gate — blocks the start, never rewrites a value. */
   const capabilityViolation = useMemo(
@@ -527,13 +545,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     [model.id, studioMode, resolution, duration, aspectRatio],
   );
 
+
   /**
    * Placement violations are explicit, never silently routed to 'start'.
-   * `endFrame` / `anchorOnly` come from the canonical registry (endFrame) resp.
-   * the documented product semantics (anchorOnly).
+   * "At the end" means ONE image sent as the last frame WITHOUT a first frame,
+   * so it needs `supportsEndOnlyPlacement` (canonical `lastFrame` mode) — a
+   * model that only pairs first+last frames is named as such instead of being
+   * offered and then rejected by the provider.
    */
   const placementViolation = useMemo<string | null>(() => {
-    if (referencePlacement === 'end' && !model.capabilities.endFrame) {
+    if (referencePlacement === 'end' && !supportsEndOnlyPlacement(model.id)) {
+      if (supportsFirstLastPair(model.id)) {
+        return tx({
+          de: `${model.name} nimmt ein Endbild nur zusammen mit einem Startbild an. Bitte Platzierung ändern oder ein Modell mit reinem Endbild wählen.`,
+          en: `${model.name} only accepts an end frame together with a start frame. Change the placement or pick a model that supports an end frame on its own.`,
+          es: `${model.name} solo acepta un fotograma final junto con uno inicial. Cambia la ubicación o elige un modelo que admita solo el fotograma final.`,
+        });
+      }
       return tx({
         de: `${model.name} kann kein Endbild verarbeiten. Bitte Platzierung ändern oder ein Modell mit Endbild wählen.`,
         en: `${model.name} cannot take an end frame. Change the placement or pick a model that supports it.`,
@@ -548,7 +576,21 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       });
     }
     return null;
-  }, [referencePlacement, model.capabilities.endFrame, model.capabilities.anchorOnly, model.name]);
+  }, [referencePlacement, model.id, model.capabilities.anchorOnly, model.name]);
+
+  /**
+   * Requested sound on a mode that cannot produce any — blocked, not dropped.
+   * The audio chip stays visible while this is active so the user can turn it
+   * off; nothing is silently rewritten on the way to the provider.
+   */
+  const audioViolation = useMemo<string | null>(() => {
+    if (!generateAudio || modeAudioSupported) return null;
+    return tx({
+      de: `${model.name} erzeugt in dieser Betriebsart keinen Ton. Bitte Ton ausschalten oder ein Modell mit nativem Ton wählen.`,
+      en: `${model.name} produces no sound in this mode. Switch sound off or pick a model with native audio.`,
+      es: `${model.name} no genera sonido en este modo. Desactiva el sonido o elige un modelo con audio nativo.`,
+    });
+  }, [generateAudio, modeAudioSupported, model.name]);
 
   /** Attached inputs the current model cannot accept — blocked, never cleared. */
   const inputViolation = useMemo<string | null>(() => {
@@ -570,7 +612,17 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     });
   }, [startImageUrl, referenceVideoUrl, viduReferences.length, model]);
 
-  const blockingIssue = capabilityViolation?.message ?? placementViolation ?? inputViolation;
+  /** Models whose canonical registry entry accepts a single END image. */
+  const endOnlyModels = useMemo(
+    () => AI_VIDEO_TOOLKIT_MODELS.filter((m) => m.capabilities.endFrame),
+    [],
+  );
+  const endOnlyModelNames = useMemo(
+    () => endOnlyModels.map((m) => m.name).join(' · '),
+    [endOnlyModels],
+  );
+
+  const blockingIssue = capabilityViolation?.message ?? placementViolation ?? inputViolation ?? audioViolation;
 
   /* ── Model switch: URL sync ONLY ──
    * No silent resets. Duration / aspect ratio / resolution / audio / uploads
@@ -1127,9 +1179,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           }
           lockedReason={
             referencePlacement === 'end'
-              ? (language === 'de'
-                  ? tx({ de: 'Endframe wird nur von Luma Ray 2 unterstützt. Placement zurück auf „Am Anfang" setzen, um andere Modelle zu wählen.', en: 'End frame is only supported by Luma Ray 2. Set placement back to "At the beginning" to choose other models.', es: 'El fotograma final solo es compatible con Luma Ray 2. Vuelve a colocar la posición en "Al principio" para elegir otros modelos.' })
-                  : 'End-frame is only supported by Luma Ray 2. Reset placement to "At start" to select other models.')
+              ? tx({
+                  de: `Ein reines Endbild unterstützen nur: ${endOnlyModelNames}. Platzierung zurück auf „Am Anfang" setzen, um andere Modelle zu wählen.`,
+                  en: `An end image on its own is only supported by: ${endOnlyModelNames}. Reset the placement to "At start" to select other models.`,
+                  es: `Solo admiten un fotograma final por sí solo: ${endOnlyModelNames}. Vuelve a poner la ubicación en «Al principio» para elegir otros modelos.`,
+                })
               : (language === 'de'
                   ? tx({ de: 'Anker-Modus wird nur von Vidu Q2 und Kling 3 unterstützt.', en: 'Anchor mode is only supported by Vidu Q2 and Kling 3.', es: 'El modo ancla solo es compatible con Vidu Q2 y Kling 3.' })
                   : 'Anchor mode is only supported by Vidu Q2 and Kling 3.')
@@ -1192,9 +1246,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         }))}
         fixedResolution={caps.resolutionLabels[0] ?? model.resolution}
         pixelLabel={capPixelLabel}
-        audioSupported={!!model.capabilities.audio}
+        audioSupported={modeAudioSupported || generateAudio}
         audioEnabled={generateAudio && !omniNonEnglishSilent}
         audioDisabled={omniNonEnglishSilent}
+        audioUnsupported={!modeAudioSupported}
         onAudioChange={setGenerateAudio}
       />
 
@@ -1450,7 +1505,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                     label: language === 'de' ? 'Am Ende' : 'At end',
                     hint: model.capabilities.endFrame
                       ? (language === 'de' ? tx({ de: 'Kamera fährt zum Bild hin', en: 'Camera moves to the image', es: 'La cámara se mueve a la imagen' }) : 'Camera transitions to image')
-                      : tx({ de: 'Nur mit Luma Ray 2 möglich', en: 'Only available with Luma Ray 2', es: 'Solo disponible con Luma Ray 2' }),
+                      : tx({
+                          de: `Nur mit: ${endOnlyModelNames}`,
+                          en: `Only with: ${endOnlyModelNames}`,
+                          es: `Solo con: ${endOnlyModelNames}`,
+                        }),
                     supportedByCurrent: !!model.capabilities.endFrame,
                   },
                   {
@@ -1479,12 +1538,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                         }
                         // Unsupported by current model → propose auto-switch via dialog.
                         if (opt.key === 'end') {
-                          const luma = AI_VIDEO_TOOLKIT_MODELS.find((m) => m.capabilities.endFrame);
-                          if (luma) {
+                          const endOnly = endOnlyModels[0];
+                          if (endOnly) {
                             setPendingPlacement({
                               placement: 'end',
-                              targetModelId: luma.id,
-                              targetModelName: luma.name,
+                              targetModelId: endOnly.id,
+                              targetModelName: endOnly.name,
                             });
                           }
                         } else if (opt.key === 'anchor') {
@@ -1982,14 +2041,20 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {pendingPlacement?.placement === 'end'
-                ? tx({ de: tx({ de: "Endframe nur mit Luma Ray 2", en: "End frame only with Luma Ray 2", es: "Fotograma final solo con Luma Ray 2" }), en: 'End-frame only with Luma Ray 2', es: 'Fotograma final solo con Luma Ray 2' })
+                ? tx({
+                    de: `Reines Endbild nur mit: ${endOnlyModelNames}`,
+                    en: `End image on its own only with: ${endOnlyModelNames}`,
+                    es: `Fotograma final por sí solo solo con: ${endOnlyModelNames}`,
+                  })
                 : (language === 'de' ? tx({ de: 'Anker-Modus benötigt Vidu Q2 oder Kling 3', en: 'Anchor mode requires Vidu Q2 or Kling 3', es: 'El modo Ancla requiere Vidu Q2 o Kling 3' }) : 'Anchor mode needs Vidu Q2 or Kling 3')}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pendingPlacement?.placement === 'end'
-                ? (language === 'de'
-                    ? tx({ de: `Die Endframe-Funktion ist ausschließlich mit Luma Ray 2 verfügbar. Möchtest du jetzt zu ${pendingPlacement?.targetModelName} wechseln? Solange „Am Ende“ aktiv ist, sind andere Modelle im Picker ausgegraut.`, en: `The end frame feature is only available with Luma Ray 2. Do you want to switch to ${pendingPlacement?.targetModelName} now? As long as “At the end” is active, other models in the picker stay greyed out.`, es: `La función de fotograma final solo está disponible con Luma Ray 2. ¿Quieres cambiar a ${pendingPlacement?.targetModelName} ahora? Mientras «Al final» esté activo, los demás modelos del selector permanecen atenuados.` })
-                    : `The end-frame option is exclusive to Luma Ray 2. Switch to ${pendingPlacement?.targetModelName} now? While "At end" is active, other models will be greyed out.`)
+                ? tx({
+                    de: `Ein reines Endbild unterstützen nur: ${endOnlyModelNames}. Möchtest du jetzt zu ${pendingPlacement?.targetModelName} wechseln? Solange „Am Ende“ aktiv ist, sind andere Modelle im Picker ausgegraut.`,
+                    en: `An end image on its own is only supported by: ${endOnlyModelNames}. Switch to ${pendingPlacement?.targetModelName} now? While "At end" is active, other models stay greyed out.`,
+                    es: `Solo admiten un fotograma final por sí solo: ${endOnlyModelNames}. ¿Cambiar ahora a ${pendingPlacement?.targetModelName}? Mientras «Al final» esté activo, los demás modelos permanecen atenuados.`,
+                  })
                 : (language === 'de'
                     ? tx({ de: `Der Anker-Modus (Referenzbild ohne festen Frame) ist nur mit Vidu Q2 oder Kling 3 verfügbar. Zu ${pendingPlacement?.targetModelName} wechseln?`, en: `Anchor mode (reference image without fixed frame) is only available with Vidu Q2 or Kling 3. Switch to ${pendingPlacement?.targetModelName}?`, es: `El modo ancla (imagen de referencia sin fotograma fijo) solo está disponible con Vidu Q2 o Kling 3. ¿Cambiar a ${pendingPlacement?.targetModelName}?` })
                     : `Anchor mode (reference image without a forced frame) is only available with Vidu Q2 or Kling 3. Switch to ${pendingPlacement?.targetModelName}?`)}

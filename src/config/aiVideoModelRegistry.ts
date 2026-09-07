@@ -18,6 +18,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { VisualInputProfile } from '@/lib/composer/visualInputs/types';
 import { getModelCapabilityUnion, referenceModeRequirement } from '@/lib/videoCapabilities/studioCapabilities';
+import { supportsEndOnly, supportsPairedEndFrame } from '@/config/videoModelSpecs';
 
 
 import { KLING_VIDEO_MODELS } from './klingVideoCredits';
@@ -74,8 +75,15 @@ export interface ToolkitModel {
      * in-frame synchronous mouth articulation.
      */
     nativeDialogue?: boolean;
-    /** DERIVED from a canonical mode with `inputs.lastFrame`. */
+    /**
+     * DERIVED: the model has a route that accepts a SINGLE end image WITHOUT
+     * a first frame (canonical `lastFrame` mode). This is what the "at the
+     * end" placement needs — NOT the weaker `inputs.lastFrame`, which is also
+     * true for first+last pairing.
+     */
     endFrame?: boolean;
+    /** DERIVED: the model can pair a first frame WITH an end frame. */
+    firstLastFrame?: boolean;
     /**
      * True identity/subject reference: model can use a reference image as
      * character/style anchor without forcing it into frame 0.
@@ -777,7 +785,8 @@ function deriveTechnicalCapabilities(m: ToolkitModelMeta): ToolkitModel {
       audio: union.audio,
       smartDuration: union.smartDuration,
       // Canonical input slots — no second hand-maintained mirror.
-      endFrame: !!union.inputs.lastFrame,
+      endFrame: supportsEndOnly(m.id),
+      firstLastFrame: supportsPairedEndFrame(m.id),
       ...(maxRefImages > 0 ? { multiRef: true, maxReferences: maxRefImages } : { multiRef: false }),
       ...(refRequirement
         ? {

@@ -81,7 +81,7 @@ serve(async (req) => {
       supabaseAdmin,
       {
         modelId: model,
-        mode: inferMode({ startImageUrl, endImageUrl: body.endImageUrl }),
+        mode: inferMode({ modelId: model, startImageUrl, endImageUrl: body.endImageUrl }),
         resolution: requestedResolution,
         durationSeconds: duration,
         aspectRatio,

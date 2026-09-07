@@ -21,6 +21,12 @@ export type VideoMode =
   | 't2v'
   | 'i2v'
   | 'firstLast'
+  /**
+   * END-ONLY: a single image is sent as the LAST frame WITHOUT a first frame.
+   * Only routes whose provider contract accepts an end image on its own may
+   * declare this mode — it is NOT implied by `firstLast`.
+   */
+  | 'lastFrame'
   | 'reference'
   | 'v2v'
   | 'edit'
@@ -132,7 +138,17 @@ export interface ModeControls {
 
 export interface ModeInputs {
   firstFrame?: boolean;
+  /** The mode accepts an end/last frame at all. */
   lastFrame?: boolean;
+  /**
+   * Machine-readable input rule for `lastFrame`.
+   *  - `true`  (the conservative default whenever `lastFrame` is set): the end
+   *    frame is only accepted TOGETHER with a first frame. An end-only request
+   *    on such a mode must be rejected, never silently ignored.
+   *  - `false`: the route accepts the end frame on its own (end-only).
+   * The dedicated `lastFrame` mode is the canonical carrier of end-only.
+   */
+  lastFrameRequiresFirstFrame?: boolean;
   images?: { min: number; max: number };
   videos?: { min: number; max: number };
   audios?: { min: number; max: number };
@@ -466,7 +482,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
         audio: true,
         controls: { smartDuration: true },
-        inputs: { firstFrame: true, lastFrame: true },
+        inputs: { firstFrame: true, lastFrame: true, lastFrameRequiresFirstFrame: true },
         constraints: [
           {
             reason:
@@ -626,7 +642,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21'],
         audio: false,
         controls: { seed: true },
-        inputs: { firstFrame: true, lastFrame: true },
+        inputs: { firstFrame: true, lastFrame: true, lastFrameRequiresFirstFrame: true },
       }),
     ],
   },
@@ -1069,7 +1085,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         fps: [24, 25],
         audio: true,
         controls: { seed: true },
-        inputs: { firstFrame: true, lastFrame: true },
+        inputs: { firstFrame: true, lastFrame: true, lastFrameRequiresFirstFrame: true },
         constraints: [
           { resolution: '2K', durations: [6, 8], reason: 'LTX rendert oberhalb 1080p nur bis 8 Sekunden.' },
           { resolution: '4K', durations: [6, 8], reason: 'LTX rendert oberhalb 1080p nur bis 8 Sekunden.' },
@@ -1451,7 +1467,24 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
         audio: false,
         controls: {},
-        inputs: { firstFrame: true, lastFrame: true },
+        inputs: { firstFrame: true, lastFrame: true, lastFrameRequiresFirstFrame: true },
+        constraints: [
+          { durations: [5], reason: 'Ray 3.2 akzeptiert Start-/Endbilder nur im 5-Sekunden-Tier.' },
+        ],
+      }),
+      /**
+       * END-ONLY. `generate-luma-video` sets `end_image` independently of
+       * `start_image` on this route, so a single image may be sent as the last
+       * frame without a first frame. Declared ONLY here — never inferred from
+       * a `firstLast`/`i2v` mode that also lists `lastFrame`.
+       */
+      mode('lastFrame', {
+        resolutions: [res('1080p', 1080, 'luma-ray32-5s'), res('720p', 720, 'luma-ray32-5s'), res('540p', 540, 'luma-ray32-5s')],
+        durations: [5],
+        aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+        audio: false,
+        controls: {},
+        inputs: { lastFrame: true, lastFrameRequiresFirstFrame: false },
         constraints: [
           { durations: [5], reason: 'Ray 3.2 akzeptiert Start-/Endbilder nur im 5-Sekunden-Tier.' },
         ],
@@ -1523,7 +1556,21 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21'],
         audio: false,
         controls: {},
-        inputs: { firstFrame: true, lastFrame: true },
+        inputs: { firstFrame: true, lastFrame: true, lastFrameRequiresFirstFrame: true },
+      }),
+      /**
+       * END-ONLY. `generate-luma-video` sets `end_image` independently of
+       * `start_image` on this route, so a single image may be sent as the last
+       * frame without a first frame. Declared ONLY here — never inferred from
+       * a `firstLast`/`i2v` mode that also lists `lastFrame`.
+       */
+      mode('lastFrame', {
+        resolutions: [res('720p', 720, 'luma-standard')],
+        durations: [5, 9],
+        aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21'],
+        audio: false,
+        controls: {},
+        inputs: { lastFrame: true, lastFrameRequiresFirstFrame: false },
       }),
     ],
   },
@@ -1562,7 +1609,21 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21'],
         audio: false,
         controls: {},
-        inputs: { firstFrame: true, lastFrame: true },
+        inputs: { firstFrame: true, lastFrame: true, lastFrameRequiresFirstFrame: true },
+      }),
+      /**
+       * END-ONLY. `generate-luma-video` sets `end_image` independently of
+       * `start_image` on this route, so a single image may be sent as the last
+       * frame without a first frame. Declared ONLY here — never inferred from
+       * a `firstLast`/`i2v` mode that also lists `lastFrame`.
+       */
+      mode('lastFrame', {
+        resolutions: [res('720p', 720, 'luma-pro')],
+        durations: [5, 9],
+        aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9', '9:21'],
+        audio: false,
+        controls: {},
+        inputs: { lastFrame: true, lastFrameRequiresFirstFrame: false },
       }),
     ],
   },
@@ -1724,7 +1785,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
         audio: true,
         controls: { seed: true },
-        inputs: { firstFrame: true, lastFrame: true },
+        inputs: { firstFrame: true, lastFrame: true, lastFrameRequiresFirstFrame: true },
       }),
     ],
   },
@@ -1763,7 +1824,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
         aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
         audio: true,
         controls: { seed: true },
-        inputs: { firstFrame: true, lastFrame: true },
+        inputs: { firstFrame: true, lastFrame: true, lastFrameRequiresFirstFrame: true },
       }),
     ],
   },
@@ -1948,6 +2009,65 @@ export function getModeSpec(spec: VideoModelSpec, m: VideoMode): ModeSpec | unde
 }
 
 /** Highest NATIVE resolution across all modes — never an upscale tier. */
+/**
+ * INPUT SIGNALS a caller actually holds — the canonical resolver turns them
+ * into a `VideoMode`. There is exactly ONE such resolver (mirrored to the
+ * client with this file), so UI and edge functions can never disagree about
+ * what "an end image without a start image" means.
+ */
+export interface GenerationInputSignals {
+  hasFirstFrame?: boolean;
+  hasLastFrame?: boolean;
+  hasReferenceImages?: boolean;
+  hasVideo?: boolean;
+}
+
+/** True when a mode accepts an end frame WITHOUT a first frame. */
+export function modeAcceptsEndOnly(m: ModeSpec): boolean {
+  return !!m.inputs?.lastFrame && m.inputs?.lastFrameRequiresFirstFrame === false;
+}
+
+/**
+ * True when the model has a route that accepts a SINGLE end image (no first
+ * frame). This — not `inputs.lastFrame` — is what the "at the end" placement
+ * needs. Paired first+last support is `supportsPairedEndFrame`.
+ */
+export function supportsEndOnly(modelId: string): boolean {
+  const spec = getVideoModelSpec(modelId);
+  return !!spec?.modes.some(modeAcceptsEndOnly);
+}
+
+/** True when the model accepts an end frame together with a first frame. */
+export function supportsPairedEndFrame(modelId: string): boolean {
+  const spec = getVideoModelSpec(modelId);
+  return !!spec?.modes.some((m) => !!m.inputs?.firstFrame && !!m.inputs?.lastFrame);
+}
+
+/**
+ * Canonical input -> mode resolution. Never guesses a mode the spec does not
+ * declare: an unsupported signal combination resolves to the mode that names
+ * it, so `validateCapability` rejects it with the real reason instead of the
+ * request being silently re-labelled as something the model does support.
+ */
+export function resolveGenerationMode(
+  modelId: string,
+  signals: GenerationInputSignals,
+): VideoMode {
+  const spec = getVideoModelSpec(modelId);
+  if (signals.hasVideo) return 'v2v';
+  if (signals.hasReferenceImages) return 'reference';
+  if (signals.hasFirstFrame && signals.hasLastFrame) {
+    // Prefer the dedicated pairing mode; fall back to the i2v route that
+    // declares `lastFrame` (Luma Ray 2 pairs inside i2v).
+    if (spec?.modes.some((m) => m.mode === 'firstLast')) return 'firstLast';
+    const paired = spec?.modes.find((m) => !!m.inputs?.firstFrame && !!m.inputs?.lastFrame);
+    return paired?.mode ?? 'firstLast';
+  }
+  if (signals.hasLastFrame) return 'lastFrame';
+  if (signals.hasFirstFrame) return 'i2v';
+  return 't2v';
+}
+
 export function maxNativeResolution(spec: VideoModelSpec): ResolutionSpec | undefined {
   const all = spec.modes.flatMap((m) => m.resolutions).filter((r) => r.native);
   return all.sort((a, b) => b.shortEdge - a.shortEdge)[0];

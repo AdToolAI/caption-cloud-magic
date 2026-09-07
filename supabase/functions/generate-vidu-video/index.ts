@@ -241,7 +241,7 @@ serve(async (req) => {
       supabaseAdmin,
       {
         modelId: model,
-        mode: inferMode({
+        mode: inferMode({ modelId: model,
           startImageUrl,
           endImageUrl,
           referenceImageUrls: Array.isArray(referenceImages) ? referenceImages : null,

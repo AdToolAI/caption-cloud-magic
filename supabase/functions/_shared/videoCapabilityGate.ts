@@ -19,6 +19,7 @@ import {
   getVideoModelSpec,
   parityKeyOf,
   projectTargetFrame,
+  resolveGenerationMode,
   validateCapability,
   type CapabilityRequest,
   type CapabilityViolation,
@@ -51,18 +52,29 @@ export interface CapabilityGateResult {
   parityColumns: ParityContextColumns | null;
 }
 
-/** Derives the generation mode from the inputs an edge function received. */
+/**
+ * Derives the generation mode from the inputs an edge function received.
+ *
+ * Spec-aware: the mapping is delegated to `resolveGenerationMode` in the
+ * canonical registry, so an END-ONLY request (end image, no start image)
+ * resolves to the `lastFrame` mode instead of being mislabelled as `t2v`
+ * (which used to let an unsupported end image through the gate and then be
+ * dropped by the provider) or as `firstLast` (which the provider would
+ * reject). Pass `modelId` whenever it is known.
+ */
 export function inferMode(input: {
+  modelId?: string | null;
   startImageUrl?: string | null;
   endImageUrl?: string | null;
   referenceImageUrls?: unknown[] | null;
   videoUrl?: string | null;
 }): VideoMode {
-  if (input.videoUrl) return 'v2v';
-  if (input.referenceImageUrls && input.referenceImageUrls.length > 0) return 'reference';
-  if (input.startImageUrl && input.endImageUrl) return 'firstLast';
-  if (input.startImageUrl) return 'i2v';
-  return 't2v';
+  return resolveGenerationMode(input.modelId ?? '', {
+    hasFirstFrame: !!input.startImageUrl,
+    hasLastFrame: !!input.endImageUrl,
+    hasReferenceImages: !!input.referenceImageUrls && input.referenceImageUrls.length > 0,
+    hasVideo: !!input.videoUrl,
+  });
 }
 
 export function evaluateCapabilityGate(req: CapabilityRequest): CapabilityGateResult {
