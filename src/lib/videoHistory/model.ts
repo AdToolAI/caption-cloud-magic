@@ -82,6 +82,7 @@ const ENHANCE_STATUS: Record<string, VideoHistoryStatus> = {
   manual_review: 'processing',
   completed: 'completed',
   provider_failed: 'failed',
+  output_lost: 'failed',
   provider_cancelled_confirmed: 'failed',
 };
 

@@ -49,6 +49,8 @@ export type RunPhase =
   | 'cancelling'
   | 'done'
   | 'failed'
+  /** Provider finished, but our stored copy is gone — money released. */
+  | 'lost'
   | 'cancelled'
   | 'review';
 
@@ -66,6 +68,7 @@ const PHASE_BY_STATUS: Record<string, RunPhase> = {
   cancel_requested: 'cancelling',
   completed: 'done',
   provider_failed: 'failed',
+  output_lost: 'lost',
   provider_cancelled_confirmed: 'cancelled',
   manual_review: 'review',
 };
@@ -91,6 +94,11 @@ const PHASE_COPY: Record<RunPhase, Tri> = {
   cancelling: { en: 'Cancelling', de: 'Wird abgebrochen', es: 'Cancelando' },
   done: { en: 'Finished', de: 'Fertig', es: 'Terminado' },
   failed: { en: 'Did not finish', de: 'Nicht abgeschlossen', es: 'No se completó' },
+  lost: {
+    en: 'Finished, but the file could not be kept — refunded',
+    de: 'Fertig, aber die Datei konnte nicht gesichert werden — erstattet',
+    es: 'Terminado, pero no se pudo conservar el archivo: reembolsado',
+  },
   cancelled: { en: 'Cancelled', de: 'Abgebrochen', es: 'Cancelado' },
   review: { en: 'Under review', de: 'In Prüfung', es: 'En revisión' },
 };
