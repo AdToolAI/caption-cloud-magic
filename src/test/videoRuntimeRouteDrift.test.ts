@@ -110,7 +110,7 @@ describe('Vidu route + mode truth', () => {
       const spec = getVideoModelSpec(id)!;
       for (const m of spec.modes) {
         expect(m.mode).not.toBe('reference');
-        expect(m.inputs?.referenceImages ?? 0).toBe(0);
+        expect(m.inputs?.images?.max ?? 0).toBeLessThanOrEqual(1);
       }
     }
   });
