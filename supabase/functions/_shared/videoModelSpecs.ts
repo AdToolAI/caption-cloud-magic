@@ -2266,6 +2266,28 @@ export function getModeSpec(spec: VideoModelSpec, m: VideoMode): ModeSpec | unde
   return spec.modes.find((entry) => entry.mode === m);
 }
 
+/**
+ * The provider contract REALLY executed for (spec x mode). Providers that split
+ * one product into task-specific routes (Wan 2.7 t2v/i2v) override it per mode.
+ * This is the parity identity — never a composite string.
+ */
+export function resolveRouteIdentity(spec: VideoModelSpec, m: VideoMode): RouteIdentity {
+  const modeSpec = getModeSpec(spec, m);
+  const identity: RouteIdentity = {
+    providerModelSlug: modeSpec?.providerModelSlug ?? spec.providerModelSlug,
+    apiRoute: modeSpec?.apiRoute ?? spec.apiRoute,
+    region: modeSpec?.region ?? spec.region,
+  };
+  assertSingleProviderSlug(identity.providerModelSlug, `${spec.id}/${m}`);
+  return identity;
+}
+
+/** Stable parity key for one executed contract. */
+export function routeParityKey(spec: VideoModelSpec, m: VideoMode, resolutionLabel?: string): string {
+  const r = resolveRouteIdentity(spec, m);
+  return [spec.id, r.providerModelSlug, r.apiRoute, r.region, m, resolutionLabel ?? '-'].join('::');
+}
+
 /** Highest NATIVE resolution across all modes — never an upscale tier. */
 /**
  * INPUT SIGNALS a caller actually holds — the canonical resolver turns them
