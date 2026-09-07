@@ -47,7 +47,7 @@ describe('studio capability selector = canonical registry', () => {
   it('never offers an enhance/upscale tier as native generation', () => {
     for (const m of AI_VIDEO_TOOLKIT_MODELS) {
       const spec = getVideoModelSpec(m.id)!;
-      const upscale = (spec.enhanceUpscaleTiers ?? []).map((t) => t.label);
+      const upscale: string[] = [...((spec.enhanceUpscaleTiers ?? []) as unknown as string[])];
       const offered = m.resolutions ?? [m.resolution];
       for (const label of upscale) {
         expect(offered, `${m.id} exposes upscale tier ${label} as native`).not.toContain(label);
