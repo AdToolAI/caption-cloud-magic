@@ -1125,7 +1125,25 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         </Card>
       )}
 
+      {/* ── Referenzen & Medien ── */}
+      <GenerateSection
+        id="references"
+        title={tx({ de: 'Referenzen & Medien', en: 'References & media', es: 'Referencias y medios' })}
+        icon={<ImagePlus className="h-4 w-4" />}
+        summary={
+          [
+            startImageUrl ? tx({ de: 'Startbild', en: 'Start image', es: 'Imagen inicial' }) : null,
+            viduReferences.length ? `${viduReferences.length} Ref.` : null,
+            referenceVideoUrl ? tx({ de: 'Video', en: 'Video', es: 'Vídeo' }) : null,
+          ].filter(Boolean).join(' · ') || null
+        }
+        defaultOpen={
+          !!startImageUrl || viduReferences.length > 0 || !!referenceVideoUrl ||
+          !!model.capabilities.multiRefRequired
+        }
+      >
       {/* ── Multi-Reference (capabilities.multiRef → Vidu Reference2V, Seedance 2.5, Veo 3.1) ── */}
+
       {model.capabilities.multiRef && !omniMediaLock &&
         !(model.capabilities.refExclusive && !!startImageUrl) && (
         refConstraintMet ? (
