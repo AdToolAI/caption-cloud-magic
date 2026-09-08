@@ -74,6 +74,78 @@ const json = (body: unknown, status = 200) =>
 
 const env = (key: string) => Deno.env.get(key) ?? undefined;
 
+/** Statuses where the provider still owes us a verdict. */
+const AWAITING_PROVIDER = new Set([
+  "provider_submitted",
+  "provider_processing",
+]);
+
+/** No more than one live provider read per run per 30 seconds. */
+const FAST_VERDICT_INTERVAL_MS = 30_000;
+
+/**
+ * Reads the provider once while the customer is watching and terminates the
+ * run IMMEDIATELY if the provider rejected it — which releases the reservation
+ * in the same moment instead of up to a whole reconcile cycle later.
+ *
+ * Deliberately narrow: a success is NOT finalised here (storing the file is
+ * the reconciler's claim-protected work), and any read failure is silent.
+ */
+// deno-lint-ignore no-explicit-any
+async function fastProviderVerdict(admin: any, run: any): Promise<any | null> {
+  if (!AWAITING_PROVIDER.has(String(run.status))) return null;
+  const providerId: string | null = run.provider_prediction_id ?? null;
+  if (!providerId) return null;
+  const lastRead = Date.parse(run.last_reconciled_at ?? "") || 0;
+  if (Date.now() - lastRead < FAST_VERDICT_INTERVAL_MS) return null;
+
+  const prediction = await readProviderPrediction(providerId, {
+    replicate: env("REPLICATE_API_KEY"),
+    topaz: env("TOPAZ_API_KEY"),
+  }, TAG).catch(() => null);
+  if (!prediction) return null;
+
+  await admin
+    .from("video_enhance_runs")
+    .update({ last_reconciled_at: new Date().toISOString() })
+    .eq("id", run.id);
+
+  if (prediction.status !== "failed") return null;
+
+  const verdict = classifyProviderFailure(prediction.error);
+  if (verdict.outage) {
+    console.error(`${TAG} PROVIDER OUTAGE (${verdict.code}) run=${run.id}: ${verdict.message}`);
+  }
+  await finalizeFailure(admin, run, verdict.code, verdict.message);
+  const { data: updated } = await admin
+    .from("video_enhance_runs")
+    .select("*")
+    .eq("id", run.id)
+    .maybeSingle();
+  return updated ?? null;
+}
+
+/**
+ * Provider-side outage pre-check.
+ *
+ * When the engine's own provider account has just refused two or more jobs for
+ * lack of funds, the next job would fail the same way — after taking the
+ * customer through reservation, submit and a long wait. So it is refused up
+ * front, before a single credit is touched.
+ */
+// deno-lint-ignore no-explicit-any
+async function providerOutageActive(admin: any, modelId: string): Promise<boolean> {
+  const since = new Date(Date.now() - 20 * 60_000).toISOString();
+  const { data } = await admin
+    .from("video_enhance_runs")
+    .select("id")
+    .eq("model_id", modelId)
+    .eq("error_code", PROVIDER_ACCOUNT_CREDITS)
+    .gte("updated_at", since)
+    .limit(2);
+  return Array.isArray(data) && data.length >= 2;
+}
+
 interface RequestBody {
   action?: "estimate" | "start" | "status" | "cancel" | "open_run";
   idempotencyKey?: string;
