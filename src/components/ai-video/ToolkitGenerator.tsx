@@ -50,7 +50,8 @@ import { QuickSettingsBar } from './generate/QuickSettingsBar';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
-import { extractEdgeErrorMessage } from '@/lib/edgeFunctionError';
+import { extractEdgeErrorMessage, extractEdgeErrorPayload } from '@/lib/edgeFunctionError';
+import { findDuplicateReferences, isReferenceRole } from '@/lib/ai-video/referenceBinding';
 import { friendlyVideoErrorMessage } from '@/lib/videoErrorMessages';
 
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
@@ -249,7 +250,22 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   } | null>(null);
   const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
   const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
-  const [viduReferences, setViduReferences] = useState<ViduReferenceSlot[]>([]);
+  // Reference slots survive a reload: same order, same roles → identical
+  // provider binding after resume (see referenceBinding.ts).
+  const [viduReferences, setViduReferences] = useState<ViduReferenceSlot[]>(() => {
+    const raw = setupDraft.viduReferences;
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((s: any) => s && typeof s.url === 'string' && s.url.length > 0)
+      .map((s: any) => ({
+        url: s.url as string,
+        role: isReferenceRole(s.role) ? s.role : 'character',
+        hash: typeof s.hash === 'string' ? s.hash : undefined,
+      }));
+  });
+  /** UI index of the reference thumbnail the provider rejected (content[N] → slot). */
+  const [rejectedReferenceIndex, setRejectedReferenceIndex] = useState<number | null>(null);
+  useEffect(() => { setRejectedReferenceIndex(null); }, [viduReferences]);
   const [uploading, setUploading] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -323,10 +339,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       castLocationId,
       castBuildingId,
       castPropIds,
+      viduReferences,
     }),
     [
       modelId, duration, aspectRatio, resolution, generateAudio, startImageUrl,
       referencePlacement, omniLines, castCharacterIds, castLocationId, castBuildingId, castPropIds,
+      viduReferences,
     ],
   );
   const setupSnapshotRef = useRef(setupSnapshot);
