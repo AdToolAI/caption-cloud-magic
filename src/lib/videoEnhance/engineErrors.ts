@@ -47,6 +47,16 @@ const COPY = {
     de: 'Die Engine konnte den Auftrag nicht annehmen. Es wurde nichts berechnet – versuche es gleich noch einmal.',
     es: 'El motor no pudo aceptar este trabajo. No se ha cobrado nada; inténtalo de nuevo en un momento.',
   },
+  providerOutage: {
+    en: 'This job could not be run right now — the engine was unavailable. Your credit was returned in full. Please try again shortly.',
+    de: 'Die Veredelung konnte gerade nicht ausgeführt werden – die Engine war nicht verfügbar. Dein Guthaben wurde vollständig zurückgebucht. Bitte versuche es in Kürze erneut.',
+    es: 'Este trabajo no se pudo ejecutar ahora mismo: el motor no estaba disponible. Se te devolvió todo el saldo. Inténtalo de nuevo en breve.',
+  },
+  outputLost: {
+    en: 'The engine finished, but the file could no longer be retrieved. Your credit was returned in full. Please start the job again.',
+    de: 'Die Engine war fertig, aber die Datei war nicht mehr abrufbar. Dein Guthaben wurde vollständig zurückgebucht. Bitte starte den Auftrag erneut.',
+    es: 'El motor terminó, pero el archivo ya no se pudo recuperar. Se te devolvió todo el saldo. Vuelve a iniciar el trabajo.',
+  },
   conflict: {
     en: 'This video is already being enhanced. Wait for that run to finish.',
     de: 'Dieses Video wird bereits verbessert. Warte, bis dieser Lauf fertig ist.',
@@ -90,6 +100,14 @@ export function enhanceErrorKeyForCode(
     case 'INSUFFICIENT_CREDITS':
     case 'NO_WALLET':
       return 'credits';
+    // The provider's own "insufficient credits" is about OUR provider account,
+    // never the customer's wallet — it must not use the `credits` wording.
+    case 'PROVIDER_ACCOUNT_CREDITS':
+    case 'PROVIDER_FAILED':
+    case 'NO_OUTPUT':
+      return 'providerOutage';
+    case 'PROVIDER_OUTPUT_GONE':
+      return 'outputLost';
     case 'PROVIDER_REJECTED':
     case 'SUBMIT_UNCERTAIN':
     case 'RESERVATION_FAILED':
