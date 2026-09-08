@@ -16,6 +16,8 @@ import { useUserRoles } from '@/hooks/useUserRoles';
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
 import { EnhanceRunProgress } from '@/components/ai-video/EnhanceRunProgress';
+import { runPhaseLabel } from '@/lib/videoEnhance/runPresentation';
+import { isEnhanceLive } from '@/lib/videoEnhance/runStore';
 import type { CanonicalVideoAsset } from '@/lib/videoEnhance/canonicalVideoAsset';
 import { isAiGeneratedSource } from '@/lib/videoEnhance/recommend';
 import { engineErrorText } from '@/lib/videoEnhance/engineErrors';
@@ -121,6 +123,7 @@ const COPY = {
   price: { en: 'Price', de: 'Preis', es: 'Precio' },
   calculating: { en: 'Calculating…', de: 'Wird berechnet …', es: 'Calculando…' },
   start: { en: 'Enhance video', de: 'Video verbessern', es: 'Mejorar vídeo' },
+  otherJobs: { en: 'Your other enhancements', de: 'Deine weiteren Verbesserungen', es: 'Tus otras mejoras' },
   running: { en: 'Enhancing…', de: 'Wird verbessert …', es: 'Mejorando…' },
   cancel: { en: 'Cancel', de: 'Abbrechen', es: 'Cancelar' },
   done: { en: 'Your enhanced video is ready.', de: 'Dein verbessertes Video ist fertig.', es: 'Tu vídeo mejorado está listo.' },
@@ -226,6 +229,7 @@ export function EnhanceVideoPanel({
     sourceMeta,
     isStarting,
     isRunning,
+    runs,
     error,
     errorCode,
     errorReason,
@@ -362,6 +366,8 @@ export function EnhanceVideoPanel({
     if (!config || !hasSource) return;
     void startEnhance(source, config);
   }, [config, hasSource, source, startEnhance]);
+
+  const otherRuns = runs.filter((r) => r.id !== run?.id && isEnhanceLive(r.status));
 
   // Notify the host surface exactly once per finished run.
   const notifiedRef = useRef<string | null>(null);
@@ -726,6 +732,35 @@ export function EnhanceVideoPanel({
 
       {isRunning && run && <EnhanceRunProgress run={run} lang={lang} />}
 
+      {/* Other jobs of this user keep running in the backend — they stay
+          visible here instead of silently disappearing behind this panel. */}
+      {otherRuns.length > 0 && (
+        <div className="space-y-2" data-testid="enhance-other-runs">
+          <p className="text-xs text-muted-foreground">{tx('otherJobs', lang)}</p>
+          {otherRuns.map((other) => (
+            <div
+              key={other.id}
+              className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2"
+            >
+              <span className="truncate text-xs text-muted-foreground">
+                {other.model_id} · {other.resolution} · {other.fps} fps
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs">{runPhaseLabel(other.status, lang)}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void cancelEnhance(other.id)}
+                  aria-label={tx('cancel', lang)}
+                >
+                  <XCircle className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {completed && run ? (
         <div className="space-y-3">
           <p className="text-sm text-primary">{tx('done', lang)}</p>
@@ -774,10 +809,12 @@ export function EnhanceVideoPanel({
         <div className="flex gap-3">
           <Button
             onClick={onStart}
-            disabled={isStarting || isRunning || !!blockedReason}
+            // A running job never blocks the next one: several upscales may
+            // run at the same time, the backend queues the heavy work.
+            disabled={isStarting || !!blockedReason}
             className="flex-1"
           >
-            {isStarting || isRunning ? (
+            {isStarting ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{tx('running', lang)}</>
             ) : (
               <><Sparkles className="w-4 h-4 mr-2" />{tx('start', lang)}</>

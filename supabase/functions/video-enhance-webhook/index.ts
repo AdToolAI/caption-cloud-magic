@@ -5,7 +5,7 @@ import {
   finalizeCancelConfirmed,
   finalizeFailure,
 } from "../_shared/video-enhance-finalize.ts";
-import { setStatus, backoffMinutes, extractProviderCost } from "../_shared/video-enhance-runtime.ts";
+import { setStatus, backoffMinutes, extractProviderCost, triggerPersist } from "../_shared/video-enhance-runtime.ts";
 import { VIDEO_ENHANCE_SPECS } from "../_shared/video-enhance-models.ts";
 import { classifyProviderFailure } from "../_shared/video-enhance-provider-errors.ts";
 
@@ -217,6 +217,9 @@ serve(async (req) => {
         })
         .eq("id", run.id)
         .not("status", "in", "(completed,provider_failed,output_lost,provider_cancelled_confirmed)");
+      // Hand the heavy transfer to the internal worker right away — the
+      // webhook itself must stay fast and must never move the bytes.
+      await triggerPersist("[video-enhance-webhook]");
       return json({ ok: true, status: "provider_output_ready" });
 
     }
