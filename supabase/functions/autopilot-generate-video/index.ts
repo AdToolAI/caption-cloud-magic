@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
       user_id: slot.user_id,
       slot_id: slot.id,
       provider: providerKey,
-      model: provider.model,
+      model: providerSlug,
       prompt: visual_prompt_en,
       duration_sec: duration,
       aspect_ratio: aspect,
