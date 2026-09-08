@@ -35,7 +35,7 @@ Die Claim-RPC bekommt zwei Parameter, ausgewertet gegen aktive Leases:
 - `p_max_global` (Standard 3),
 - `p_max_per_user` (Standard 1).
 
-Werte kommen aus einer einzigen Konstantenquelle (`_shared/video-enhance-runtime.ts`, per Function-Secret überschreibbar) — keine verstreuten Zahlen. Überzählige Runs bleiben einfach `provider_output_ready` und werden beim nächsten freien Platz geclaimt; nichts schlägt fehl.
+Werte kommen aus einer einzigen Konstantenquelle (`_shared/video-enhance-runtime.ts`, per Function-Secret überschreibbar) — keine verstreuten Zahlen. Überzählige Runs bleiben einfach `provider_output_ready` und werden beim nächsten freien Platz geclaimt; nichts schlägt fehl. Fairness: die Claim-Auswahl sortiert nach ältestem Run pro Nutzer, sodass ein Nutzer mit vielen Jobs die anderen nicht aushungern kann.
 
 ## D. Mehrere Jobs im Frontend
 
@@ -46,7 +46,7 @@ Werte kommen aus einer einzigen Konstantenquelle (`_shared/video-enhance-runtime
 
 ## E. Globales Job-Center
 
-Kleiner App-weiter Indikator (Popover im Header, sichtbar sobald offene Runs existieren), gespeist aus `open_runs`: Titel/Vorschaubild sofern vorhanden, Anbieter/Modell, Zielauflösung + FPS, aktuelle Phase, Abbrechen für genau diesen Job. Zusätzlich zeigt die History (`VideoGenerationHistory` / `videoHistory/model.ts`) offene Runs als laufende Einträge — derselbe Eintrag wechselt beim Abschluss auf „Fertig", ohne zweite Zeile.
+Kleiner App-weiter Indikator (Popover im Header, sichtbar sobald offene Runs existieren), gespeist aus `open_runs`: Titel/Vorschaubild sofern vorhanden, Anbieter/Modell, Zielauflösung + FPS, aktuelle Phase, Abbrechen für genau diesen Job. Angezeigte Phasen: In Warteschlange · Verbessern · Anbieter rechnet · Datei wird gesichert · Sicherung wird wiederholt · Manuelle Prüfung. Zusätzlich zeigt die History (`VideoGenerationHistory` / `videoHistory/model.ts`) offene Runs als laufende Einträge — derselbe Eintrag wechselt beim Abschluss auf „Fertig", ohne zweite Zeile.
 
 ## F. Topaz Backend-Poller
 
@@ -67,6 +67,8 @@ Neu bzw. erweitert:
 - Fortsetzung großer Dateien ab gespeichertem Offset; kein Vollpuffer im Speicher.
 - Keine doppelte Belastung/Erstattung.
 - Abgeschlossene Jobs erscheinen in History/Mediathek — derselbe Eintrag, kein Duplikat.
+- Lease-Ablauf und Wiederaufnahme durch den nächsten Worker.
+- Lasttest: 3 Nutzer × 2 gleichzeitige 4K-Jobs mit dicht beieinander liegenden Provider-Abschlüssen — globale Grenze 3 und Nutzergrenze 1 eingehalten, keine Aushungerung, keine doppelte Speicherung, keine doppelte Abrechnung, jeder Run sichtbar und terminal.
 
 ## Manueller Abnahmetest
 
