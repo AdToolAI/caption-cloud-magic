@@ -1,6 +1,17 @@
 # TICKET: Composer refund key `gen:<scene_id>:failure` is too coarse
 
-**Status:** open · **Priority:** high (financial integrity) · **Opened:** 2026-09-08
+**Status:** resolved 2026-09-08 · **Priority:** high (financial integrity) · **Opened:** 2026-09-08
+
+## Resolution (2026-09-08)
+- New RPC `composer_refund_scene_run(user, scene, run, amount, reason)`: key = `gen:<scene_id>:<run_id>:<reason>`;
+  legacy calls without run id fall back to the historical `gen:<scene_id>:<reason>` key (at-most-once, never over-refunds).
+- Refund amount is bounded by the matching charge (run-scoped `metadata.run_id`/`run_ids`/`generation_id`, then scene-scoped)
+  minus refunds already recorded against that charge (`bounded_charge_id` / `refund_charge_id`).
+- `compose-clip-webhook` failure path now calls the new RPC with the callback's `run_id`; watchdog/recovery already used
+  `composer_refund_charge` (charge-level) and are unchanged.
+- Tests: `supabase/tests/composer-refund-key-granularity.test.sql` (same run retried → 1; second charged run → 2nd refund;
+  concurrent loser → no-op; legacy row → fallback key, no over-refund; cap at charge) — all green, rolled back.
+- Historical ledger rows untouched. No pricing / charge / Lip-Sync changes.
 
 ## Problem
 `refund_ai_video_credits(p_refund_key)` defaults to `gen:<generation_id>:failure`. In Composer paths the

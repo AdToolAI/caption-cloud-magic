@@ -818,13 +818,25 @@ serve((req: Request) => withLang(req, () => (async (req) => {
           const costPerSec = CLIP_COSTS[sceneData.clip_source]?.[tier] ?? 0.15;
           const refundAmount = sceneData.duration_seconds * costPerSec;
           try {
-            await supabase.rpc('refund_ai_video_credits', {
-              p_user_id: project.user_id,
-              p_amount_euros: refundAmount,
-              p_generation_id: sceneId,
-            });
+            // Refund key = charged attempt (scene + run), not just the scene:
+            // a second legitimately charged attempt on the same scene must be
+            // independently refundable; a retried callback for the same run
+            // is a no-op. Runs without an id fall back to the legacy scene key
+            // (at most once — never over-refunds). Amount is bounded DB-side
+            // by the matching charge. See TICKET-composer-refund-key-granularity.
+            const { data: refundRow, error: refundRpcErr } = await supabase.rpc(
+              'composer_refund_scene_run',
+              {
+                p_user_id: project.user_id,
+                p_scene_id: sceneId,
+                p_run_id: runId ?? null,
+                p_amount_euros: refundAmount,
+                p_reason: 'failure',
+              },
+            );
+            if (refundRpcErr) throw refundRpcErr;
             console.log(
-              `[compose-clip-webhook] Refunded €${refundAmount.toFixed(2)} (${sceneData.clip_source}/${tier})`,
+              `[compose-clip-webhook] refund outcome=${(refundRow as any)?.outcome} €${Number((refundRow as any)?.amount_euros ?? 0).toFixed(2)} key=${(refundRow as any)?.refund_key} (${sceneData.clip_source}/${tier})`,
             );
           } catch (refundErr) {
             console.error('[compose-clip-webhook] Refund failed:', refundErr);

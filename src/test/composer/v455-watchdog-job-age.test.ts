@@ -70,8 +70,12 @@ describe('V455 — Green-Net ist terminal', () => {
     expect(src).toContain("String(enrichedError ?? '').slice(0, 480)");
   });
 
-  it('lässt den idempotenten Refund-Pfad unverändert', () => {
-    expect(src).toContain("supabase.rpc('refund_ai_video_credits'");
+  it('refundet idempotent pro belastetem Versuch (Szene + Run), nicht nur pro Szene', () => {
+    // TICKET-composer-refund-key-granularity: key = gen:<scene>:<run>:failure,
+    // Betrag DB-seitig an die passende Belastung gebunden.
+    expect(src).toContain("'composer_refund_scene_run'");
+    expect(src).toContain('p_run_id: runId ?? null');
+    expect(src).not.toContain("supabase.rpc('refund_ai_video_credits'");
     expect(src).toContain("_write_id: 'ccw:failed'");
   });
 });
