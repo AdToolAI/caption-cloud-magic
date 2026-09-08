@@ -107,3 +107,23 @@ describe('video enhance — every surface goes through the same copy', () => {
     expect(server).toMatch(/code:\s*"VIDEO_ENHANCE_NOT_AN_UPSCALE",\s*reason:\s*upscale\.reason,\s*source:\s*source\.meta/);
   });
 });
+
+describe('provider account credits are never blamed on the customer', () => {
+  it('maps PROVIDER_ACCOUNT_CREDITS to the engine-unavailable wording', () => {
+    for (const lang of ['en', 'de', 'es'] as const) {
+      const text = engineErrorText('PROVIDER_ACCOUNT_CREDITS', 'raw', lang);
+      expect(text).not.toBe('raw');
+      expect(text.toLowerCase()).not.toContain('insufficient');
+    }
+  });
+
+  it('maps PROVIDER_OUTPUT_GONE to the lost-output wording', () => {
+    expect(engineErrorText('PROVIDER_OUTPUT_GONE', 'raw', 'en')).not.toBe('raw');
+  });
+
+  it('classifies raw provider credit text away from the customer wallet', () => {
+    const msg = friendlyVideoErrorMessage('provider account has no credits (raw: INSUFFICIENT_CREDITS)');
+    expect(msg.toLowerCase()).not.toContain('insufficient_credits');
+    expect(classifyVideoError('INSUFFICIENT_CREDITS')).toBe('provider_account');
+  });
+});
