@@ -3,6 +3,7 @@
 // The poller (autopilot-video-poll) handles completion and credit refund.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { gateVideoCapability } from "../_shared/videoCapabilityGate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
