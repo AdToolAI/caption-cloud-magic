@@ -31,18 +31,28 @@ Added/extended tests:
 - two runs of one user coexist; cancelling one leaves the other live;
 - store hydration restores all unfinished runs; terminal runs stop polling;
 - History mapping: one entry per run across running → saving → done, no duplicates;
+- Topaz cadence: due-time schedule follows 15 s / 30 s / 60 s buckets and never lets two pollers work the same run;
 - transfer layer untouched: resume from stored offset, no full-file buffering;
 - no additional wallet debit or refund on any of these paths.
 
-## Part 4 — Live acceptance run (real money)
+### Security tests for the internal functions
 
-Executed against the existing test account(s), reporting per run: provider completion time, delay from provider completion to persistence start, persistence duration, total time, plus checks for duplicate persistence, duplicate charge/refund and starvation.
+Explicit tests, run against the deployed functions, proving that:
+- an unauthenticated/public request to `video-enhance-persist` and `video-enhance-poll` is rejected;
+- a normal signed-in user's token cannot invoke either internal operation;
+- one user can neither claim nor read another user's run (claim RPC and `status`/`open_runs` are user-scoped);
+- only the internal secret / service-role path succeeds.
 
-Manual browser steps: start 2 jobs, leave the Enhance page, open History, reload, close the tab and sign in again, cancel one run.
+## Part 4 — Live acceptance, staged
 
-The 3 users × 2 simultaneous 4K jobs load test needs three real accounts with sufficient credit and spends real provider money. Confirm before I start it; otherwise I run the smaller 1 user × 2 jobs variant plus a simulated-claim concurrency test and report the limitation.
+Stage 1 (no provider money): 3 users × 2 jobs as a simulated concurrency scenario against database state and the claim RPC — verifies 3 global / 1 per user, fairness, queueing instead of failure, exactly one claim per run and no starvation.
+
+Stage 2 (small real run): 1 user × 2 simultaneous real enhancement jobs, with the manual browser sequence — navigate away, check History shows both, reload, close the tab and sign in again, cancel one run and confirm the other continues. Reported per run: provider completion time, provider-completion → persistence-start delay, persistence duration, total duration, and exactly one charge, one persistence and no duplicate refund.
+
+Stage 3 (full 3 users × 2 real 4K jobs) only after you approve the Stage 1 + 2 report; it needs three funded accounts and spends real provider money.
 
 ## Technical notes
 
-- Files touched: `supabase/config.toml`, one new migration (cron schedule), `src/components/ai-video/VideoGenerationHistory.tsx` (store subscription only), tests under `src/test/`.
+- Files touched: `supabase/config.toml`, `video-enhance-poll` (self-scheduling cadence), one cron entry as recovery trigger, `src/components/ai-video/VideoGenerationHistory.tsx` (store subscription only), tests under `src/test/`.
 - Not touched: `video-enhance-transfer.ts`, the transfer part of `video-enhance-finalize.ts`, pricing catalogs, wallet RPCs, refund keys, Lip-Sync and Director's Cut.
+
