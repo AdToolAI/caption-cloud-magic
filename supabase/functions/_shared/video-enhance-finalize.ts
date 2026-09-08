@@ -404,8 +404,10 @@ export async function finalizeSuccess(
         Number(providerCost.units),
       );
       costPatch.actual_provider_credits = providerCost.units;
-      costPatch.provider_credit_drift_pct = Math.round(drift.ratio * 10000) / 100;
+      costPatch.provider_credit_drift_pct =
+        drift.driftPct === null ? null : Math.round(drift.driftPct * 10000) / 100;
       costPatch.provider_credit_drift_flagged = drift.flagged;
+
     }
   }
 
