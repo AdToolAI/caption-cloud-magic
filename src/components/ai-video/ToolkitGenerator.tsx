@@ -1579,6 +1579,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
             brandCharacterUrl={brandCharacter?.reference_image_url ?? null}
             brandCharacterName={brandCharacter?.name ?? null}
+            rejectedIndex={rejectedReferenceIndex}
           />
         ) : (
           <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
