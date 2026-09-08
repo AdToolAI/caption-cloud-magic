@@ -324,6 +324,8 @@ Deno.serve(async (req) => {
         p_user_id: user.id,
         p_amount_euros: delta,
         p_generation_id: generation.id,
+        // Distinct from the failure refund: unused smart-duration seconds.
+        p_refund_key: `gen:${generation.id}:smart_duration`,
       });
       if (refundError) {
         console.error("[generate-seedance25-video] Smart-duration refund failed:", refundError);
