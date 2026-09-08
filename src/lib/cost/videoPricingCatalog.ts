@@ -37,8 +37,8 @@ const CATALOG_SOURCE: Record<string, CatalogSource> = {
   'happyhorse-standard':  { id: 'happyhorse-standard',  label: 'HappyHorse 720p',      unit: 'per-second', sellEUR: 0.3, costEUR: 0.14,  minDuration: 3,  maxDuration: 15 },
   'happyhorse-pro':       { id: 'happyhorse-pro',       label: 'HappyHorse Pro 1080p', unit: 'per-second', sellEUR: 0.605, costEUR: 0.28,  minDuration: 3,  maxDuration: 15 },
 
-  'seedance-mini':        { id: 'seedance-mini',        label: 'Seedance 1 Lite (Draft)', unit: 'per-second', sellEUR: 0.045, costEUR: 0.02,  minDuration: 3,  maxDuration: 15 },
-  'seedance-mini-1080p':  { id: 'seedance-mini-1080p',  label: 'Seedance 1 Lite 1080p',   unit: 'per-second', sellEUR: 0.1, costEUR: 0.045, minDuration: 3, maxDuration: 15 },
+  'seedance-mini':        { id: 'seedance-mini',        label: 'Seedance 1 Lite (Draft)', unit: 'per-second', sellEUR: 0.045, costEUR: 0.02,  minDuration: 5,  maxDuration: 10 },
+  'seedance-mini-1080p':  { id: 'seedance-mini-1080p',  label: 'Seedance 1 Lite 1080p',   unit: 'per-second', sellEUR: 0.1, costEUR: 0.045, minDuration: 5, maxDuration: 10 },
   'seedance-standard':    { id: 'seedance-standard',    label: 'Seedance 2.0 Fast 720p',  unit: 'per-second', sellEUR: 0.32, costEUR: 0.15,  minDuration: 3,  maxDuration: 15 },
   'seedance-pro':         { id: 'seedance-pro',         label: 'Seedance 2.0 720p',       unit: 'per-second', sellEUR: 0.385, costEUR: 0.18,  minDuration: 3,  maxDuration: 15 },
   'seedance-2-5':         { id: 'seedance-2-5',         label: 'Seedance 2.5 (ModelArk)', unit: 'per-second', sellEUR: 0.3333, costEUR: 0.217, minDuration: 4,  maxDuration: 30 },
@@ -46,7 +46,7 @@ const CATALOG_SOURCE: Record<string, CatalogSource> = {
 
   'kling-3':              { id: 'kling-3',              label: 'Kling 3.0 1080p',      unit: 'per-second', sellEUR: 0.135, costEUR: 0.06,  minDuration: 3,  maxDuration: 15 },
   'kling-2.5-turbo':      { id: 'kling-2.5-turbo',      label: 'Kling 2.5 Turbo Pro',  unit: 'per-second', sellEUR: 0.07, costEUR: 0.03,  minDuration: 5,  maxDuration: 10 },
-  'kling-2.6':            { id: 'kling-2.6',            label: 'Kling 2.6',            unit: 'per-second', sellEUR: 0.09, costEUR: 0.04,  minDuration: 5,  maxDuration: 15 },
+  'kling-2.6':            { id: 'kling-2.6',            label: 'Kling 2.6',            unit: 'per-second', sellEUR: 0.09, costEUR: 0.04,  minDuration: 5,  maxDuration: 10 },
   'kling-omni':           { id: 'kling-omni',           label: 'Kling 3.0 Omni',       unit: 'per-second', sellEUR: 0.43, costEUR: 0.20,  minDuration: 3,  maxDuration: 15 },
 
   'wan-standard':         { id: 'wan-standard',         label: 'Wan 2.5 Std',          unit: 'per-second', sellEUR: 0.09, costEUR: 0.04,  minDuration: 4,  maxDuration: 10 },
@@ -71,7 +71,7 @@ const CATALOG_SOURCE: Record<string, CatalogSource> = {
   'pika-2-2-standard':    { id: 'pika-2-2-standard',    label: 'Pika 2.2 Std',         unit: 'per-second', sellEUR: 0.09, costEUR: 0.04,  minDuration: 3,  maxDuration: 10 },
   'pika-2-2-pro':         { id: 'pika-2-2-pro',         label: 'Pika 2.2 Pro',         unit: 'per-second', sellEUR: 0.2, costEUR: 0.09,  minDuration: 3,  maxDuration: 10 },
 
-  'runway-gen4-aleph':    { id: 'runway-gen4-aleph',    label: 'Runway Gen-4 Aleph',   unit: 'per-second', sellEUR: 0.18, costEUR: 0.08,  minDuration: 5,  maxDuration: 10 },
+  'runway-gen4-aleph':    { id: 'runway-gen4-aleph',    label: 'Runway Gen-4 Aleph',   unit: 'per-second', sellEUR: 0.18, costEUR: 0.08,  minDuration: 5,  maxDuration: 5 },
 
   'veo-3.1-lite-720p':    { id: 'veo-3.1-lite-720p',    label: 'Veo 3.1 Lite 720p',    unit: 'per-second', sellEUR: 0.32, costEUR: 0.15,  minDuration: 4,  maxDuration: 8  },
   'veo-3.1-lite-1080p':   { id: 'veo-3.1-lite-1080p',   label: 'Veo 3.1 Lite 1080p',   unit: 'per-second', sellEUR: 0.475, costEUR: 0.22,  minDuration: 4,  maxDuration: 8  },

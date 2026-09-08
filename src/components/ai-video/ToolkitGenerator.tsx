@@ -42,6 +42,8 @@ import {
   getStudioCapabilities,
   validateStudioSelection,
 } from '@/lib/videoCapabilities/studioCapabilities';
+import { resolvePricingId } from '@/config/videoModelSpecs';
+
 import { GenerateSection } from './generate/GenerateSection';
 import { QuickSettingsBar } from './generate/QuickSettingsBar';
 
@@ -696,8 +698,18 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   // Display currency must follow the WALLET, not the UI language — otherwise a
   // USD price (incl. FX uplift) could be shown while an EUR wallet is charged.
   const billingCurrency: Currency = walletCurrency ?? currency;
+  /**
+   * BILLING IDENTITY — tier-scoped, never the bare model id.
+   * The backend charges the pricing id of the selected (mode x resolution)
+   * tier; quoting `model.id` showed the 720p price while a 480p run was
+   * deducted. Same resolver on both sides.
+   */
+  const billingPricingId = useMemo(
+    () => resolvePricingId(model.id, studioMode, resolution) ?? model.id,
+    [model.id, studioMode, resolution],
+  );
   // Catalog prices are already personalized; the local fallback is a list price.
-  const catalogPricePerSecond = getPricePerSecond(model.id, billingCurrency);
+  const catalogPricePerSecond = getPricePerSecond(billingPricingId, billingCurrency);
   // Never show a binding price we could not verify against the server catalog —
   // that was the source of preview/charge mismatches.
   const priceUnverified = !catalogReady || catalogPricePerSecond == null;
@@ -708,9 +720,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const billedSeconds = duration === -1
     ? Math.max(...model.durations)
     : duration;
-  // Total is rounded exactly like the backend deduction (once, at the end).
-  const cost = getTotalCost(model.id, billingCurrency, billedSeconds)
+  // Total is rounded exactly like the backend deduction chain.
+  const cost = getTotalCost(billingPricingId, billingCurrency, billedSeconds)
     ?? billedSeconds * pricePerSecond;
+
 
   const symbol = billingCurrency === 'USD' ? '$' : '€';
   const isUnlimited = (wallet as any)?.is_unlimited === true;

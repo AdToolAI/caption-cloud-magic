@@ -621,10 +621,20 @@ const AI_VIDEO_TOOLKIT_MODELS_RAW: ToolkitModelMeta[] = [
     // accepts one optional reference image.
     capabilities: { t2v: false, i2v: false, v2v: true, audio: false },
     costPerSecond: { EUR: 0.18, USD: 0.18 },
-    badge: 'V2V Specialist',
+    badge: tx({ de: "Wartung", en: "Maintenance", es: "Mantenimiento" }),
     tagline: 'Restyle & transform existing clips',
     legacyRoute: '/runway-video-studio',
+    // Provider retired the Gen-4 Aleph endpoint (audit 08.09.2026). The
+    // canonical spec is `available: false / removed`, so the capability gate
+    // already refuses it server-side; the picker must not offer it either.
+    status: 'maintenance',
+    statusReason: tx({
+      de: 'Runway hat die Gen-4-Aleph-Route abgekündigt. Die Nachfolger (Gen-4.5, Gen-4 Turbo, Aleph 2.0) werden erst nach einem erfolgreichen Provider-Test freigeschaltet.',
+      en: 'Runway retired the Gen-4 Aleph route. Its successors (Gen-4.5, Gen-4 Turbo, Aleph 2.0) will only be enabled after a successful provider smoke test.',
+      es: 'Runway retiró la ruta Gen-4 Aleph. Sus sucesores (Gen-4.5, Gen-4 Turbo, Aleph 2.0) solo se activarán tras una prueba real con el proveedor.',
+    }),
   },
+
 
   /* ─────────── Pika 2.2 (fal.ai `fal-ai/pika/v2.2/*`) ───────────
    * Provider reality check 11.08.2026: Pika has NO first-party Replicate
@@ -859,7 +869,10 @@ export const LEGACY_ROUTE_TO_MODEL: Record<string, string> = {
   '/luma-video-studio':     'luma-standard',
   '/seedance-video-studio': 'seedance-standard',
   '/grok-video-studio':     'grok-imagine',
-  '/sora-video-studio':     'sora-2-standard',
+  // '/sora-video-studio' intentionally absent: Sora 2 is removed and the route
+  // redirects in App.tsx. It used to map to `sora-2-standard`, an id that
+  // exists in neither the registry nor the canonical specs.
+
   '/vidu-studio':           'vidu-q2-reference',
   '/happyhorse-video-studio': 'happyhorse-standard',
 };

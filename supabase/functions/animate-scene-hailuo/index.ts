@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { capabilityGate } from "../_shared/videoCapabilityGate.ts";
+
+/** Canonical model this route animates with (registry id, not a raw slug). */
+const HAILUO_MODEL_ID = 'hailuo-standard';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,10 +56,30 @@ serve(async (req) => {
       );
     }
 
+    // CANONICAL CAPABILITY GATE (v510) — this route used to call a hard-coded
+    // provider slug with no duration/aspect validation at all, so an invalid
+    // scene length was accepted here and rejected (or silently altered) by the
+    // provider. Model id, provider slug and the legal durations now come from
+    // the canonical registry, exactly like the Studio path.
+    const gate = capabilityGate(
+      { modelId: HAILUO_MODEL_ID, mode: 'i2v', resolution: '768p', durationSeconds: Number(duration) },
+      corsHeaders,
+    );
+    if ('response' in gate && gate.response) return gate.response;
+    const providerSlug = (gate as { routeIdentity?: { providerModelSlug?: string } })
+      .routeIdentity?.providerModelSlug;
+    if (!providerSlug) {
+      return new Response(
+        JSON.stringify({ error: 'No provider contract for hailuo scene animation' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     console.log(`🎬 Animating scene ${sceneId} with Hailuo 2.3`);
     console.log(`  - Image: ${imageUrl.substring(0, 80)}...`);
     console.log(`  - Audio: ${audioUrl ? 'Yes (lip-sync enabled)' : 'No'}`);
     console.log(`  - Duration: ${duration}s`);
+
     console.log(`  - Motion: ${motionType}`);
 
     // Build motion prompt based on intensity
@@ -72,6 +96,9 @@ serve(async (req) => {
     const input: Record<string, unknown> = {
       image: imageUrl,
       prompt: motionDescription,
+      // Duration was validated by the gate and is now actually submitted —
+      // it used to be logged and then dropped.
+      duration: Number(duration),
     };
 
     // If audio is provided, enable lip-sync
@@ -84,7 +111,7 @@ serve(async (req) => {
 
     // Run the model
     const output = await replicate.run(
-      "minimax/hailuo-2.3",
+      providerSlug as `${string}/${string}`,
       { input }
     );
 

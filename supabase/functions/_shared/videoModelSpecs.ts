@@ -2389,6 +2389,57 @@ export function nativeResolutionLabels(spec: VideoModelSpec): string[] {
   return [...seen.entries()].sort((a, b) => b[1] - a[1]).map(([label]) => label);
 }
 
+/**
+ * CANONICAL BILLING IDENTITY (v510).
+ *
+ * The catalog id that a given (model x mode x resolution tier) is billed on.
+ * Resolution tiers may carry their OWN pricing id (Seedance 2.5 480p, Veo Lite,
+ * Hailuo, Wan, LTX, HappyHorse …), so a price preview that only knows the model
+ * id will silently quote another tier's price. Both the UI preview and the
+ * edge functions resolve the billing id through THIS function — that is the
+ * only way display and deduction cannot diverge.
+ *
+ * Returns `null` when the combination does not exist; callers must then refuse
+ * to quote a price rather than fall back to the model id.
+ */
+export function resolvePricingId(
+  modelId: string,
+  mode: VideoMode,
+  resolutionLabel?: string | null,
+): string | null {
+  const spec = getVideoModelSpec(modelId);
+  if (!spec) return null;
+  const modeSpec = getModeSpec(spec, mode);
+  if (!modeSpec) return null;
+  const tiers = modeSpec.resolutions;
+  if (!tiers.length) return null;
+  if (resolutionLabel) {
+    const tier = tiers.find((r) => r.label.toLowerCase() === resolutionLabel.toLowerCase());
+    return tier ? tier.pricingId : null;
+  }
+  // No tier named: only unambiguous for a single-tier mode (same rule the
+  // capability gate enforces for the generation request itself).
+  return tiers.length === 1 ? tiers[0].pricingId : null;
+}
+
+/**
+ * Canonical availability of a model — the ONLY source any surface may use to
+ * decide whether a route may be dispatched or offered. Unknown id = not
+ * available (fail closed).
+ */
+export function isVideoModelAvailable(modelId: string): boolean {
+  return getVideoModelSpec(modelId)?.available === true;
+}
+
+/** Every distinct billing id a model can be charged on, across all its modes. */
+export function pricingIdsOfModel(modelId: string): string[] {
+  const spec = getVideoModelSpec(modelId);
+  if (!spec) return [];
+  return [...new Set(spec.modes.flatMap((m) => m.resolutions.map((r) => r.pricingId)))];
+}
+
+
+
 export interface CapabilityRequest {
   modelId: string;
   mode: VideoMode;

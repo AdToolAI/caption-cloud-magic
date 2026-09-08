@@ -4,7 +4,7 @@
 // Regenerate with: node scripts/generate-video-model-specs.mjs
 // =============================================================================
 
-export const SPECS_SOURCE_HASH = '54c30d4b37ad94d65bd5a6fcfaad22e553e108d3c738c146b89e7d14865e1fea';
+export const SPECS_SOURCE_HASH = '648188c3e53621353040537ff9967812f3e82baaa1c2ab054f5a22d69cb0eedf';
 
 // ============================================================================
 // CANONICAL VIDEO MODEL CAPABILITY REGISTRY
@@ -846,14 +846,13 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     providerDocsVersion: 'Replicate 07.09.2026',
     verificationSourceUrl: 'https://replicate.com/kwaivgi/kling-v3-omni-video',
     verificationNotes:
-      'Native dialog (EN). Reference images max. 7, with a reference video max. 4. ' +
-      'Route audit 2026-09-07 (openapi_schema of kwaivgi/kling-v3-omni-video): mode = standard (720p) | pro (1080p, default) | 4k. ' +
-      'The earlier assumption of a 1080p ceiling was wrong: 4K is route-documented and is therefore held as a LOCKED tier (t2v/i2v/reference). ' +
-      'Hard route rule: "4K does not support reference_video" — hence NO 4K tier on v2v. ' +
-      'Duration 3-15 s and aspect_ratio 16:9|9:16|1:1 are, per schema, independent of mode and resolution; the schema states NO exact pixel size for 4K, ' +
-      'so sizingRuleVerified stays false until a smoke test on OUR endpoint measures the frames. ' +
-      'The Kling 3.0 standard route (kwaivgi/kling-v3-video) and Omni are separate capability identities — no constraint is carried from one into the other.',
-
+      'Nativer Dialog (EN). Referenzbilder max. 7, mit Referenzvideo max. 4. ' +
+      'Routen-Audit 07.09.2026 (openapi_schema von kwaivgi/kling-v3-omni-video): mode = standard (720p) | pro (1080p, default) | 4k. ' +
+      'Die frühere Annahme "max. 1080p" war falsch — 4K ist routen-dokumentiert und daher als GESPERRTES Tier hinterlegt (t2v/i2v/reference). ' +
+      'Harte Routen-Regel: "4K does not support reference_video" — deshalb KEIN 4K-Tier auf v2v. ' +
+      'Dauer 3–15 s und aspect_ratio 16:9|9:16|1:1 sind laut Schema modus- und auflösungsunabhängig; das Schema nennt für 4K KEINE exakten Pixel, ' +
+      'daher bleibt sizingRuleVerified=false, bis ein Smoke-Test auf UNSEREM Endpoint die Frames misst. ' +
+      'Kling-3.0-Standard-Route (kwaivgi/kling-v3-video) und Omni sind getrennte Capability-Identitäten — keine Übertragung von Einschränkungen in eine der beiden Richtungen.',
 
     ...UNAUDITED,
     modes: [
@@ -2397,6 +2396,57 @@ export function nativeResolutionLabels(spec: VideoModelSpec): string[] {
   }
   return [...seen.entries()].sort((a, b) => b[1] - a[1]).map(([label]) => label);
 }
+
+/**
+ * CANONICAL BILLING IDENTITY (v510).
+ *
+ * The catalog id that a given (model x mode x resolution tier) is billed on.
+ * Resolution tiers may carry their OWN pricing id (Seedance 2.5 480p, Veo Lite,
+ * Hailuo, Wan, LTX, HappyHorse …), so a price preview that only knows the model
+ * id will silently quote another tier's price. Both the UI preview and the
+ * edge functions resolve the billing id through THIS function — that is the
+ * only way display and deduction cannot diverge.
+ *
+ * Returns `null` when the combination does not exist; callers must then refuse
+ * to quote a price rather than fall back to the model id.
+ */
+export function resolvePricingId(
+  modelId: string,
+  mode: VideoMode,
+  resolutionLabel?: string | null,
+): string | null {
+  const spec = getVideoModelSpec(modelId);
+  if (!spec) return null;
+  const modeSpec = getModeSpec(spec, mode);
+  if (!modeSpec) return null;
+  const tiers = modeSpec.resolutions;
+  if (!tiers.length) return null;
+  if (resolutionLabel) {
+    const tier = tiers.find((r) => r.label.toLowerCase() === resolutionLabel.toLowerCase());
+    return tier ? tier.pricingId : null;
+  }
+  // No tier named: only unambiguous for a single-tier mode (same rule the
+  // capability gate enforces for the generation request itself).
+  return tiers.length === 1 ? tiers[0].pricingId : null;
+}
+
+/**
+ * Canonical availability of a model — the ONLY source any surface may use to
+ * decide whether a route may be dispatched or offered. Unknown id = not
+ * available (fail closed).
+ */
+export function isVideoModelAvailable(modelId: string): boolean {
+  return getVideoModelSpec(modelId)?.available === true;
+}
+
+/** Every distinct billing id a model can be charged on, across all its modes. */
+export function pricingIdsOfModel(modelId: string): string[] {
+  const spec = getVideoModelSpec(modelId);
+  if (!spec) return [];
+  return [...new Set(spec.modes.flatMap((m) => m.resolutions.map((r) => r.pricingId)))];
+}
+
+
 
 export interface CapabilityRequest {
   modelId: string;

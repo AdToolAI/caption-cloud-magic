@@ -3,6 +3,7 @@
 // The poller (autopilot-video-poll) handles completion and credit refund.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { gateVideoCapability } from "../_shared/videoCapabilityGate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,25 +16,18 @@ interface Body {
   visual_prompt_en: string;
 }
 
-// Provider → Replicate model + cost per second (in autopilot credits).
-// Credits are charged against brief.weekly_credit_budget.
-const PROVIDERS: Record<string, { model: string; creditsPerSec: number; ratioMap: Record<string, string> }> = {
-  "hailuo-standard": {
-    model: "minimax/hailuo-02",
-    creditsPerSec: 5,
-    ratioMap: { "9:16": "9:16", "1:1": "1:1", "16:9": "16:9" },
-  },
-  "kling-std": {
-    model: "kwaivgi/kling-v2.1",
-    creditsPerSec: 8,
-    ratioMap: { "9:16": "9:16", "1:1": "1:1", "16:9": "16:9" },
-  },
-  "seedance-lite": {
-    model: "bytedance/seedance-1-lite",
-    creditsPerSec: 6,
-    ratioMap: { "9:16": "9:16", "1:1": "1:1", "16:9": "16:9" },
-  },
+// Autopilot provider keys → CANONICAL model ids (v510).
+// The provider slug is no longer hand-written here: it comes from the
+// canonical registry via the capability gate (`routeIdentity`), so autopilot
+// can never dispatch to a route the Studio has retired.
+// `creditsPerSec` is autopilot's own weekly-budget economy and unrelated to
+// the wallet pricing catalog.
+const PROVIDERS: Record<string, { modelId: string; creditsPerSec: number }> = {
+  "hailuo-standard": { modelId: "hailuo-standard", creditsPerSec: 5 },
+  "kling-std":       { modelId: "kling-2.5-turbo", creditsPerSec: 8 },
+  "seedance-lite":   { modelId: "seedance-mini",   creditsPerSec: 6 },
 };
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -58,8 +52,32 @@ Deno.serve(async (req) => {
 
     const providerKey = brief.video_provider as string;
     const provider = PROVIDERS[providerKey] ?? PROVIDERS["hailuo-standard"];
-    const duration = Math.min(Math.max(brief.video_duration_sec ?? 6, 4), 12);
-    const aspect = brief.video_aspect_ratio ?? "9:16";
+    const duration = Number(brief.video_duration_sec ?? 6);
+    const aspect = String(brief.video_aspect_ratio ?? "9:16");
+
+    // CANONICAL CAPABILITY GATE — no silent clamps (v510).
+    // Previously duration was clamped to 4–12 s and an unsupported aspect
+    // ratio silently became 9:16, so the brief's setting and the delivered
+    // clip could differ without anyone noticing. An invalid combination now
+    // blocks the slot with an explicit reason instead.
+    const gate = await gateVideoCapability(
+      admin,
+      { modelId: provider.modelId, mode: "t2v", durationSeconds: duration, aspectRatio: aspect },
+      corsHeaders,
+    );
+    if (gate.response) {
+      await admin.from("autopilot_queue").update({
+        status: "blocked",
+        block_reason: "invalid_video_capability",
+        video_status: "failed",
+        video_error: `capability:${provider.modelId}:${duration}s:${aspect}`,
+      }).eq("id", slot_id);
+      return gate.response;
+    }
+    const providerSlug = gate.routeIdentity?.providerModelSlug;
+    if (!providerSlug) {
+      return json({ ok: false, error: "no_provider_contract" }, 500);
+    }
 
     // Cost (charged against weekly budget; refunded on failure by poller)
     const cost = Math.round(provider.creditsPerSec * duration);
@@ -75,10 +93,11 @@ Deno.serve(async (req) => {
     const input: Record<string, unknown> = {
       prompt: visual_prompt_en,
       duration,
-      aspect_ratio: provider.ratioMap[aspect] ?? "9:16",
+      aspect_ratio: aspect,
     };
 
-    const predResp = await fetch("https://api.replicate.com/v1/models/" + provider.model + "/predictions", {
+    const predResp = await fetch("https://api.replicate.com/v1/models/" + providerSlug + "/predictions", {
+
       method: "POST",
       headers: {
         Authorization: `Bearer ${replicateKey}`,
@@ -122,7 +141,7 @@ Deno.serve(async (req) => {
       user_id: slot.user_id,
       slot_id: slot.id,
       provider: providerKey,
-      model: provider.model,
+      model: providerSlug,
       prompt: visual_prompt_en,
       duration_sec: duration,
       aspect_ratio: aspect,

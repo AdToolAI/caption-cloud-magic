@@ -59,34 +59,48 @@ export function useVideoPricingCatalog() {
   const map = new Map<string, CatalogModel>();
   (query.data?.models ?? []).forEach((m) => map.set(m.id, m));
 
-  /** Returns the canonical sell price/second (EUR or USD), or `null` if the
-   *  catalog is not loaded / model is missing. Callers should fall back to
-   *  the local config when this is null. */
-  const getPricePerSecond = (modelId: string, currency: 'EUR' | 'USD'): number | null => {
-    const entry = map.get(modelId);
-    if (!entry) return null;
-    return currency === 'USD' ? entry.sellUSD : entry.sellEUR;
-  };
-
   const discountFactor = (100 - (query.data?.discountPercent ?? 0)) / 100;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
 
   /**
-   * Binding total for a generation, computed exactly like the backend:
-   * `deduct_ai_video_credits` rounds `list * seconds * discountFactor` once,
-   * at the end. Rounding the per-second price first would drift by cents.
+   * Canonical sell price/second (EUR or USD) for a BILLING ID, or `null` when
+   * the catalog is not loaded / the id is missing. Callers must pass the
+   * tier-scoped pricing id (see `resolvePricingId` in the model registry), not
+   * the bare model id — a 480p tier is billed on its own catalog row.
+   *
+   * Rounded exactly like the backend: `resolveAccountCostPerSecond` rounds the
+   * LIST price to 2 decimals first, and the deduction RPC applies the discount
+   * afterwards.
    */
-  const getTotalCost = (
-    modelId: string,
-    currency: 'EUR' | 'USD',
-    seconds: number,
-  ): number | null => {
-    const entry = map.get(modelId);
+  const getPricePerSecond = (pricingId: string, currency: 'EUR' | 'USD'): number | null => {
+    const entry = map.get(pricingId);
     if (!entry) return null;
     const list = currency === 'USD'
       ? (entry.listUSD ?? entry.sellUSD)
       : (entry.listEUR ?? entry.sellEUR);
-    return Math.round(list * seconds * discountFactor * 100) / 100;
+    return round2(round2(list) * discountFactor);
   };
+
+  /**
+   * Binding total for a generation, computed exactly like the backend chain:
+   *   perSecond = round2(listPrice)                 (accountVideoPricing)
+   *   charged   = round2(perSecond * seconds * discountFactor)
+   *                                                 (deduct_ai_video_credits)
+   * Rounding only once at the end drifts by cents against the deduction.
+   */
+  const getTotalCost = (
+    pricingId: string,
+    currency: 'EUR' | 'USD',
+    seconds: number,
+  ): number | null => {
+    const entry = map.get(pricingId);
+    if (!entry) return null;
+    const list = currency === 'USD'
+      ? (entry.listUSD ?? entry.sellUSD)
+      : (entry.listEUR ?? entry.sellEUR);
+    return round2(round2(list) * seconds * discountFactor);
+  };
+
 
   return {
     isLoading: query.isLoading,

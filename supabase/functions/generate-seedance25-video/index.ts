@@ -3,6 +3,7 @@ import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
+import { resolvePricingId } from "../_shared/videoModelSpecs.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 import {
   createSeedance25Task,
@@ -102,16 +103,18 @@ Deno.serve(async (req) => {
     } = body;
 
     // Capability gate — before wallet, before provider.
+    const generationMode = inferMode({
+      modelId: "seedance-2-5",
+      startImageUrl,
+      endImageUrl,
+      referenceImageUrls: Array.isArray(referenceImageUrls) ? referenceImageUrls : null,
+      videoUrl: referenceVideoUrl ?? (referenceVideoUrls?.[0] ?? null),
+    });
     const gate = await gateVideoCapability(
       supabaseAdmin,
       {
         modelId: "seedance-2-5",
-        mode: inferMode({ modelId: "seedance-2-5",
-          startImageUrl,
-          endImageUrl,
-          referenceImageUrls: Array.isArray(referenceImageUrls) ? referenceImageUrls : null,
-          videoUrl: referenceVideoUrl ?? (referenceVideoUrls?.[0] ?? null),
-        }),
+        mode: generationMode,
         resolution,
         durationSeconds: Number(duration),
         aspectRatio,
@@ -119,6 +122,7 @@ Deno.serve(async (req) => {
       corsHeaders,
     );
     if (gate.response) return gate.response;
+
 
     const refVideos = [
       ...(referenceVideoUrls ?? []),
@@ -205,9 +209,12 @@ Deno.serve(async (req) => {
       .single();
 
     const currency = (walletPreview?.currency || "EUR") as "EUR" | "USD";
-    // 480p and 720p are billed on separate catalog tiers (20.08.2026 re-pricing):
-    // 720p = 11.95 EUR / 30 s, 480p = 6.95 EUR / 30 s.
-    const pricingModelId = resolution === "480p" ? `${MODEL_ID}-480p` : MODEL_ID;
+    // Billing identity comes from the canonical registry (tier-scoped pricing
+    // id), never from a hand-written string here — the UI preview resolves the
+    // identical id, so display and deduction cannot diverge.
+    const pricingModelId =
+      resolvePricingId(MODEL_ID, generationMode, gate.resolutionLabel ?? resolution) ?? MODEL_ID;
+
     const costPerSecond = await resolveAccountCostPerSecond(
       supabaseAdmin, user.id, pricingModelId, currency, 0.3983,
     );
