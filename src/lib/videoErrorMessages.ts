@@ -10,6 +10,8 @@ export type VideoErrorKind =
   | 'overloaded'
   | 'timeout'
   | 'real_person_image'
+  /** Provider blocked the OUTPUT for copyright reasons (music, brands, IP). */
+  | 'copyright_output'
   | 'moderation'
   | 'invalid_input'
   | 'rate_limit'
@@ -46,6 +48,11 @@ export function classifyVideoError(errorMessage: string | null | undefined): Vid
     raw.includes('celebrity')
   ) {
     return 'real_person_image';
+  }
+  // Output-side copyright block (ByteDance: "the output video/audio may be
+  // related to copyright restrictions"). Not an input problem, not an outage.
+  if (raw.includes('copyright')) {
+    return 'copyright_output';
   }
   if (
     raw.includes('high load') ||
@@ -139,12 +146,18 @@ export function friendlyVideoErrorMessage(errorMessage: string | null | undefine
         en: `The provider does not allow photos of real people as image input. ${REFUND.en} Use an AI-generated character image from your library, or describe the person in text only.`,
         es: `El proveedor no permite fotos de personas reales como imagen de referencia. ${REFUND.es} Usa una imagen de personaje generada por IA de tu biblioteca o describe a la persona solo con texto.`,
       });
+    case 'copyright_output':
+      return tx({
+        de: `Der Anbieter hat das Ergebnis wegen möglicher Urheberrechte gesperrt – das passiert oft bei bekannten Marken, Figuren, Songs oder Filmszenen, besonders bei langen Clips. ${REFUND.de} Beschreibe die Szene mit eigenen Motiven, ohne Marken- oder Songnamen, oder wähle eine kürzere Länge.`,
+        en: `The provider blocked the result over possible copyright – this often happens with well-known brands, characters, songs or movie scenes, especially in long clips. ${REFUND.en} Describe the scene with your own motifs, without brand or song names, or choose a shorter length.`,
+        es: `El proveedor bloqueó el resultado por posibles derechos de autor: suele ocurrir con marcas, personajes, canciones o escenas de películas conocidas, sobre todo en clips largos. ${REFUND.es} Describe la escena con motivos propios, sin nombres de marcas o canciones, o elige una duración más corta.`,
+      });
     case 'moderation':
 
       return tx({
-        de: `Der Anbieter hat diesen Inhalt abgelehnt (Inhaltsprüfung). ${REFUND.de} Bitte formuliere die Beschreibung um oder nutze ein anderes Bild.`,
-        en: `The provider rejected this content (content review). ${REFUND.en} Please rephrase the description or use a different image.`,
-        es: `El proveedor rechazó este contenido (revisión de contenido). ${REFUND.es} Reformula la descripción o usa otra imagen.`,
+        de: `Die Inhaltsprüfung des Anbieters hat diese Anfrage abgelehnt (sensibler Inhalt). ${REFUND.de} Formuliere die Beschreibung sachlicher um oder tausche das Bild aus – oft reicht schon eine ruhigere Szene.`,
+        en: `The provider's content review rejected this request (sensitive content). ${REFUND.en} Rephrase the description more neutrally or swap the image – a calmer scene is usually enough.`,
+        es: `La revisión de contenido del proveedor rechazó esta solicitud (contenido sensible). ${REFUND.es} Reformula la descripción de forma más neutral o cambia la imagen: una escena más tranquila suele bastar.`,
       });
     case 'invalid_input':
       return tx({
