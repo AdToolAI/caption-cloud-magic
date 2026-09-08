@@ -130,7 +130,7 @@ describe('Topaz model-aware cost estimator', () => {
       interpolationModel: 'apollo',
       interpolationApplies: false,
     });
-    expect(e.interpolationModel).toBeNull();
+    expect(e.interpolationModel).toBe('none');
     expect(e.credits).toBeLessThan(
       topazEstimatedCredits({
         durationSeconds: 10,
