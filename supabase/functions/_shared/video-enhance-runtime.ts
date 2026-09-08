@@ -112,6 +112,28 @@ export function extractProviderCost(prediction: any, modelId?: string): Provider
   return { source: 'unavailable', processingSeconds };
 }
 
+/**
+ * Calibration telemetry for a finished provider job — observation only, never
+ * a gate. Billed units are readable ONLY while a worker holds the provider
+ * response, so whoever sees completion first writes them onto the run.
+ */
+// deno-lint-ignore no-explicit-any
+export function providerCreditPatch(run: any, cost: ProviderCostReading): Record<string, unknown> {
+  if (cost.units === undefined) return {};
+  const patch: Record<string, unknown> = { actual_units: cost.units };
+  const estimated = run?.estimated_provider_credits;
+  if (estimated !== null && estimated !== undefined) {
+    const drift = topazCreditDrift(Number(estimated), Number(cost.units));
+    patch.actual_provider_credits = cost.units;
+    patch.provider_credit_drift_pct =
+      drift.driftPct === null ? null : Math.round(drift.driftPct * 10000) / 100;
+    patch.provider_credit_drift_flagged = drift.flagged;
+  }
+  return patch;
+}
+
+
+
 
 export type LedgerOperation = 'reserve' | 'capture' | 'release' | 'true_up_refund';
 
