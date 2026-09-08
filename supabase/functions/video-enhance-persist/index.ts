@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-import { isInternalCaller } from "../_shared/video-enhance-reconcile-guard.ts";
+import { isPrivilegedInternalCaller } from "../_shared/video-enhance-reconcile-guard.ts";
 import { runPersistCycle } from "../_shared/video-enhance-persist-cycle.ts";
 
 /**
@@ -38,7 +38,7 @@ serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
 
   // Internal only. The body is never read: no caller can steer which run runs.
-  if (!isInternalCaller(req.headers, (key) => Deno.env.get(key))) {
+  if (!isPrivilegedInternalCaller(req.headers, (key) => Deno.env.get(key))) {
     return json({ error: "Unauthorized" }, 401);
   }
 

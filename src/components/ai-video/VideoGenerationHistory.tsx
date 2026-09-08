@@ -23,6 +23,12 @@ import {
   type VideoHistoryItem,
 } from '@/lib/videoHistory/model';
 import { runPhaseLabel } from '@/lib/videoEnhance/runPresentation';
+import {
+  getEnhanceRuns,
+  hydrateEnhanceRuns,
+  subscribeEnhanceRuns,
+} from '@/lib/videoEnhance/runStore';
+import type { EnhanceRunRow } from '@/hooks/useEnhanceVideo';
 import type { EnhanceLang } from '@/lib/videoEnhance/engineErrors';
 
 const MODEL_DISPLAY_NAMES: Record<string, string> = {
@@ -131,6 +137,20 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
     // A save in progress finishes server-side; keep the row fresh without a reload.
     refetchInterval: 15000,
   });
+
+  /**
+   * Unfinished upscales belong to the backend, not to a page. The shared store
+   * holds every open job of this customer (restored via `open_runs` on mount,
+   * on reload and after a fresh sign-in), so History shows them immediately
+   * and keeps updating them while the customer is somewhere else in the app.
+   */
+  const [liveEnhanceRuns, setLiveEnhanceRuns] = useState<EnhanceRunRow[]>(() => getEnhanceRuns());
+  useEffect(() => subscribeEnhanceRuns(setLiveEnhanceRuns), []);
+  useEffect(() => {
+    void hydrateEnhanceRuns(true);
+  }, [user?.id]);
+
+
 
   /**
    * Seedance 2.5 runs on ByteDance ModelArk, which has no webhook. If a job is
@@ -262,10 +282,22 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
     en: 'Video upscale',
     es: 'Escalado de vídeo',
   });
+  /**
+   * The shared job store is the fresher truth for a run that is still moving:
+   * it polls every unfinished job of this customer app-wide. Merging it over
+   * the query result by run ID keeps ONE history entry that walks from running
+   * to saving to done — never a second row for the same job.
+   */
+  const enhanceById = new Map<string, any>();
+  for (const row of enhanceRuns ?? []) enhanceById.set((row as any).id, row);
+  for (const live of liveEnhanceRuns) {
+    enhanceById.set(live.id, { ...(enhanceById.get(live.id) ?? {}), ...live });
+  }
   const items: VideoHistoryItem[] = mergeHistory([
     ...(generations ?? []).map(generationToHistoryItem),
-    ...(enhanceRuns ?? []).map((row: any) => enhanceRunToHistoryItem(row, upscaleTitle)),
+    ...Array.from(enhanceById.values()).map((row: any) => enhanceRunToHistoryItem(row, upscaleTitle)),
   ]);
+
 
   if (isLoading) {
     return (

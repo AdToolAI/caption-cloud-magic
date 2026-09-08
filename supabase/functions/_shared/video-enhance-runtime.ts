@@ -352,3 +352,31 @@ export async function triggerPersist(tag = '[video-enhance]'): Promise<void> {
     console.warn(`${tag} persist trigger failed:`, error instanceof Error ? error.message : error);
   }
 }
+
+/**
+ * Fire-and-forget hand-over to a fresh provider-poll invocation.
+ *
+ * Keeps the dense 15–60 s cadence alive across function time budgets without
+ * the browser or a minute-granular cron owning completion detection. A lost
+ * hand-over costs nothing: the minute cron re-arms the chain.
+ */
+export async function triggerPoll(depth = 1, tag = '[video-enhance]'): Promise<void> {
+  const env = (globalThis as any).Deno?.env;
+  const url = env?.get('SUPABASE_URL');
+  const serviceKey = env?.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !serviceKey) return;
+  try {
+    await fetch(`${url}/functions/v1/video-enhance-poll`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({ depth }),
+    });
+  } catch (error) {
+    console.warn(`${tag} poll trigger failed:`, error instanceof Error ? error.message : error);
+  }
+}
+

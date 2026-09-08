@@ -97,3 +97,29 @@ export function decideCycle(
   }
   return { run: true };
 }
+
+/**
+ * Stricter gate for the internal WORKERS (`video-enhance-persist`,
+ * `video-enhance-poll`).
+ *
+ * These two move provider files and cause provider traffic, so the public
+ * publishable key — which ships inside the app bundle — is NOT enough here.
+ * Only the scheduler secret or the service role may call them; a signed-in
+ * customer, an anonymous visitor and an empty request are all rejected.
+ */
+export function isPrivilegedInternalCaller(
+  headers: Headers,
+  env: (key: string) => string | undefined,
+): boolean {
+  const cronSecret = env('CRON_SECRET');
+  const providedCron = headers.get('x-cron-secret');
+  if (cronSecret && providedCron && timingSafeEqual(providedCron, cronSecret)) return true;
+
+  const serviceKey = env('SUPABASE_SERVICE_ROLE_KEY');
+  if (!serviceKey) return false;
+  const bearer = (headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
+  const apikey = (headers.get('apikey') ?? '').trim();
+  if (bearer.length > 0 && isUserJwt(bearer)) return false;
+  return (bearer.length > 0 && timingSafeEqual(bearer, serviceKey)) ||
+    (apikey.length > 0 && timingSafeEqual(apikey, serviceKey));
+}
