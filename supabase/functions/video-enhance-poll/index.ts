@@ -10,6 +10,7 @@ import {
 } from "../_shared/video-enhance-finalize.ts";
 import {
   extractProviderCost,
+  providerCreditPatch,
   providerPollIntervalSeconds,
   setStatus,
   triggerPersist,
@@ -117,6 +118,9 @@ async function pollDueRuns(
     if (prediction.status === "succeeded" && prediction.output) {
       // Provider done. Storing the file is separate, heavy work: record the
       // fact and hand it to the persistence worker straight away.
+      // Billed provider units are only readable HERE (the persistence worker
+      // never re-reads the provider), so calibration telemetry is captured now.
+      const creditPatch = providerCreditPatch(run, extractProviderCost(prediction, run.model_id));
       await admin
         .from("video_enhance_runs")
         .update({
@@ -129,6 +133,7 @@ async function pollDueRuns(
           next_provider_poll_at: null,
           next_reconcile_at: null,
           last_reconciled_at: new Date().toISOString(),
+          ...creditPatch,
         })
         .eq("id", run.id)
         .not(
