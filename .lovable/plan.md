@@ -67,6 +67,8 @@ Neu bzw. erweitert:
 - Fortsetzung großer Dateien ab gespeichertem Offset; kein Vollpuffer im Speicher.
 - Keine doppelte Belastung/Erstattung.
 - Abgeschlossene Jobs erscheinen in History/Mediathek — derselbe Eintrag, kein Duplikat.
+- Lease-Ablauf und Wiederaufnahme durch den nächsten Worker.
+- Lasttest: 3 Nutzer × 2 gleichzeitige 4K-Jobs mit dicht beieinander liegenden Provider-Abschlüssen — globale Grenze 3 und Nutzergrenze 1 eingehalten, keine Aushungerung, keine doppelte Speicherung, keine doppelte Abrechnung, jeder Run sichtbar und terminal.
 
 ## Manueller Abnahmetest
 
