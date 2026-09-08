@@ -304,8 +304,15 @@ serve(async (req) => {
         .eq("user_id", user.id)
         .maybeSingle();
       if (!run) return json({ error: "Run not found" }, 404);
+
+      // Fast provider verdict. A run that the provider has already REJECTED
+      // must not keep spinning (and keep the reservation held) until the next
+      // 5-minute reconcile cycle. Only a rejection is acted on here — success
+      // and persistence stay with the reconciler's claim path — and at most
+      // once every 30 seconds per run.
+      const fresh = await fastProviderVerdict(admin, run);
       // Customer projection only: measured output facts in, internals out.
-      return json({ run: toClientRun(run) });
+      return json({ run: toClientRun(fresh ?? run) });
     }
 
 
