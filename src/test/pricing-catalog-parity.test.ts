@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { AI_VIDEO_TOOLKIT_MODELS } from '@/config/aiVideoModelRegistry';
 import { USD_PER_EUR } from '@/lib/cost/fx';
+import { VIDEO_PRICING_CATALOG as CLIENT_CATALOG } from '@/lib/cost/videoPricingCatalog';
 
 function loadBackendCatalog(): Record<string, { sellEUR: number; sellUSD: number }> {
   const src = readFileSync(
@@ -44,4 +45,45 @@ describe('video pricing parity (UI ↔ backend catalog)', () => {
       expect(model.costPerSecond.USD).toBeCloseTo(entry!.sellUSD, 4);
     },
   );
+});
+
+/**
+ * v510 — the client mirror must also agree on DURATIONS, not just prices.
+ * A divergent min/max duration let the UI offer a length the catalog does not
+ * price (and the capability gate then rejects after the user committed).
+ */
+function loadBackendRows(): Record<string, Record<string, number>> {
+  const src = readFileSync(
+    resolve(process.cwd(), 'supabase/functions/_shared/videoPricingCatalog.ts'),
+    'utf8',
+  );
+  const out: Record<string, Record<string, number>> = {};
+  const re = /'([^']+)':\s*\{\s*id:\s*'[^']+',([^}]*)\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src))) {
+    const row: Record<string, number> = {};
+    for (const key of ['sellEUR', 'costEUR', 'minDuration', 'maxDuration', 'fixedClipSeconds']) {
+      const v = new RegExp(`${key}:\\s*([\\d.]+)`).exec(m[2]);
+      if (v) row[key] = Number(v[1]);
+    }
+    out[m[1]] = row;
+  }
+  return out;
+}
+
+describe('pricing catalog mirror (client ↔ server)', () => {
+  const backend = loadBackendRows();
+
+  it('has the same row set on both sides', () => {
+    expect(Object.keys(CLIENT_CATALOG).sort()).toEqual(Object.keys(backend).sort());
+  });
+
+  it.each(Object.keys(backend))('row %s matches price and duration bounds', (id) => {
+    const server = backend[id];
+    const client = (CLIENT_CATALOG as Record<string, any>)[id];
+    expect(client, `row "${id}" missing in the client mirror`).toBeTruthy();
+    for (const key of ['sellEUR', 'costEUR', 'minDuration', 'maxDuration', 'fixedClipSeconds']) {
+      expect(client[key] ?? null, `${id}.${key}`).toEqual(server[key] ?? null);
+    }
+  });
 });
