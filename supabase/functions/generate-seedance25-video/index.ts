@@ -19,6 +19,11 @@ import {
   probeRemoteImageSize,
   type ImageLocale,
 } from "../_shared/videoImageRequirements.ts";
+import {
+  describePreflightViolation,
+  preflightVideoRequest,
+  type PreflightLocale,
+} from "../_shared/videoRequestPreflight.ts";
 
 
 const corsHeaders = {
@@ -140,6 +145,34 @@ Deno.serve(async (req) => {
       generateAudio && suppressDialogue
         ? `${String(prompt).trim()}\n\n${NO_SPEECH_CLAUSE}`
         : prompt;
+
+    // Request-shape preflight (prompt length, exclusive input slots) — runs
+    // before the wallet and before ModelArk. A provider 400/422 must never be
+    // our first validation layer.
+    {
+      const preLocale = ((req.headers.get("x-locale") ?? "en").slice(0, 2)) as PreflightLocale;
+      const pre = preflightVideoRequest({
+        modelId: MODEL_ID,
+        prompt: String(prompt ?? ""),
+        startImageUrl,
+        endImageUrl,
+        referenceImageUrls: Array.isArray(referenceImageUrls) ? referenceImageUrls : null,
+        referenceVideoUrls: [
+          ...(referenceVideoUrls ?? []),
+          ...(referenceVideoUrl ? [referenceVideoUrl] : []),
+        ],
+      });
+      if (!pre.ok) {
+        return new Response(
+          JSON.stringify({
+            error: describePreflightViolation(pre.violation, preLocale, "Seedance 2.5"),
+            code: pre.code,
+            violation: pre.violation.kind,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
 
     if (!prompt || !prompt.trim()) {
       return new Response(JSON.stringify({ error: "Prompt is required" }), {

@@ -4,6 +4,11 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
+import {
+  describePreflightViolation,
+  preflightVideoRequest,
+  type PreflightLocale,
+} from "../_shared/videoRequestPreflight.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
@@ -99,6 +104,28 @@ serve(async (req) => {
       corsHeaders,
     );
     if (gate.response) return gate.response;
+
+    // Replicate rejects prompts over 4000 characters with a raw 422 — refuse
+    // here, before wallet and provider.
+    {
+      const preLocale = ((req.headers.get("x-locale") ?? "en").slice(0, 2)) as PreflightLocale;
+      const pre = preflightVideoRequest({
+        modelId: model,
+        prompt: String(prompt ?? ""),
+        startImageUrl,
+        endImageUrl,
+      });
+      if (!pre.ok) {
+        return new Response(
+          JSON.stringify({
+            error: describePreflightViolation(pre.violation, preLocale, "Seedance"),
+            code: pre.code,
+            violation: pre.violation.kind,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
 
     const isImageToVideo = !!startImageUrl;
     const mode = isImageToVideo ? 'Image-to-Video' : 'Text-to-Video';
