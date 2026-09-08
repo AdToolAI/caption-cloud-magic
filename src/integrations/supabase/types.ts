@@ -932,6 +932,54 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_video_wallet_open_corrections: {
+        Row: {
+          correction_key: string
+          created_at: string
+          expected_amount_euros: number
+          generation_id: string | null
+          id: string
+          ledger_transaction_id: string | null
+          note: string | null
+          open_amount_euros: number
+          reason: string
+          recovered_amount_euros: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          correction_key: string
+          created_at?: string
+          expected_amount_euros: number
+          generation_id?: string | null
+          id?: string
+          ledger_transaction_id?: string | null
+          note?: string | null
+          open_amount_euros: number
+          reason: string
+          recovered_amount_euros?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          correction_key?: string
+          created_at?: string
+          expected_amount_euros?: number
+          generation_id?: string | null
+          id?: string
+          ledger_transaction_id?: string | null
+          note?: string | null
+          open_amount_euros?: number
+          reason?: string
+          recovered_amount_euros?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_video_wallets: {
         Row: {
           balance_euros: number
