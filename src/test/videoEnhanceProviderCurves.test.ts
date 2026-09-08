@@ -12,6 +12,7 @@ import {
 import {
   TOPAZ_COST_ESTIMATOR_VERSION,
   topazEstimatedCredits,
+  topazSourceResolutionMultiplier,
   topazUncertaintyBuffer,
   topazCreditDrift,
 } from '@/lib/videoEnhance/topazCostEstimator';
@@ -101,7 +102,7 @@ describe('post-discount loss policy', () => {
 
 describe('Topaz model-aware cost estimator', () => {
   it('is explicitly versioned', () => {
-    expect(TOPAZ_COST_ESTIMATOR_VERSION).toBe('2026-09-09-calibrated-v3');
+    expect(TOPAZ_COST_ESTIMATOR_VERSION).toBe('2026-09-09-calibrated-v4');
   });
 
   it('charges Apollo clearly more than Chronos for the same job', () => {
@@ -111,9 +112,8 @@ describe('Topaz model-aware cost estimator', () => {
     expect(apollo.credits).toBeGreaterThan(chronos.credits * 1.4);
   });
 
-  it('documents the unexplained historical 51-credit 4K run as an outlier', () => {
-    // v3 fits the three repeated 4K/60 Apollo samples, not this single
-    // historical run. The drift monitor must still see it as flagged.
+  it('explains the historical 51-credit 4K run through its 720p source', () => {
+    // 720x1280, 15.042 s, 4K/60, Apollo — reproduced 1:1 with current code.
     const estimate = topazEstimatedCredits({
       durationSeconds: 15.042,
       creditFamily: 'precision',
@@ -121,8 +121,43 @@ describe('Topaz model-aware cost estimator', () => {
       resolution: '4k',
       interpolationModel: 'apollo',
       interpolationApplies: true,
+      sourceWidth: 720,
+      sourceHeight: 1280,
     });
-    expect(topazCreditDrift(estimate.credits, 51).flagged).toBe(true);
+    const drift = topazCreditDrift(estimate.credits, 51);
+    expect(drift.flagged).toBe(false);
+    expect(Math.abs(drift.driftPct!)).toBeLessThanOrEqual(0.15);
+  });
+
+  it('keeps the 1080p source as the neutral reference and never under-prices smaller sources', () => {
+    expect(topazSourceResolutionMultiplier(1080, 1920)).toBeCloseTo(1, 3);
+    expect(topazSourceResolutionMultiplier(1920, 1080)).toBeCloseTo(1, 3);
+    expect(topazSourceResolutionMultiplier(720, 1280)).toBeGreaterThan(1.7);
+    expect(topazSourceResolutionMultiplier(540, 960)).toBeGreaterThan(
+      topazSourceResolutionMultiplier(720, 1280),
+    );
+    // Unknown geometry must not silently discount the run.
+    expect(topazSourceResolutionMultiplier(undefined, undefined)).toBe(1);
+    // Guard rails.
+    expect(topazSourceResolutionMultiplier(64, 64)).toBeLessThanOrEqual(3);
+    expect(topazSourceResolutionMultiplier(7680, 4320)).toBeGreaterThanOrEqual(0.6);
+  });
+
+  it('prices a smaller source higher for an identical target job', () => {
+    const base = {
+      durationSeconds: 10,
+      creditFamily: 'precision' as const,
+      targetFps: 60,
+      resolution: '4k' as const,
+      interpolationModel: 'apollo',
+      interpolationApplies: true,
+    };
+    const from1080 = topazEstimatedCredits({ ...base, sourceWidth: 1080, sourceHeight: 1920 });
+    const from720 = topazEstimatedCredits({ ...base, sourceWidth: 720, sourceHeight: 1280 });
+    const from540 = topazEstimatedCredits({ ...base, sourceWidth: 540, sourceHeight: 960 });
+    expect(from720.credits).toBeGreaterThan(from1080.credits);
+    expect(from540.credits).toBeGreaterThan(from720.credits);
+    expect(from1080.sourceResolutionMultiplier).toBeCloseTo(1, 3);
   });
 
   it('bills no interpolation when the frame rate stays the same', () => {
@@ -237,6 +272,8 @@ describe('Topaz estimator v2 — measured billing regression', () => {
     interpolationModel?: string;
     interpolationApplies: boolean;
     billed: number;
+    sourceWidth?: number;
+    sourceHeight?: number;
   }> = [
     { name: '2K/24 no interpolation (calibration run 1)', duration: 9.917, fps: 24, resolution: '2k', interpolationApplies: false, billed: 4 },
     { name: '2K/60 Chronos (calibration run 2)', duration: 9.917, fps: 60, resolution: '2k', interpolationModel: 'chronos', interpolationApplies: true, billed: 10 },
@@ -247,6 +284,7 @@ describe('Topaz estimator v2 — measured billing regression', () => {
     { name: '4K/60 Chronos (historical)', duration: 9.917, fps: 60, resolution: '4k', interpolationModel: 'chronos', interpolationApplies: true, billed: 10 },
     { name: '4K/30 Chronos (historical)', duration: 14.708, fps: 30, resolution: '4k', interpolationModel: 'chronos', interpolationApplies: true, billed: 8 },
     { name: '4K/24 no interpolation (historical)', duration: 17.083, fps: 24, resolution: '4k', interpolationApplies: false, billed: 7 },
+    { name: '4K/60 Apollo 15.04s from a 720p source (reproduced 51-credit run)', duration: 15.042, fps: 60, resolution: '4k', interpolationModel: 'apollo', interpolationApplies: true, billed: 51, sourceWidth: 720, sourceHeight: 1280 },
   ];
 
   for (const c of cases) {
@@ -258,6 +296,8 @@ describe('Topaz estimator v2 — measured billing regression', () => {
         creditFamily: 'precision',
         interpolationModel: c.interpolationModel,
         interpolationApplies: c.interpolationApplies,
+        sourceWidth: c.sourceWidth ?? 1080,
+        sourceHeight: c.sourceHeight ?? 1920,
       });
       const drift = topazCreditDrift(estimate.credits, c.billed);
       expect(drift.flagged).toBe(false);
