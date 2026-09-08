@@ -13,8 +13,9 @@ Finishes the two remaining parts of the approved architecture and then verifies 
 ## Part 1 — Multiple parallel jobs (close the gaps)
 
 1. Add config entries for the two internal functions so they are reachable without a user token (`verify_jwt = false`) and have a sufficient timeout (persist ~120 s, poll ~60 s). They stay internal-only through the existing shared-secret/service-role check in the handlers.
-2. Add a migration that schedules `video-enhance-poll` every minute (provider completion detection) and keeps the existing 5-minute reconcile as watchdog only.
+2. Topaz completion latency: the poller itself keeps a self-scheduling cadence of 15 s during the first 2 minutes, 30 s up to 5 minutes and 60 s afterwards, driven by the stored `next_provider_poll_at` and a self re-trigger while any run is due sooner than the next cron tick. The 1-minute cron stays only as a recovery trigger, and the reconcile every 5 minutes stays as watchdog. The browser never owns completion detection.
 3. Re-check the claim path end to end so that queued jobs never fail: over-limit runs must stay claimable later, and the per-user limit of 1 heavy transfer must not block a second user.
+
 
 ## Part 2 — Visibility and restoration
 
