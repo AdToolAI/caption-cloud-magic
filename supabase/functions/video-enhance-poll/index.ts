@@ -8,6 +8,7 @@ import {
   finalizeCancelConfirmed,
   finalizeFailure,
 } from "../_shared/video-enhance-finalize.ts";
+import { topazCreditDrift } from "../_shared/topaz-cost-estimator.ts";
 import {
   extractProviderCost,
   providerPollIntervalSeconds,
