@@ -120,6 +120,8 @@ export function priceVideoEnhanceRun(
     tier: config.tier,
     outputSeconds,
     sourceFps: source.fps,
+    sourceWidth: source.width,
+    sourceHeight: source.height,
     interpolationModel: config.interpolationModel,
   });
   const baseCostEur = bufferedProviderCostEur(detail.costUsd);
