@@ -129,6 +129,22 @@ roughly cost + 33 %, and Chronos — the new default — is materially cheaper f
   Drift above 15 % is logged and flagged for review; the customer price is never changed
   retroactively upward — only the existing true-up refund can move money back.
 
+### Post-discount loss policy
+
+- Every run computes and stores
+  `effective_multiple = final_customer_charge / estimated_provider_cost`
+  (after the account discount, before VAT) and a classification:
+  `profitable` when it is >= 1.0, `subsidized` when below.
+- Subsidized runs are explicitly observable: flagged on the run, counted in the pricing
+  report, and logged with model, configuration, discount percent and the shortfall.
+  Nothing about the customer's discount or price changes — no silent override.
+- Pre-release check (a test, not a runtime rule): every selectable Topaz configuration is
+  priced at the discount levels in use (0 % and the founder/creator rates). Any combination
+  whose effective multiple drops below 1.0 is listed for an explicit decision — allow the
+  subsidy deliberately, exclude that configuration from the discount, or raise the base
+  curve. The build reports them; it does not fix them by itself.
+
+
 ## 6. Tests
 
 vCube 10 s 1080p30 / 10 s 4K30 / 10 s 4K60 / 30 s 4K60 — multiple always within 1.6–2.5.
