@@ -14,12 +14,24 @@ export type VideoErrorKind =
   | 'invalid_input'
   | 'rate_limit'
   | 'provider_error'
+  /** OUR provider account is out of funds — never the customer's balance. */
+  | 'provider_account'
   | 'network'
   | 'unknown';
 
 export function classifyVideoError(errorMessage: string | null | undefined): VideoErrorKind {
   if (!errorMessage) return 'unknown';
   const raw = errorMessage.toLowerCase();
+
+  // Checked FIRST: the provider's own "insufficient credits" is about the
+  // AdTool provider account. Shown verbatim it wrongly blames the customer.
+  if (
+    raw.includes('provider account has no credits') ||
+    raw.includes('insufficient_credits') ||
+    (raw.includes('insufficient') && raw.includes('credit'))
+  ) {
+    return 'provider_account';
+  }
 
   // Provider privacy gate on uploaded images (ByteDance/Seedance:
   // `InputImageSensitiveContentDetected.PrivacyInformation`). Checked before
@@ -145,6 +157,12 @@ export function friendlyVideoErrorMessage(errorMessage: string | null | undefine
         de: `Die Verbindung zum Anbieter ist abgebrochen. ${REFUND.de} Bitte versuche es gleich noch einmal.`,
         en: `The connection to the provider was interrupted. ${REFUND.en} Please try again shortly.`,
         es: `Se interrumpió la conexión con el proveedor. ${REFUND.es} Inténtalo de nuevo en breve.`,
+      });
+    case 'provider_account':
+      return tx({
+        de: `Die Veredelung konnte gerade nicht ausgeführt werden – der Anbieter war nicht verfügbar. ${REFUND.de} Bitte versuche es in Kürze erneut.`,
+        en: `This job could not be run right now — the engine was unavailable. ${REFUND.en} Please try again shortly.`,
+        es: `Este trabajo no se pudo ejecutar ahora mismo: el motor no estaba disponible. ${REFUND.es} Inténtalo de nuevo en breve.`,
       });
     case 'provider_error':
       return tx({
