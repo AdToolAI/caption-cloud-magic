@@ -285,7 +285,13 @@ serve(async (req) => {
         }
 
       } else if (prediction.status === "failed") {
-        await finalizeFailure(admin, run, "PROVIDER_FAILED", String(prediction.error ?? "provider failed"));
+        const verdict = classifyProviderFailure(prediction.error);
+        if (verdict.outage) {
+          // Whole-engine condition (our provider account is out of funds):
+          // loud in the logs so operations sees it before customers do.
+          console.error(`${TAG} PROVIDER OUTAGE (${verdict.code}) run=${run.id}: ${verdict.message}`);
+        }
+        await finalizeFailure(admin, run, verdict.code, verdict.message);
         summary.failed++;
       } else if (prediction.status === "canceled") {
         await finalizeCancelConfirmed(admin, run, providerCost);
