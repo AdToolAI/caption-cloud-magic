@@ -7,6 +7,7 @@
  */
 
 import { actualMargin, costDrift, VIDEO_RATE_CARDS } from './video-enhance-models.ts';
+import { topazCreditDrift } from './topaz-cost-estimator.ts';
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;

@@ -206,6 +206,7 @@ serve(async (req) => {
             next_reconcile_at: null,
             reconciliation_attempts: attempts,
             last_reconciled_at: nowIso,
+            ...providerCreditPatch(run, providerCost),
           });
           // Do not wait for the next cycle to store it.
           await triggerPersist(TAG);
