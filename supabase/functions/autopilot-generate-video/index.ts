@@ -15,25 +15,18 @@ interface Body {
   visual_prompt_en: string;
 }
 
-// Provider → Replicate model + cost per second (in autopilot credits).
-// Credits are charged against brief.weekly_credit_budget.
-const PROVIDERS: Record<string, { model: string; creditsPerSec: number; ratioMap: Record<string, string> }> = {
-  "hailuo-standard": {
-    model: "minimax/hailuo-02",
-    creditsPerSec: 5,
-    ratioMap: { "9:16": "9:16", "1:1": "1:1", "16:9": "16:9" },
-  },
-  "kling-std": {
-    model: "kwaivgi/kling-v2.1",
-    creditsPerSec: 8,
-    ratioMap: { "9:16": "9:16", "1:1": "1:1", "16:9": "16:9" },
-  },
-  "seedance-lite": {
-    model: "bytedance/seedance-1-lite",
-    creditsPerSec: 6,
-    ratioMap: { "9:16": "9:16", "1:1": "1:1", "16:9": "16:9" },
-  },
+// Autopilot provider keys → CANONICAL model ids (v510).
+// The provider slug is no longer hand-written here: it comes from the
+// canonical registry via the capability gate (`routeIdentity`), so autopilot
+// can never dispatch to a route the Studio has retired.
+// `creditsPerSec` is autopilot's own weekly-budget economy and unrelated to
+// the wallet pricing catalog.
+const PROVIDERS: Record<string, { modelId: string; creditsPerSec: number }> = {
+  "hailuo-standard": { modelId: "hailuo-standard", creditsPerSec: 5 },
+  "kling-std":       { modelId: "kling-2.5-turbo", creditsPerSec: 8 },
+  "seedance-lite":   { modelId: "seedance-mini",   creditsPerSec: 6 },
 };
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
