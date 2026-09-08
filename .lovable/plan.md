@@ -33,15 +33,17 @@ Added/extended tests:
 - History mapping: one entry per run across running → saving → done, no duplicates;
 - Topaz cadence: due-time schedule follows 15 s / 30 s / 60 s buckets and never lets two pollers work the same run;
 - transfer layer untouched: resume from stored offset, no full-file buffering;
-- no additional wallet debit or refund on any of these paths.
+- no additional wallet debit or refund on any of these paths: exactly one reservation/debit per run, and retries, polling, webhook races and persistence cause no further financial mutation;
+- monotonic run states: once a run is completed (or otherwise terminal), a late webhook, poll or reconcile response can never move it back to a non-terminal state — enforced in the database, not only in code.
 
 ### Security tests for the internal functions
 
-Explicit tests, run against the deployed functions, proving that:
-- an unauthenticated/public request to `video-enhance-persist` and `video-enhance-poll` is rejected;
+`video-enhance-persist` and `video-enhance-poll` get a stricter caller gate than the reconciler: only the scheduler secret or the service role, never the public publishable key. Explicit tests prove that:
+- an unauthenticated/public request to either function is rejected;
 - a normal signed-in user's token cannot invoke either internal operation;
 - one user can neither claim nor read another user's run (claim RPC and `status`/`open_runs` are user-scoped);
 - only the internal secret / service-role path succeeds.
+
 
 ## Part 4 — Live acceptance, staged
 
