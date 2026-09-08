@@ -1,8 +1,16 @@
 import type { QualityTier, VideoResolution } from '@/config/videoEnhanceModels/types';
 import {
   TOPAZ_VIDEO_MODEL_VIEWS,
+  topazInterpolationAppliesView,
+  topazModelView,
   type TopazCreditFamily,
 } from '@/config/videoEnhanceModels/topazCatalog';
+import {
+  TOPAZ_COST_ESTIMATOR_VERSION,
+  topazEstimatedCredits,
+  type TopazCostEstimate,
+} from './topazCostEstimator';
+
 
 /**
  * Provider rate cards for Video Enhance.
@@ -51,6 +59,8 @@ interface RateCardMeta {
   costUnverified?: boolean;
   /** true while the units/seconds estimator is not calibrated from real runs. */
   estimatorCalibrating?: boolean;
+  /** Version of a calibrated estimator, frozen into every price snapshot. */
+  estimatorVersion?: string;
 }
 
 export type VideoRateCard = RateCardMeta &
@@ -65,6 +75,8 @@ export type VideoRateCard = RateCardMeta &
         unitsPerOutputSecondByMode?: Record<string, Partial<Record<VideoResolution, number>>>;
         /** Multiplier applied on top for higher frame rates. */
         fpsFactor?: Record<number, number>;
+        /** Model-aware estimator that replaces the flat units x fps factor. */
+        estimator?: 'topaz_credits';
         /** Published reference table, kept for admin comparison only. */
         entries?: MatrixEntry[];
       }
@@ -78,21 +90,12 @@ export interface VideoCostConfig {
   fps: number;
   tier: QualityTier;
   outputSeconds: number;
+  /** Measured source frame rate — decides whether interpolation is billed. */
+  sourceFps?: number;
+  /** Topaz interpolation model id, when the frame rate changes. */
+  interpolationModel?: string;
 }
 
-function matrixRates(
-  mode: string,
-  tier: QualityTier,
-  rows: [VideoResolution, number, number][],
-): MatrixEntry[] {
-  return rows.map(([resolution, fps, usdPerSecond]) => ({
-    mode,
-    resolution,
-    fps,
-    tier,
-    usdPerSecond,
-  }));
-}
 
 /**
  * ByteDance vCube (`bytedance/video-upscaler`) is billed per second of OUTPUT
@@ -188,11 +191,15 @@ export const VIDEO_RATE_CARDS: Record<string, VideoRateCard> = {
     unitsPerOutputSecond: TOPAZ_CREDITS_PER_SECOND,
     unitsPerOutputSecondByMode: TOPAZ_CREDITS_BY_MODE,
     fpsFactor: TOPAZ_FPS_FACTOR,
+    // Model-aware, per-output-frame estimator: the interpolation model (Apollo
+    // vs Chronos) drives the credits, not a blanket fps factor.
+    estimator: 'topaz_credits',
     source:
-      'Topaz direct API credit pricing (published Proteus + Nyx/Themis credit tables); credit USD value from TOPAZ_CREDIT_USD',
-    checkedAt: '2026-09-07',
+      'Topaz direct API credits, model-aware per-frame estimator calibrated on billed AdTool runs',
+    checkedAt: '2026-09-08',
     costUnverified: true,
     estimatorCalibrating: true,
+    estimatorVersion: TOPAZ_COST_ESTIMATOR_VERSION,
     entries: TOPAZ_ENTRIES,
   },
 };
@@ -205,8 +212,17 @@ export class UnpriceableRunError extends Error {
   }
 }
 
-/** Provider cost in USD for one run. Throws when the card has no entry. */
-export function videoProviderCostUsd(card: VideoRateCard, config: VideoCostConfig): number {
+export interface VideoCostDetail {
+  costUsd: number;
+  /** Present for the model-aware Topaz estimator. */
+  topaz?: TopazCostEstimate;
+}
+
+/** Provider cost for one run. Throws when the card has no entry. */
+export function videoProviderCostDetail(
+  card: VideoRateCard,
+  config: VideoCostConfig,
+): VideoCostDetail {
   const seconds = Math.max(0, config.outputSeconds);
   switch (card.type) {
     case 'per_second_matrix': {
@@ -222,11 +238,23 @@ export function videoProviderCostUsd(card: VideoRateCard, config: VideoCostConfi
           `no rate for ${config.mode}/${config.resolution}/${config.fps}fps/${config.tier}`,
         );
       }
-      return entry.usdPerSecond * seconds;
+      return { costUsd: entry.usdPerSecond * seconds };
     }
     case 'per_output_second':
-      return card.usdPerSecond * seconds;
+      return { costUsd: card.usdPerSecond * seconds };
     case 'per_unit': {
+      if (card.estimator === 'topaz_credits') {
+        const sourceFps = Math.round(config.sourceFps ?? config.fps) || 30;
+        const estimate = topazEstimatedCredits({
+          durationSeconds: seconds,
+          targetFps: config.fps,
+          resolution: config.resolution,
+          creditFamily: topazModelView(config.mode)?.creditFamily,
+          interpolationModel: config.interpolationModel,
+          interpolationApplies: topazInterpolationAppliesView(sourceFps, config.fps),
+        });
+        return { costUsd: card.unitUsd * estimate.credits, topaz: estimate };
+      }
       const table = card.unitsPerOutputSecondByMode?.[config.mode] ?? card.unitsPerOutputSecond;
       const perSecond = table[config.resolution];
       if (perSecond === undefined) {
@@ -234,16 +262,21 @@ export function videoProviderCostUsd(card: VideoRateCard, config: VideoCostConfi
       }
       const fpsFactor = card.fpsFactor?.[config.fps] ?? 1;
       const units = Math.ceil(perSecond * fpsFactor * seconds);
-      return card.unitUsd * Math.max(1, units);
+      return { costUsd: card.unitUsd * Math.max(1, units) };
     }
     case 'tiered': {
       const tier =
         card.tiers.find((t) => seconds <= t.maxOutputSeconds) ?? card.tiers[card.tiers.length - 1];
       if (!tier) throw new UnpriceableRunError('empty tier table');
-      return tier.usd;
+      return { costUsd: tier.usd };
     }
   }
 }
+
+export function videoProviderCostUsd(card: VideoRateCard, config: VideoCostConfig): number {
+  return videoProviderCostDetail(card, config).costUsd;
+}
+
 
 export interface CostDriftVerdict {
   ratio: number;

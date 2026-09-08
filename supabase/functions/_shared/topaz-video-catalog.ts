@@ -246,7 +246,11 @@ export const TOPAZ_INTERPOLATION_MODELS: TopazInterpolationModel[] = [
   { id: 'aion', slug: 'aion-1', name: 'Aion', fast: false },
 ];
 
-export const TOPAZ_DEFAULT_INTERPOLATION_ID = 'apollo';
+/**
+ * Chronos is the default: Apollo costs roughly 2.7x per output frame at the
+ * provider, so it is a deliberate premium choice, never a silent one.
+ */
+export const TOPAZ_DEFAULT_INTERPOLATION_ID = 'chronos';
 
 export function isTopazInterpolationId(value: unknown): boolean {
   return typeof value === 'string' && TOPAZ_INTERPOLATION_MODELS.some((m) => m.id === value);

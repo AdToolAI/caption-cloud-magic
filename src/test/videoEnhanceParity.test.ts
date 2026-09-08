@@ -86,17 +86,19 @@ describe('video enhance pricing parity', () => {
     });
   }
 
-  it('lets the hard multiplier cap win over the price floor and flags it for review', () => {
-    // Micro-run: the platform price floor would imply far more than 3x the
-    // provider cost. Policy: never price above the cap — flag the config.
+  it('flags a micro-run whose cent rounding lifts it above the provider band', () => {
+    // Micro-run: one cent is already more than the band multiple of the
+    // provider cost. Policy: never silently price outside the band — flag it.
     const price = priceServer(
       { modelId: 'bytedance-vcube', mode: 'aigc', resolution: '1080p', fps: 24, tier: 'standard' },
       { ...source, durationSeconds: 1 },
     );
-    expect(price.effectiveMultiplier!).toBeLessThanOrEqual(price.multiplierCap + 1e-6);
+    expect(price.userPriceEur).toBe(0.02);
+    expect(price.effectiveMultiplier!).toBeGreaterThan(price.multiplierBandMax);
     expect(price.pricingGate).toBe('review_required');
     expect(price.pricingGateReason).toBe('floor_conflict');
   });
+
 
 });
 

@@ -206,6 +206,8 @@ export interface TopazInterpolationView {
   slug: string;
   name: string;
   fast: boolean;
+  /** Costs markedly more at the provider — the UI has to warn about it. */
+  premium?: boolean;
   hint: LocalizedText;
 }
 
@@ -215,10 +217,11 @@ export const TOPAZ_INTERPOLATION_VIEWS: TopazInterpolationView[] = [
     slug: 'apo-8',
     name: 'Apollo',
     fast: false,
+    premium: true,
     hint: {
-      en: 'Best for fast motion',
-      de: 'Am besten bei schnellen Bewegungen',
-      es: 'Mejor para movimiento rápido',
+      en: 'Best for fast motion — premium, clearly more expensive',
+      de: 'Am besten bei schnellen Bewegungen – Premium, deutlich teurer',
+      es: 'Mejor para movimiento rápido: premium, claramente más caro',
     },
   },
   {
@@ -226,10 +229,11 @@ export const TOPAZ_INTERPOLATION_VIEWS: TopazInterpolationView[] = [
     slug: 'apf-2',
     name: 'Apollo Fast',
     fast: true,
+    premium: true,
     hint: {
-      en: 'Quicker, slightly softer',
-      de: 'Schneller, etwas weicher',
-      es: 'Más rápido, algo más suave',
+      en: 'Quicker, slightly softer — premium price',
+      de: 'Schneller, etwas weicher – Premium-Preis',
+      es: 'Más rápido, algo más suave: precio premium',
     },
   },
   {
@@ -238,9 +242,9 @@ export const TOPAZ_INTERPOLATION_VIEWS: TopazInterpolationView[] = [
     name: 'Chronos',
     fast: false,
     hint: {
-      en: 'Best for slow motion',
-      de: 'Am besten für Zeitlupe',
-      es: 'Mejor para cámara lenta',
+      en: 'Recommended standard, best value',
+      de: 'Empfohlener Standard, bestes Preis-Leistungs-Verhältnis',
+      es: 'Estándar recomendado, mejor relación calidad-precio',
     },
   },
   {
@@ -259,15 +263,17 @@ export const TOPAZ_INTERPOLATION_VIEWS: TopazInterpolationView[] = [
     slug: 'aion-1',
     name: 'Aion',
     fast: false,
+    premium: true,
     hint: {
-      en: 'Newest model, very smooth',
-      de: 'Neuestes Modell, sehr flüssig',
-      es: 'Modelo más nuevo, muy fluido',
+      en: 'Newest model, very smooth — premium price',
+      de: 'Neuestes Modell, sehr flüssig – Premium-Preis',
+      es: 'Modelo más nuevo, muy fluido: precio premium',
     },
   },
 ];
 
-export const TOPAZ_DEFAULT_INTERPOLATION_ID = 'apollo';
+export const TOPAZ_DEFAULT_INTERPOLATION_ID = 'chronos';
+
 
 // ---------------------------------------------------------------------------
 
