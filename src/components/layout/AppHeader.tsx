@@ -14,6 +14,7 @@ import { SocialConnectionIcons } from "@/components/dashboard/SocialConnectionIc
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { StreakBadge } from "@/components/streak/StreakBadge";
 import { WalletBadge } from "@/components/layout/WalletBadge";
+import { EnhanceJobCenter } from "@/components/jobs/EnhanceJobCenter";
 import { FounderCrest } from "@/components/founders/FounderCrest";
 
 export function AppHeader() {
@@ -61,6 +62,7 @@ export function AppHeader() {
 
         {/* Right: Actions */}
         <div data-tour="header-actions" className="flex items-center gap-1 sm:gap-2 lg:ml-12 shrink-0">
+          {user && <EnhanceJobCenter />}
           {user && <WalletBadge />}
           {user && <StreakBadge />}
           <LanguageSwitcher />
