@@ -592,6 +592,15 @@ serve(async (req) => {
       );
     }
 
+    // Engine-wide outage on OUR provider account: refuse before reserving.
+    if (await providerOutageActive(admin, config.modelId)) {
+      console.error(`${TAG} start refused: provider outage for ${config.modelId}`);
+      return json(
+        { error: "The engine is temporarily unavailable.", code: PROVIDER_ACCOUNT_CREDITS },
+        503,
+      );
+    }
+
     if (!body.idempotencyKey) return json({ error: "idempotencyKey required" }, 400);
 
     const { data: wallet } = await admin
