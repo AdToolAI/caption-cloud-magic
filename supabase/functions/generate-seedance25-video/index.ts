@@ -208,9 +208,12 @@ Deno.serve(async (req) => {
       .single();
 
     const currency = (walletPreview?.currency || "EUR") as "EUR" | "USD";
-    // 480p and 720p are billed on separate catalog tiers (20.08.2026 re-pricing):
-    // 720p = 11.95 EUR / 30 s, 480p = 6.95 EUR / 30 s.
-    const pricingModelId = resolution === "480p" ? `${MODEL_ID}-480p` : MODEL_ID;
+    // Billing identity comes from the canonical registry (tier-scoped pricing
+    // id), never from a hand-written string here — the UI preview resolves the
+    // identical id, so display and deduction cannot diverge.
+    const pricingModelId =
+      resolvePricingId(MODEL_ID, generationMode, gate.resolutionLabel ?? resolution) ?? MODEL_ID;
+
     const costPerSecond = await resolveAccountCostPerSecond(
       supabaseAdmin, user.id, pricingModelId, currency, 0.3983,
     );
