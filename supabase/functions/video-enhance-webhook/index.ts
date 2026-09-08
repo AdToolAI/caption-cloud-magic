@@ -221,7 +221,11 @@ serve(async (req) => {
     }
 
     if (providerStatus === "failed") {
-      return await asFailure(admin, run, "PROVIDER_FAILED", String(prediction.error ?? "provider failed"));
+      const verdict = classifyProviderFailure(prediction.error);
+      if (verdict.outage) {
+        console.error(`${TAG} PROVIDER OUTAGE (${verdict.code}) run=${run.id}: ${verdict.message}`);
+      }
+      return await asFailure(admin, run, verdict.code, verdict.message);
     }
 
     if (providerStatus === "canceled") {
