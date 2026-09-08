@@ -51,8 +51,32 @@ Deno.serve(async (req) => {
 
     const providerKey = brief.video_provider as string;
     const provider = PROVIDERS[providerKey] ?? PROVIDERS["hailuo-standard"];
-    const duration = Math.min(Math.max(brief.video_duration_sec ?? 6, 4), 12);
-    const aspect = brief.video_aspect_ratio ?? "9:16";
+    const duration = Number(brief.video_duration_sec ?? 6);
+    const aspect = String(brief.video_aspect_ratio ?? "9:16");
+
+    // CANONICAL CAPABILITY GATE — no silent clamps (v510).
+    // Previously duration was clamped to 4–12 s and an unsupported aspect
+    // ratio silently became 9:16, so the brief's setting and the delivered
+    // clip could differ without anyone noticing. An invalid combination now
+    // blocks the slot with an explicit reason instead.
+    const gate = await gateVideoCapability(
+      admin,
+      { modelId: provider.modelId, mode: "t2v", durationSeconds: duration, aspectRatio: aspect },
+      corsHeaders,
+    );
+    if (gate.response) {
+      await admin.from("autopilot_queue").update({
+        status: "blocked",
+        block_reason: "invalid_video_capability",
+        video_status: "failed",
+        video_error: `capability:${provider.modelId}:${duration}s:${aspect}`,
+      }).eq("id", slot_id);
+      return gate.response;
+    }
+    const providerSlug = gate.routeIdentity?.providerModelSlug;
+    if (!providerSlug) {
+      return json({ ok: false, error: "no_provider_contract" }, 500);
+    }
 
     // Cost (charged against weekly budget; refunded on failure by poller)
     const cost = Math.round(provider.creditsPerSec * duration);
@@ -68,10 +92,11 @@ Deno.serve(async (req) => {
     const input: Record<string, unknown> = {
       prompt: visual_prompt_en,
       duration,
-      aspect_ratio: provider.ratioMap[aspect] ?? "9:16",
+      aspect_ratio: aspect,
     };
 
-    const predResp = await fetch("https://api.replicate.com/v1/models/" + provider.model + "/predictions", {
+    const predResp = await fetch("https://api.replicate.com/v1/models/" + providerSlug + "/predictions", {
+
       method: "POST",
       headers: {
         Authorization: `Bearer ${replicateKey}`,
