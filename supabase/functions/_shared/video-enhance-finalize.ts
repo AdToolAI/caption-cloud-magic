@@ -226,6 +226,22 @@ export async function finalizeSuccess(
         .update({ resumable_upload_offset: progress.offset })
         .eq('id', run.id);
       if (progress.providerGone) {
+        // Same rule as before the transfer: an expired link gets exactly one
+        // refresh, and the next cycle resumes at the stored byte offset.
+        const fresh = await freshProviderUrl(run, providerOutputUrl);
+        if (fresh) {
+          await admin
+            .from('video_enhance_runs')
+            .update({ provider_output_url: fresh })
+            .eq('id', run.id);
+          await setStatus(admin, run.id, 'asset_staging', {
+            persist_attempts: Number(run.persist_attempts ?? 0),
+            next_persist_at: new Date().toISOString(),
+            persist_lease_until: null,
+            failure_stage: null,
+          });
+          return { ok: false, status: 'asset_staging' };
+        }
         return await finalizeFailure(
           admin,
           run,
