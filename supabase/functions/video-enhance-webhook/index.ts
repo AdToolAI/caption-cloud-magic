@@ -7,6 +7,7 @@ import {
 } from "../_shared/video-enhance-finalize.ts";
 import { setStatus, backoffMinutes, extractProviderCost } from "../_shared/video-enhance-runtime.ts";
 import { VIDEO_ENHANCE_SPECS } from "../_shared/video-enhance-models.ts";
+import { classifyProviderFailure } from "../_shared/video-enhance-provider-errors.ts";
 
 /**
  * Provider callback for Video Enhance.
@@ -221,7 +222,11 @@ serve(async (req) => {
     }
 
     if (providerStatus === "failed") {
-      return await asFailure(admin, run, "PROVIDER_FAILED", String(prediction.error ?? "provider failed"));
+      const verdict = classifyProviderFailure(prediction.error);
+      if (verdict.outage) {
+        console.error(`${TAG} PROVIDER OUTAGE (${verdict.code}) run=${run.id}: ${verdict.message}`);
+      }
+      return await asFailure(admin, run, verdict.code, verdict.message);
     }
 
     if (providerStatus === "canceled") {

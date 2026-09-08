@@ -15,13 +15,9 @@ import {
 } from "../_shared/video-enhance-runtime.ts";
 import { MAX_PERSIST_ATTEMPTS } from "../_shared/video-enhance-transfer.ts";
 import { decideCycle, isInternalCaller } from "../_shared/video-enhance-reconcile-guard.ts";
+import { classifyProviderFailure } from "../_shared/video-enhance-provider-errors.ts";
 
-import {
-  getTopazVideoStatus,
-  topazBilledCredits,
-  topazDownloadUrl,
-  topazVideoOutcome,
-} from "../_shared/topaz-client.ts";
+import { readProviderPrediction } from "../_shared/video-enhance-provider-read.ts";
 
 /**
  * Reconciler for Video Enhance.
@@ -66,46 +62,18 @@ const DETERMINISTIC_OUTPUT_FAILURES = new Set(["OUTPUT_MISMATCH", "OUTPUT_INVALI
 const OUTPUT_VERDICT_CONFIRM_ATTEMPTS = 2;
 
 /**
- * One provider read, normalised to the Replicate prediction shape the rest of
- * this function already understands.
- *
- * Topaz runs are marked by a `topaz:` prefix on the stored provider id and are
- * read from the DIRECT Topaz API. Their billed credits are mapped onto
- * `metrics.units`, which the per-unit rate card converts into real USD.
+ * One provider read for the whole engine — shared with the customer's status
+ * poll, so both reach the same verdict (`_shared/video-enhance-provider-read`).
  */
 async function readProvider(
   providerId: string,
   replicateKey: string | undefined,
 ): Promise<any | null> {
-  if (providerId.startsWith("topaz:")) {
-    const topazKey = Deno.env.get("TOPAZ_API_KEY");
-    if (!topazKey) return null;
-    try {
-      const status = await getTopazVideoStatus(topazKey, providerId.slice("topaz:".length));
-      const outcome = topazVideoOutcome(status.status);
-      const credits = topazBilledCredits(status.estimates);
-      return {
-        status:
-          outcome === "complete" ? "succeeded" : outcome === "canceled" ? "canceled" : outcome,
-        output: topazDownloadUrl(status),
-        outputExpiresAt: status.download?.expiresAt ?? null,
-        error: status.errorCode ?? status.message ?? null,
-        metrics: credits !== undefined ? { units: credits } : {},
-      };
-    } catch (error) {
-      console.error(`${TAG} topaz read failed for ${providerId}:`, error);
-      return null;
-    }
-  }
-  if (!replicateKey) return null;
-  const res = await fetch(`https://api.replicate.com/v1/predictions/${providerId}`, {
-    headers: { Authorization: `Bearer ${replicateKey}` },
-  });
-  if (!res.ok) {
-    console.error(`${TAG} provider read failed [${res.status}] for ${providerId}`);
-    return null;
-  }
-  return await res.json();
+  return await readProviderPrediction(
+    providerId,
+    { replicate: replicateKey, topaz: Deno.env.get("TOPAZ_API_KEY") },
+    TAG,
+  );
 }
 
 const json = (body: unknown, status = 200) =>
@@ -285,7 +253,13 @@ serve(async (req) => {
         }
 
       } else if (prediction.status === "failed") {
-        await finalizeFailure(admin, run, "PROVIDER_FAILED", String(prediction.error ?? "provider failed"));
+        const verdict = classifyProviderFailure(prediction.error);
+        if (verdict.outage) {
+          // Whole-engine condition (our provider account is out of funds):
+          // loud in the logs so operations sees it before customers do.
+          console.error(`${TAG} PROVIDER OUTAGE (${verdict.code}) run=${run.id}: ${verdict.message}`);
+        }
+        await finalizeFailure(admin, run, verdict.code, verdict.message);
         summary.failed++;
       } else if (prediction.status === "canceled") {
         await finalizeCancelConfirmed(admin, run, providerCost);

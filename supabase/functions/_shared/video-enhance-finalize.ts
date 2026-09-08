@@ -13,6 +13,7 @@
  */
 
 import { probeRemoteVideo } from './mp4-probe.ts';
+import { refreshProviderOutputUrl } from './video-enhance-provider-read.ts';
 import { frameMeetsTarget, resolveTargetFrame } from './video-enhance-frame.ts';
 import {
   VIDEO_PRICING_HARD_MULTIPLIER_CAP,
@@ -53,6 +54,22 @@ export interface FinalizeResult {
 }
 
 const TAG = '[video-enhance]';
+
+/**
+ * One re-request of the provider download link, and only one: the fresh URL is
+ * returned exclusively when it actually differs from the expired one, so a
+ * provider that keeps handing back the same dead link can never loop here.
+ */
+async function freshProviderUrl(run: Run, expiredUrl: string): Promise<string | null> {
+  const env = (globalThis as any).Deno?.env;
+  const fresh = await refreshProviderOutputUrl(run.provider_prediction_id, {
+    topaz: env?.get('TOPAZ_API_KEY'),
+    replicate: env?.get('REPLICATE_API_KEY'),
+  });
+  if (!fresh || fresh === expiredUrl) return null;
+  console.log(`${TAG} refreshed expired provider link for run ${run.id}`);
+  return fresh;
+}
 
 /**
  * Our storage failed, the provider did NOT. The provider reference is kept so
@@ -110,7 +127,20 @@ export async function finalizeSuccess(
   const alreadyComplete = stored !== null && stored > 0 && (size === 0 || stored >= size);
 
   if (!alreadyComplete) {
-    const head = await headProviderOutput(providerOutputUrl);
+    let head = await headProviderOutput(providerOutputUrl);
+    if (!head.ok && head.gone) {
+      // A download link can EXPIRE without the file being gone. Ask the
+      // provider once for a fresh link before declaring the result lost.
+      const fresh = await freshProviderUrl(run, providerOutputUrl);
+      if (fresh) {
+        providerOutputUrl = fresh;
+        await admin
+          .from('video_enhance_runs')
+          .update({ provider_output_url: fresh })
+          .eq('id', run.id);
+        head = await headProviderOutput(fresh);
+      }
+    }
     if (!head.ok) {
       // Provider link permanently gone: nothing left to recover. This is the
       // ONLY path that hands the run to the terminal provider-failure route.
@@ -196,6 +226,22 @@ export async function finalizeSuccess(
         .update({ resumable_upload_offset: progress.offset })
         .eq('id', run.id);
       if (progress.providerGone) {
+        // Same rule as before the transfer: an expired link gets exactly one
+        // refresh, and the next cycle resumes at the stored byte offset.
+        const fresh = await freshProviderUrl(run, providerOutputUrl);
+        if (fresh) {
+          await admin
+            .from('video_enhance_runs')
+            .update({ provider_output_url: fresh })
+            .eq('id', run.id);
+          await setStatus(admin, run.id, 'asset_staging', {
+            persist_attempts: Number(run.persist_attempts ?? 0),
+            next_persist_at: new Date().toISOString(),
+            persist_lease_until: null,
+            failure_stage: null,
+          });
+          return { ok: false, status: 'asset_staging' };
+        }
         return await finalizeFailure(
           admin,
           run,

@@ -38,6 +38,12 @@ import {
   backoffMinutes,
   walletOperation,
 } from "../_shared/video-enhance-runtime.ts";
+import { finalizeFailure } from "../_shared/video-enhance-finalize.ts";
+import { readProviderPrediction } from "../_shared/video-enhance-provider-read.ts";
+import {
+  classifyProviderFailure,
+  PROVIDER_ACCOUNT_CREDITS,
+} from "../_shared/video-enhance-provider-errors.ts";
 
 /**
  * THE Video Enhance engine. Every surface (AI Video Studio, media library,
@@ -67,6 +73,78 @@ const json = (body: unknown, status = 200) =>
   });
 
 const env = (key: string) => Deno.env.get(key) ?? undefined;
+
+/** Statuses where the provider still owes us a verdict. */
+const AWAITING_PROVIDER = new Set([
+  "provider_submitted",
+  "provider_processing",
+]);
+
+/** No more than one live provider read per run per 30 seconds. */
+const FAST_VERDICT_INTERVAL_MS = 30_000;
+
+/**
+ * Reads the provider once while the customer is watching and terminates the
+ * run IMMEDIATELY if the provider rejected it — which releases the reservation
+ * in the same moment instead of up to a whole reconcile cycle later.
+ *
+ * Deliberately narrow: a success is NOT finalised here (storing the file is
+ * the reconciler's claim-protected work), and any read failure is silent.
+ */
+// deno-lint-ignore no-explicit-any
+async function fastProviderVerdict(admin: any, run: any): Promise<any | null> {
+  if (!AWAITING_PROVIDER.has(String(run.status))) return null;
+  const providerId: string | null = run.provider_prediction_id ?? null;
+  if (!providerId) return null;
+  const lastRead = Date.parse(run.last_reconciled_at ?? "") || 0;
+  if (Date.now() - lastRead < FAST_VERDICT_INTERVAL_MS) return null;
+
+  const prediction = await readProviderPrediction(providerId, {
+    replicate: env("REPLICATE_API_KEY"),
+    topaz: env("TOPAZ_API_KEY"),
+  }, TAG).catch(() => null);
+  if (!prediction) return null;
+
+  await admin
+    .from("video_enhance_runs")
+    .update({ last_reconciled_at: new Date().toISOString() })
+    .eq("id", run.id);
+
+  if (prediction.status !== "failed") return null;
+
+  const verdict = classifyProviderFailure(prediction.error);
+  if (verdict.outage) {
+    console.error(`${TAG} PROVIDER OUTAGE (${verdict.code}) run=${run.id}: ${verdict.message}`);
+  }
+  await finalizeFailure(admin, run, verdict.code, verdict.message);
+  const { data: updated } = await admin
+    .from("video_enhance_runs")
+    .select("*")
+    .eq("id", run.id)
+    .maybeSingle();
+  return updated ?? null;
+}
+
+/**
+ * Provider-side outage pre-check.
+ *
+ * When the engine's own provider account has just refused two or more jobs for
+ * lack of funds, the next job would fail the same way — after taking the
+ * customer through reservation, submit and a long wait. So it is refused up
+ * front, before a single credit is touched.
+ */
+// deno-lint-ignore no-explicit-any
+async function providerOutageActive(admin: any, modelId: string): Promise<boolean> {
+  const since = new Date(Date.now() - 20 * 60_000).toISOString();
+  const { data } = await admin
+    .from("video_enhance_runs")
+    .select("id")
+    .eq("model_id", modelId)
+    .eq("error_code", PROVIDER_ACCOUNT_CREDITS)
+    .gte("updated_at", since)
+    .limit(2);
+  return Array.isArray(data) && data.length >= 2;
+}
 
 interface RequestBody {
   action?: "estimate" | "start" | "status" | "cancel" | "open_run";
@@ -298,8 +376,15 @@ serve(async (req) => {
         .eq("user_id", user.id)
         .maybeSingle();
       if (!run) return json({ error: "Run not found" }, 404);
+
+      // Fast provider verdict. A run that the provider has already REJECTED
+      // must not keep spinning (and keep the reservation held) until the next
+      // 5-minute reconcile cycle. Only a rejection is acted on here — success
+      // and persistence stay with the reconciler's claim path — and at most
+      // once every 30 seconds per run.
+      const fresh = await fastProviderVerdict(admin, run);
       // Customer projection only: measured output facts in, internals out.
-      return json({ run: toClientRun(run) });
+      return json({ run: toClientRun(fresh ?? run) });
     }
 
 
@@ -507,6 +592,15 @@ serve(async (req) => {
       );
     }
 
+    // Engine-wide outage on OUR provider account: refuse before reserving.
+    if (await providerOutageActive(admin, config.modelId)) {
+      console.error(`${TAG} start refused: provider outage for ${config.modelId}`);
+      return json(
+        { error: "The engine is temporarily unavailable.", code: PROVIDER_ACCOUNT_CREDITS },
+        503,
+      );
+    }
+
     if (!body.idempotencyKey) return json({ error: "idempotencyKey required" }, 400);
 
     const { data: wallet } = await admin
@@ -677,6 +771,12 @@ serve(async (req) => {
     /** Refund + fail on a provider REJECTION (a definite, cost-free outcome). */
     const rejectSubmit = async (message: string, status: number) => {
       console.error(`${TAG} provider rejected run ${run.id}: ${message}`);
+      // "Insufficient credits" from the PROVIDER is about our own provider
+      // account and must never be reported under the customer-wallet code.
+      const verdict = classifyProviderFailure(message, "PROVIDER_REJECTED");
+      if (verdict.outage) {
+        console.error(`${TAG} PROVIDER OUTAGE (${verdict.code}) run=${run.id}: ${verdict.message}`);
+      }
       await walletOperation(admin, {
         runId: run.id,
         userId: user.id,
@@ -685,11 +785,11 @@ serve(async (req) => {
         note: "provider rejected submit",
       });
       await setStatus(admin, run.id, "provider_failed", {
-        error_code: "PROVIDER_REJECTED",
-        error_message: message,
+        error_code: verdict.code,
+        error_message: verdict.message,
         submit_lease_owner: null,
       });
-      return json({ error: message, code: "PROVIDER_REJECTED", status }, 502);
+      return json({ error: message, code: verdict.code, status }, 502);
     };
 
     try {

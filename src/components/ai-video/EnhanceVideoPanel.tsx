@@ -763,7 +763,9 @@ export function EnhanceVideoPanel({
           <p className="text-xs text-muted-foreground">{tx('messengerHint', lang)}</p>
         </div>
       ) : run?.status === 'provider_failed' || run?.status === 'output_lost' || run?.status === 'manual_review' ? (
-        <p className="text-sm text-destructive">{tx('failed', lang)}</p>
+        <p className="text-sm text-destructive">
+          {engineErrorText(run.error_code, tx('failed', lang), lang)}
+        </p>
       ) : run?.status === 'provider_cancelled_confirmed' ? (
         <p className="text-sm text-muted-foreground">{tx('cancelled', lang)}</p>
       ) : null}
