@@ -5764,10 +5764,33 @@ serve(async (req) => {
             predictionId: prediction.id,
           });
         } else if (scene.clipSource === "ai-runway") {
+          // RETIRED ROUTE (audit 08.09.2026): the provider shut down the
+          // Gen-4 Aleph endpoint and the canonical spec is
+          // `available: false / removed`. The composer must not dispatch a
+          // dead contract — the scene fails with an explicit reason instead of
+          // burning a wallet charge on a request that cannot succeed.
+          if (!isVideoModelAvailable("runway-gen4-aleph")) {
+            await supabaseAdmin
+              .from("composer_scenes")
+              .update(
+                failedClipUpdate(
+                  (scene.engineOverride ?? "auto") === "cinematic-sync",
+                  "Runway Gen-4 Aleph wurde vom Anbieter abgekündigt — bitte eine andere Engine wählen.",
+                ),
+              )
+              .eq("id", scene.id);
+            results.push({
+              sceneId: scene.id,
+              status: "failed",
+              error: "runway_route_retired",
+            });
+            continue;
+          }
           // Runway Gen-4 Aleph — V2V only. Requires a reference VIDEO (not image).
           // Composer convention: scene.uploadUrl OR a previously rendered scene clipUrl
           // can serve as the reference. We accept uploadUrl here as the V2V source.
           const referenceVideoUrl = scene.uploadUrl;
+
           if (!referenceVideoUrl) {
             console.warn(
               `[compose-video-clips] Runway scene ${scene.id} has no reference video — falling back to ai-hailuo.`,
