@@ -7,6 +7,7 @@ import {
   engineErrorText,
   toEnhanceLang,
 } from '@/lib/videoEnhance/engineErrors';
+import { classifyVideoError, friendlyVideoErrorMessage } from '@/lib/videoErrorMessages';
 
 const read = (path: string) => readFileSync(path, 'utf8');
 
