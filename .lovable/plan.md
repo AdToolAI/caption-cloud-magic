@@ -71,6 +71,22 @@ Topaz does not bill the encoder; inventing a factor would be a guess.
 Calibration check: 720p→4K, 15.0 s, 24→60, Apollo → 52 credits estimated vs 51 billed.
 1080p→4K, 24→30, Chronos → 8 vs 8–12 billed. 4K, 24 fps, no interpolation → 7 vs 6–7 billed.
 
+These per-frame rates are INFERRED from our own billed runs, not published provider truth.
+They stay explicitly marked as calibrated/estimated:
+
+- `topazCostEstimatorVersion = "2026-09-08-calibrated-v1"` is written into every price
+  snapshot and stored on the run, next to the existing `estimatorCalibrating` flag.
+- High-cost, uncertain configurations get a safety buffer on the ESTIMATED provider cost
+  before the curve is applied: `+15 %` when the chain includes an interpolation model whose
+  rate has no verified billed sample yet (Apollo, Apollo Fast, Aion) and the estimated cost
+  exceeds €2.00. The buffer raises assumed cost, never the multiple — the 1.2x floor is
+  never trusted blindly on an unverified Apollo chain.
+- Price may never fall below the estimated provider cost, also after cent rounding and
+  before any account discount: `listPrice = max(ceilCent(cost * multiple), ceilCent(cost))`.
+- vCube keeps the plain deterministic Replicate rate card. No calibration buffer, no
+  estimator version logic — the Topaz calibration path is not shared with it.
+
+
 ## 4. Example prices (list price, before account discount)
 
 ByteDance vCube (standard tier)
