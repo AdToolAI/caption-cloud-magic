@@ -432,7 +432,8 @@ Deno.serve(async (req) => {
         aspectRatio,
         firstFrameUrl: startImageUrl,
         lastFrameUrl: endImageUrl,
-        referenceImageUrls,
+        // Exactly the bound slots, in UI order — no hidden extra images.
+        referenceImageUrls: referenceSlots.length > 0 ? referenceSlots.map((s) => s.url) : referenceImageUrls,
         referenceVideoUrls: refVideos,
         referenceAudioUrls: refAudios,
         generateAudio,
@@ -444,12 +445,31 @@ Deno.serve(async (req) => {
       console.error("[generate-seedance25-video] ModelArk error:", rawMessage);
       // Raw provider JSON (incl. request ids) stays in the log and in the
       // generation row; the user gets one readable, localized sentence.
-      const friendly = describeProviderImageError(rawMessage, locale);
+      // `content[N]` in the provider message is mapped back to the exact UI
+      // reference slot so the customer knows WHICH thumbnail was rejected.
+      const rejected = resolveRejectedReference(rawMessage, referenceSlots);
+      let friendly = describeProviderImageError(rawMessage, locale);
+      if (rejected) {
+        const roleNote = rejected.role ? ` (${rejected.role})` : "";
+        const slotLine = locale === "de"
+          ? `Betroffen ist Referenzbild ${rejected.imageNumber}${roleNote}. Tausche dieses Bild aus – die anderen Referenzen sind nicht betroffen.`
+          : locale === "es"
+            ? `Afecta a la imagen de referencia ${rejected.imageNumber}${roleNote}. Sustituye esa imagen; las demás referencias no se ven afectadas.`
+            : `Reference image ${rejected.imageNumber}${roleNote} was rejected. Replace that image – the other references are unaffected.`;
+        friendly = `${friendly} ${slotLine}`;
+      }
       await refund(`ModelArk Error: ${rawMessage}`);
       return new Response(
         JSON.stringify({
           error: friendly,
           code: "MODELARK_ERROR",
+          ...(rejected
+            ? {
+                rejectedContentIndex: rejected.contentIndex,
+                rejectedReferenceIndex: rejected.uiIndex,
+                rejectedReferenceRole: rejected.role,
+              }
+            : {}),
         }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
