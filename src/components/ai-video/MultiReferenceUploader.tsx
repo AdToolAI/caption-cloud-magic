@@ -240,14 +240,24 @@ export function MultiReferenceUploader({
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
         {slots.map((slot, idx) => {
           const Icon = ROLE_ICON[slot.role];
+          const isRejected = rejectedIndex === idx;
           return (
             <motion.div
               key={`${slot.url}-${idx}`}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="relative group rounded-lg overflow-hidden border border-primary/30 aspect-square bg-background/40"
+              data-reference-index={idx}
+              data-rejected={isRejected ? 'true' : undefined}
+              className={`relative group rounded-lg overflow-hidden border aspect-square bg-background/40 ${
+                isRejected ? 'border-destructive ring-2 ring-destructive/70' : 'border-primary/30'
+              }`}
             >
               <img src={slot.url} alt={`Ref ${idx + 1}`} className="w-full h-full object-cover" />
+              {isRejected && (
+                <Badge variant="destructive" className="absolute top-1 left-1 text-[9px] px-1.5 py-0">
+                  {tx({ de: 'Abgelehnt', en: 'Rejected', es: 'Rechazada' })}
+                </Badge>
+              )}
               <button
                 type="button"
                 onClick={() => removeSlot(idx)}
