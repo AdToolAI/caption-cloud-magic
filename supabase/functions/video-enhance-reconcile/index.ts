@@ -15,6 +15,7 @@ import {
 } from "../_shared/video-enhance-runtime.ts";
 import { MAX_PERSIST_ATTEMPTS } from "../_shared/video-enhance-transfer.ts";
 import { decideCycle, isInternalCaller } from "../_shared/video-enhance-reconcile-guard.ts";
+import { classifyProviderFailure } from "../_shared/video-enhance-provider-errors.ts";
 
 import {
   getTopazVideoStatus,
