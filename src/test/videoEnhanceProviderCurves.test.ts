@@ -130,17 +130,19 @@ describe('Topaz model-aware cost estimator', () => {
   });
 
   it('keeps the 1080p source as the neutral reference and never under-prices smaller sources', () => {
-    expect(topazSourceResolutionMultiplier(1080, 1920)).toBeCloseTo(1, 3);
-    expect(topazSourceResolutionMultiplier(1920, 1080)).toBeCloseTo(1, 3);
-    expect(topazSourceResolutionMultiplier(720, 1280)).toBeGreaterThan(1.7);
-    expect(topazSourceResolutionMultiplier(540, 960)).toBeGreaterThan(
-      topazSourceResolutionMultiplier(720, 1280),
+    expect(topazSourceResolutionMultiplier('4k', 1080, 1920)).toBeCloseTo(1, 3);
+    expect(topazSourceResolutionMultiplier('4k', 1920, 1080)).toBeCloseTo(1, 3);
+    expect(topazSourceResolutionMultiplier('4k', 720, 1280)).toBeGreaterThan(1.7);
+    expect(topazSourceResolutionMultiplier('4k', 540, 960)).toBeGreaterThan(
+      topazSourceResolutionMultiplier('4k', 720, 1280),
     );
+    // A smaller enlargement is never discounted below the reference.
+    expect(topazSourceResolutionMultiplier('2k', 1080, 1920)).toBe(1);
+    expect(topazSourceResolutionMultiplier('720p', 1080, 1920)).toBe(1);
     // Unknown geometry must not silently discount the run.
-    expect(topazSourceResolutionMultiplier(undefined, undefined)).toBe(1);
+    expect(topazSourceResolutionMultiplier('4k', undefined, undefined)).toBe(1);
     // Guard rails.
-    expect(topazSourceResolutionMultiplier(64, 64)).toBeLessThanOrEqual(3);
-    expect(topazSourceResolutionMultiplier(7680, 4320)).toBeGreaterThanOrEqual(0.6);
+    expect(topazSourceResolutionMultiplier('4k', 64, 64)).toBeLessThanOrEqual(3);
   });
 
   it('prices a smaller source higher for an identical target job', () => {
@@ -158,6 +160,7 @@ describe('Topaz model-aware cost estimator', () => {
     expect(from720.credits).toBeGreaterThan(from1080.credits);
     expect(from540.credits).toBeGreaterThan(from720.credits);
     expect(from1080.sourceResolutionMultiplier).toBeCloseTo(1, 3);
+    expect(from1080.upscaleFactor).toBeCloseTo(2, 2);
   });
 
   it('bills no interpolation when the frame rate stays the same', () => {
@@ -285,6 +288,9 @@ describe('Topaz estimator v2 — measured billing regression', () => {
     { name: '4K/30 Chronos (historical)', duration: 14.708, fps: 30, resolution: '4k', interpolationModel: 'chronos', interpolationApplies: true, billed: 8 },
     { name: '4K/24 no interpolation (historical)', duration: 17.083, fps: 24, resolution: '4k', interpolationApplies: false, billed: 7 },
     { name: '4K/60 Apollo 15.04s from a 720p source (reproduced 51-credit run)', duration: 15.042, fps: 60, resolution: '4k', interpolationModel: 'apollo', interpolationApplies: true, billed: 51, sourceWidth: 720, sourceHeight: 1280 },
+    { name: '4K/60 Apollo 15.67s from a 720p source', duration: 15.667, fps: 60, resolution: '4k', interpolationModel: 'apollo', interpolationApplies: true, billed: 53, sourceWidth: 720, sourceHeight: 1280 },
+    { name: '4K/24 no interpolation from a 720p source', duration: 15.042, fps: 24, resolution: '4k', interpolationApplies: false, billed: 11, sourceWidth: 720, sourceHeight: 1280 },
+    { name: '2K/60 Apollo from a 1080p source (target below the reference)', duration: 9.917, fps: 60, resolution: '2k', interpolationModel: 'apollo', interpolationApplies: true, billed: 19, sourceWidth: 1080, sourceHeight: 1920 },
   ];
 
   for (const c of cases) {
