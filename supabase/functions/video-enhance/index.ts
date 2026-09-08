@@ -771,6 +771,12 @@ serve(async (req) => {
     /** Refund + fail on a provider REJECTION (a definite, cost-free outcome). */
     const rejectSubmit = async (message: string, status: number) => {
       console.error(`${TAG} provider rejected run ${run.id}: ${message}`);
+      // "Insufficient credits" from the PROVIDER is about our own provider
+      // account and must never be reported under the customer-wallet code.
+      const verdict = classifyProviderFailure(message, "PROVIDER_REJECTED");
+      if (verdict.outage) {
+        console.error(`${TAG} PROVIDER OUTAGE (${verdict.code}) run=${run.id}: ${verdict.message}`);
+      }
       await walletOperation(admin, {
         runId: run.id,
         userId: user.id,
@@ -779,11 +785,11 @@ serve(async (req) => {
         note: "provider rejected submit",
       });
       await setStatus(admin, run.id, "provider_failed", {
-        error_code: "PROVIDER_REJECTED",
-        error_message: message,
+        error_code: verdict.code,
+        error_message: verdict.message,
         submit_lease_owner: null,
       });
-      return json({ error: message, code: "PROVIDER_REJECTED", status }, 502);
+      return json({ error: message, code: verdict.code, status }, 502);
     };
 
     try {
