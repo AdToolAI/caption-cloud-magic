@@ -64,7 +64,6 @@ import { validateImageForModel } from '@/lib/ai-video/imageRequirements';
 import {
   describePreflightViolation,
   preflightVideoRequest,
-  promptCharLimit,
   type PreflightLocale,
 } from '@/lib/ai-video/requestPreflight';
 
