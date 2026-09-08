@@ -9,10 +9,9 @@
  *    reference enlargement (verified at 2K and 4K),
  *  - Chronos interpolation is effectively free (verified at 2K and 4K),
  *  - Apollo is the interpolation cost driver (0.0156/frame at 4K),
- *  - the whole per-frame cost scales with the LINEAR UPSCALE FACTOR
- *    sqrt(target pixels / source pixels), normalised at factor 2.0 and never
- *    below 1.0. Reproducible billed points at 4K/60 Apollo: 1080x1920 source
- *    ~0.0322 credits/frame, 720x1280 source ~0.0565 credits/frame.
+ *  - the per-frame cost scales with the PROCESSED pixels: source pixels times
+ *    the square of the internal scale (the next power of two above the
+ *    requested enlargement), normalised at a 1080x1920 source at 2x.
  *
  * The 51-credit run (720x1280, 15.0 s, 4K/60, Apollo, 903 frames) that v3 could
  * not explain was reproduced 1:1 with current code and is predicted by this
@@ -63,25 +62,31 @@ export const TOPAZ_INTERPOLATION_CREDITS_PER_FRAME: Record<
 // ---------------------------------------------------------------------------
 
 /**
- * Reference enlargement the v2/v3 rate card was measured at: a 1080x1920
- * source to a 4K box, i.e. a LINEAR UPSCALE FACTOR of 2.0.
+ * Source resolution and enlargement — the dimension v4 adds.
  *
- * Billed evidence (credits per output frame, 4K/60 Apollo unless noted):
- *   1080x1920 -> 4K   factor 2.0   0.0318 - 0.0333  (4 runs)  => reference
- *   1080x1920 -> 2K   factor 1.33  0.0319           (2 runs)  => still 1.0
- *    720x1280 -> 4K   factor 3.0   0.0564 - 0.0565  (3 runs)  => 1.75x
- *    720x1280 -> 4K   factor 3.0   0.0305 no interp (1 run)   => 1.79x
- *   1280x720  -> 2K   factor 2.0   ~0.013 no interp (1 run)   => ~1.0
- * Below the reference the cost does NOT fall (the 2K case bills like the 4K
- * case), so the multiplier is floored at 1.0 — a smaller job is never
- * discounted, which also keeps the estimator free of under-pricing.
+ * Nine reproducible billed runs show that Topaz bills the PROCESSED pixels:
+ *   credits_per_output_frame  ~  source_pixels  x  internal_scale^2
+ * where the internal scale is the next power of two above the requested
+ * enlargement (Proteus works in 2x steps). Normalised at the geometry the v2/v3
+ * card was measured on — a 1080x1920 source at a 2x enlargement.
+ *
+ * Billed evidence (credits per output frame, proteus family):
+ *   1080x1920 -> 4K/60 Apollo   gain 2.0   0.0318-0.0333  (4 runs) reference
+ *   1080x1920 -> 2K/60 Apollo   gain 1.33  0.0319         (2 runs)
+ *   1080x1920 -> 2K/24 plain    gain 1.33  0.0168         (3 runs)
+ *   1080x1920 -> 4K/24 plain    gain 2.0   0.0171         (2 runs)
+ *    720x1280 -> 4K/60 Apollo   gain 3.0   0.0564-0.0565  (4 runs)
+ *    720x1280 -> 4K/24 plain    gain 3.0   0.0305         (1 run)
+ *    720x1280 -> 2K/60 Apollo   gain 2.0   0.0144         (1 run)
+ *    540x960  -> 4K/60 Apollo   gain 4.0   0.0321         (1 run)
+ * Known outlier: one 608x1080 -> 4K/60 Apollo run billed half of what this law
+ * predicts. It is a single old sample and deliberately NOT fitted; the law
+ * over-states it, so it can never under-price.
  */
-export const TOPAZ_REFERENCE_UPSCALE_FACTOR = 2.0;
-/** Fitted from the 1080p (1.0x) and 720p (1.755x) points: ln(1.755)/ln(1.5). */
-export const TOPAZ_UPSCALE_FACTOR_EXPONENT = 1.39;
-/** Guard rails so an odd source geometry can never explode or zero the cost. */
-export const TOPAZ_UPSCALE_MULTIPLIER_MIN = 1.0;
-export const TOPAZ_UPSCALE_MULTIPLIER_MAX = 3.0;
+export const TOPAZ_REFERENCE_SOURCE_PIXELS = 1080 * 1920;
+export const TOPAZ_REFERENCE_INTERNAL_SCALE = 2;
+/** Proteus works in 2x steps and tops out at 4x. */
+export const TOPAZ_MAX_INTERNAL_SCALE = 4;
 
 /** Pixel box of a target resolution, orientation-independent. */
 export const TOPAZ_TARGET_PIXELS: Record<TopazEstimatorResolution, number> = {
@@ -91,7 +96,7 @@ export const TOPAZ_TARGET_PIXELS: Record<TopazEstimatorResolution, number> = {
   '4k': 3840 * 2160,
 };
 
-/** Linear upscale factor: sqrt(target pixels / source pixels). */
+/** Requested linear enlargement: sqrt(target pixels / source pixels). */
 export function topazUpscaleFactor(
   resolution: TopazEstimatorResolution,
   sourceWidth?: number,
@@ -99,28 +104,36 @@ export function topazUpscaleFactor(
 ): number {
   const w = Number(sourceWidth) || 0;
   const h = Number(sourceHeight) || 0;
-  if (w <= 0 || h <= 0) return TOPAZ_REFERENCE_UPSCALE_FACTOR;
+  if (w <= 0 || h <= 0) return TOPAZ_REFERENCE_INTERNAL_SCALE;
   const factor = Math.sqrt(TOPAZ_TARGET_PIXELS[resolution] / (w * h));
-  return Number.isFinite(factor) && factor > 0 ? factor : TOPAZ_REFERENCE_UPSCALE_FACTOR;
+  return Number.isFinite(factor) && factor > 0 ? factor : TOPAZ_REFERENCE_INTERNAL_SCALE;
+}
+
+/** Internal scale Topaz actually runs: the next power of two, 2x .. 4x. */
+export function topazInternalScale(upscaleFactor: number): number {
+  const f = Number.isFinite(upscaleFactor) && upscaleFactor > 0 ? upscaleFactor : 1;
+  const stepped = Math.pow(2, Math.ceil(Math.log2(Math.max(f, 1))));
+  return Math.min(Math.max(stepped, TOPAZ_REFERENCE_INTERNAL_SCALE), TOPAZ_MAX_INTERNAL_SCALE);
 }
 
 /**
- * Cost multiplier for the enlargement, 1.0 at the reference factor and never
- * below it. Missing source geometry falls back to the reference.
+ * Cost multiplier of the run geometry, 1.0 for a 1080x1920 source at 2x.
+ * A bigger source costs proportionally more, a bigger enlargement costs with
+ * the square of the internal scale.
  */
-export function topazUpscaleFactorMultiplier(factor: number): number {
-  const f = Number.isFinite(factor) && factor > 0 ? factor : TOPAZ_REFERENCE_UPSCALE_FACTOR;
-  const raw = Math.pow(f / TOPAZ_REFERENCE_UPSCALE_FACTOR, TOPAZ_UPSCALE_FACTOR_EXPONENT);
-  return Math.min(Math.max(raw, TOPAZ_UPSCALE_MULTIPLIER_MIN), TOPAZ_UPSCALE_MULTIPLIER_MAX);
-}
-
-/** Convenience: multiplier straight from the run geometry. */
-export function topazSourceResolutionMultiplier(
+export function topazGeometryMultiplier(
   resolution: TopazEstimatorResolution,
   sourceWidth?: number,
   sourceHeight?: number,
 ): number {
-  return topazUpscaleFactorMultiplier(topazUpscaleFactor(resolution, sourceWidth, sourceHeight));
+  const w = Number(sourceWidth) || 0;
+  const h = Number(sourceHeight) || 0;
+  if (w <= 0 || h <= 0) return 1;
+  const scale = topazInternalScale(topazUpscaleFactor(resolution, sourceWidth, sourceHeight));
+  const pixelRatio = (w * h) / TOPAZ_REFERENCE_SOURCE_PIXELS;
+  const scaleRatio = Math.pow(scale / TOPAZ_REFERENCE_INTERNAL_SCALE, 2);
+  const raw = pixelRatio * scaleRatio;
+  return Number.isFinite(raw) && raw > 0 ? raw : 1;
 }
 
 /**
@@ -172,8 +185,8 @@ export interface TopazCostEstimate {
   interpolationModel: string;
   /** Linear enlargement of this run. */
   upscaleFactor: number;
-  /** Cost multiplier derived from the source resolution. */
-  sourceResolutionMultiplier: number;
+  /** Cost multiplier derived from source geometry and enlargement. */
+  geometryMultiplier: number;
   estimatorVersion: string;
   /** true when the interpolation rate is not confirmed by a billed run. */
   unverifiedChain: boolean;
@@ -189,7 +202,11 @@ export function topazEstimatedCredits(input: TopazCostInput): TopazCostEstimate 
     ? topazInterpolationCreditsPerFrame(interpolationModel, input.resolution)
     : 0;
   const upscaleFactor = topazUpscaleFactor(input.resolution, input.sourceWidth, input.sourceHeight);
-  const sourceMultiplier = topazUpscaleFactorMultiplier(upscaleFactor);
+  const sourceMultiplier = topazGeometryMultiplier(
+    input.resolution,
+    input.sourceWidth,
+    input.sourceHeight,
+  );
   // Topaz bills whole credits and rounds — ceiling here would systematically
   // over-state small jobs (measured: a 239-frame job billed 4, not 5).
   const credits = Math.max(
@@ -203,7 +220,7 @@ export function topazEstimatedCredits(input: TopazCostInput): TopazCostEstimate 
     interpolationCreditsPerFrame: interpolation,
     interpolationModel,
     upscaleFactor: Math.round(upscaleFactor * 1e4) / 1e4,
-    sourceResolutionMultiplier: Math.round(sourceMultiplier * 1e4) / 1e4,
+    geometryMultiplier: Math.round(sourceMultiplier * 1e4) / 1e4,
     estimatorVersion: TOPAZ_COST_ESTIMATOR_VERSION,
     unverifiedChain:
       input.interpolationApplies && TOPAZ_UNVERIFIED_INTERPOLATION_IDS.includes(interpolationModel),
