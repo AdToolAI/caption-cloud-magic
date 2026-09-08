@@ -50,10 +50,29 @@ Provider cost of moderation failures: 23 create-time 400s (privacy/dims/slot) ne
 
 Uncertainties: ledger-linked failure stage relies on error text; `parity_mode` is NULL on 58% of runs (pre-parity rows), so mode split is partial; 30d ≈ 7d because volume is recent.
 
+## C) Follow-up: Seedance 2.5 reference-image 400s (test user)
+
+Test user, last 7 days, Seedance 2.5 reference mode: 12 failed / 2 completed. Failed = 10 × `InputImageSensitiveContentDetected.PrivacyInformation` ("input image 'content[N]' may contain real person"), 2 × copyright (post-processing). Globally (30d, all accounts): reference mode 11 completed / 18 failed; every create-time 400 in reference mode is the same privacy code (13 × content[1], 2 × content[2]); the other 3 accounts show the identical pattern. Zero `InvalidParameter` errors in reference mode except one v2v run (start image + reference media mixed, 17:35 UTC on 09-07, now blocked by today's preflight).
+
+Is the request built correctly? Yes. `_shared/modelark.ts` sends `content[0]` = text, `content[1..n]` = `image_url` with `role: reference_image`, videos/audio after; ratio/resolution are documented body fields; no duplicate slots, no MIME/URL errors (an unreachable or malformed URL would return `InvalidParameter … downloading image`, seen only twice for a 152 px-wide image on 08-30). The index in ModelArk's message maps 1:1 to the uploaded reference order, so `content[1]` = the user's first reference photo, `content[2]` = second.
+
+Verdict: the user is doing something the provider does not allow — using photos of real people as Seedance 2.5 reference images. ByteDance rejects these before creating a task (no provider cost, refund already issued each time). The same user's 2 successful reference runs and identical-prompt retries that later succeeded indicate that only the flagged photo differs. Same prompt template was retried up to 5× with the same result.
+
+Current UX gap: the message the user sees is the generic "rejected for content or copyright reasons — adjust prompt or image" (`videoImageRequirements.ts`); the client already knows the class `real_person_image` but does not tell the user WHICH image (index) or WHY (real person), and does not stop identical resubmission.
+
+Preventable checks / UX changes needed:
+1. Map `content[N]` to the reference slot and highlight that thumbnail with a specific text: "Seedance 2.5 rejects photos of real people as references (provider policy). Remove or replace image N."
+2. Pre-submission screen: run the existing face detector (`_shared/plate-face-detect.ts` / `validate-frame-face`) on Seedance 2.5 reference images and warn before charging; treat as warning, not hard block, because the provider filter is the authority.
+3. Offer a route hint in the warning to models whose provider permits person references (to be verified per route before naming one — not from documentation).
+4. Client-side resubmission guard: identical reference set + prompt after a privacy rejection → require a change before the button re-enables.
+5. Extend preflight with ModelArk image floor (≥ 300 px shorter side) so the 08-30 class cannot recur.
+
 ## Highest-priority fixes (proposed, not executed)
 1. Route `autopilotCredits.refundStage` through an RPC with a deterministic key (`autopilot:<production>:<stage>:<scene>`), remove direct wallet writes.
 2. Cap `v459_refund_lipsync_euros` per source debit (refund ≤ debit − prior refunds referencing it).
 3. Store the charged amount on the refund (bound to original charge) so discount drift cannot over/under-refund.
 4. Preflight image constraints before wallet/provider: min 300 px (ModelArk), reference aspect 0.4–2.5 (Kling Omni).
-5. Pre-submission warnings for real-person photos in Seedance reference slots and brand/franchise terms; block identical resubmission of a copyright/privacy-rejected request without change.
+5. Section C items 1–4: slot-specific real-person message, face pre-screen, resubmission guard; plus brand/franchise-term warning for copyright rejections.
 6. Verify ModelArk billing for failed copyright tasks; if billed, factor into Seedance 2.5 margin.
+
+Note: roadmap.md was not updated because this turn is read-only; the follow-up task is captured in this report.
