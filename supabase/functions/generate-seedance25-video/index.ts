@@ -102,16 +102,18 @@ Deno.serve(async (req) => {
     } = body;
 
     // Capability gate — before wallet, before provider.
+    const generationMode = inferMode({
+      modelId: "seedance-2-5",
+      startImageUrl,
+      endImageUrl,
+      referenceImageUrls: Array.isArray(referenceImageUrls) ? referenceImageUrls : null,
+      videoUrl: referenceVideoUrl ?? (referenceVideoUrls?.[0] ?? null),
+    });
     const gate = await gateVideoCapability(
       supabaseAdmin,
       {
         modelId: "seedance-2-5",
-        mode: inferMode({ modelId: "seedance-2-5",
-          startImageUrl,
-          endImageUrl,
-          referenceImageUrls: Array.isArray(referenceImageUrls) ? referenceImageUrls : null,
-          videoUrl: referenceVideoUrl ?? (referenceVideoUrls?.[0] ?? null),
-        }),
+        mode: generationMode,
         resolution,
         durationSeconds: Number(duration),
         aspectRatio,
@@ -119,6 +121,7 @@ Deno.serve(async (req) => {
       corsHeaders,
     );
     if (gate.response) return gate.response;
+
 
     const refVideos = [
       ...(referenceVideoUrls ?? []),
