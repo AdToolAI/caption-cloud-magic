@@ -8,9 +8,9 @@ import {
   finalizeCancelConfirmed,
   finalizeFailure,
 } from "../_shared/video-enhance-finalize.ts";
-import { topazCreditDrift } from "../_shared/topaz-cost-estimator.ts";
 import {
   extractProviderCost,
+  providerCreditPatch,
   providerPollIntervalSeconds,
   setStatus,
   triggerPersist,
@@ -120,18 +120,7 @@ async function pollDueRuns(
       // fact and hand it to the persistence worker straight away.
       // Billed provider units are only readable HERE (the persistence worker
       // never re-reads the provider), so calibration telemetry is captured now.
-      const cost = extractProviderCost(prediction, run.model_id);
-      const creditPatch: Record<string, unknown> = {};
-      if (cost.units !== undefined) {
-        creditPatch.actual_units = cost.units;
-        if (run.estimated_provider_credits !== null && run.estimated_provider_credits !== undefined) {
-          const drift = topazCreditDrift(Number(run.estimated_provider_credits), Number(cost.units));
-          creditPatch.actual_provider_credits = cost.units;
-          creditPatch.provider_credit_drift_pct =
-            drift.driftPct === null ? null : Math.round(drift.driftPct * 10000) / 100;
-          creditPatch.provider_credit_drift_flagged = drift.flagged;
-        }
-      }
+      const creditPatch = providerCreditPatch(run, extractProviderCost(prediction, run.model_id));
       await admin
         .from("video_enhance_runs")
         .update({
