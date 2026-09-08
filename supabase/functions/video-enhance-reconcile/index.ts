@@ -17,12 +17,7 @@ import { MAX_PERSIST_ATTEMPTS } from "../_shared/video-enhance-transfer.ts";
 import { decideCycle, isInternalCaller } from "../_shared/video-enhance-reconcile-guard.ts";
 import { classifyProviderFailure } from "../_shared/video-enhance-provider-errors.ts";
 
-import {
-  getTopazVideoStatus,
-  topazBilledCredits,
-  topazDownloadUrl,
-  topazVideoOutcome,
-} from "../_shared/topaz-client.ts";
+import { readProviderPrediction } from "../_shared/video-enhance-provider-read.ts";
 
 /**
  * Reconciler for Video Enhance.
@@ -79,8 +74,6 @@ async function readProvider(
     { replicate: replicateKey, topaz: Deno.env.get("TOPAZ_API_KEY") },
     TAG,
   );
-}
-  return await res.json();
 }
 
 const json = (body: unknown, status = 200) =>
