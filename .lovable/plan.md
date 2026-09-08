@@ -123,12 +123,27 @@ roughly cost + 33 %, and Chronos — the new default — is materially cheaper f
   "Apollo interpolation significantly increases processing cost. Estimated price: €X.XX"
   (EN/DE/ES).
 - vCube rate card stays marked estimated; every run logs estimated cost vs charge so actual
-  Replicate cost can be reconciled once exposed. Topaz logs estimated vs billed credits as
-  pricing drift.
+  Replicate cost can be reconciled once exposed.
+- Every completed Topaz run stores `estimated_credits`, `actual_billed_credits` (already read
+  by the finalize path) and the resulting `credit_drift_pct`, plus the estimator version.
+  Drift above 15 % is logged and flagged for review; the customer price is never changed
+  retroactively upward — only the existing true-up refund can move money back.
 
 ## 6. Tests
 
 vCube 10 s 1080p30 / 10 s 4K30 / 10 s 4K60 / 30 s 4K60 — multiple always within 1.6–2.5.
 Topaz 1080p→4K none / Chronos / Chronos Fast / 720p→4K Apollo 24→60 — multiple within
-1.2–1.8, Apollo materially above Chronos, no selectable combination priced below cost,
-discount applied exactly once, client/server parity.
+1.2–1.8, Apollo materially above Chronos, no selectable configuration priced below the
+estimated provider cost, discount applied exactly once.
+
+Client/server parity asserted on: provider cost estimate, list price, effective price after
+discount, selected interpolation model, estimator version.
+
+## 7. Rollout gate (real runs before broad release)
+
+Three real Topaz acceptance runs on the test account: one without interpolation, one with
+Chronos, one with Apollo. For each: estimated vs actual billed credits, drift %, and the
+resulting list multiple checked against the 1.2–1.8 band. If actual billing differs
+materially (drift > 15 %) from the calibrated estimator, rollout stops and the estimator is
+recalibrated before any customer-facing price changes ship.
+
