@@ -32,3 +32,9 @@
 
 ## In Progress
 - Stripe-Umzug auf AdTool AI abschließen (siehe offene Punkte oben).
+
+## Topaz v4 — Quellauflösung/Vergrößerung kalibriert (2026-09-09)
+- Kostengesetz: Kosten/Ausgabebild ~ Quellpixel x (interner Maßstab)^2, interner Maßstab = nächste Zweierpotenz der Vergrößerung (2x..4x), normiert auf 1080x1920 @ 2x.
+- Validiert an 12 echten Abrechnungen inkl. neuer Läufe 720p->2K (13), 540p->4K (29), 720p->4K/24 (11), 720p->4K/60 (51): Abweichung 0 %.
+- Ausreißer 608x1080->4K (halbe Abrechnung) bewusst nicht gefittet; wird überschätzt, nie unterschätzt.
+- Offen: globaler Topaz-Rollout freigeben (aktuell weiterhin Test-Gate).
