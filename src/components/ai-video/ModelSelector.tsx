@@ -17,8 +17,10 @@ import {
   getVideoModelSpec,
   maxNativeResolution,
   nativeResolutionLabels,
+  pricingIdsOfModel,
   type UiGroup,
 } from '@/config/videoModelSpecs';
+
 import type { Currency } from '@/config/pricing';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Lock, Wrench, Crown } from 'lucide-react';
