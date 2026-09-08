@@ -16,6 +16,7 @@ import { probeRemoteVideo } from './mp4-probe.ts';
 import { refreshProviderOutputUrl } from './video-enhance-provider-read.ts';
 import { frameMeetsTarget, resolveTargetFrame } from './video-enhance-frame.ts';
 import {
+  topazCreditDrift,
   VIDEO_PRICING_HARD_MULTIPLIER_CAP,
   verifiedPricing,
   type VideoResolution,
