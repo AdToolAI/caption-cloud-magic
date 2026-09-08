@@ -89,11 +89,14 @@ describe('post-discount loss policy', () => {
     expect(r.subsidyEur).toBe(0.16);
   });
 
-  it('ignores nonsensical discount values instead of inventing a price', () => {
+  it('never invents a discount from a nonsensical value', () => {
     expect(evaluatePostDiscount(1, 'nope', 0.5).discountPercent).toBe(0);
     expect(evaluatePostDiscount(1, -5, 0.5).discountPercent).toBe(0);
-    expect(evaluatePostDiscount(1, 400, 0.5).discountPercent).toBe(0);
+    // Out-of-range values are clamped, never applied beyond 100%.
+    expect(evaluatePostDiscount(1, 400, 0.5).discountPercent).toBe(100);
+    expect(evaluatePostDiscount(1, 400, 0.5).chargedPriceEur).toBe(0);
   });
+
 });
 
 describe('Topaz model-aware cost estimator', () => {
