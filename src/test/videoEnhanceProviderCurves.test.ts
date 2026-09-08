@@ -174,6 +174,19 @@ describe('Topaz model-aware cost estimator', () => {
     expect(topazCreditDrift(20, 22).flagged).toBe(false);
     expect(topazCreditDrift(20, 30).flagged).toBe(true);
   });
+
+  it('does not flag tiny rounding misses, but keeps the raw drift', () => {
+    // 3 billed vs. 2 estimated is +50 % and financially irrelevant.
+    const tiny = topazCreditDrift(2, 3);
+    expect(tiny.driftPct).toBeCloseTo(0.5, 6);
+    expect(tiny.flagged).toBe(false);
+    // 2 estimated vs. 6 billed crosses both guards.
+    expect(topazCreditDrift(2, 6).flagged).toBe(true);
+    // The real 2K/30 validation sample: 3 estimated, 2 billed => review-free.
+    const sample = topazCreditDrift(3, 2);
+    expect(sample.driftPct).toBeCloseTo(-1 / 3, 6);
+    expect(sample.flagged).toBe(false);
+  });
 });
 
 describe('priced runs', () => {
