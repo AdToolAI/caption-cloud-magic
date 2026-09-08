@@ -42,6 +42,8 @@ import {
   getStudioCapabilities,
   validateStudioSelection,
 } from '@/lib/videoCapabilities/studioCapabilities';
+import { resolvePricingId } from '@/config/videoModelSpecs';
+
 import { GenerateSection } from './generate/GenerateSection';
 import { QuickSettingsBar } from './generate/QuickSettingsBar';
 
