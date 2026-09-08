@@ -12,6 +12,7 @@
 - Watchdog-Intervall prüfen: aktuell 1-Minuten-Cron als Recovery; auf 2–5 Minuten anheben, sobald der Self-scheduling-Poller in Produktion stabil läuft.
 - Observability erweitern/erhalten: Provider-Zeit, Persistenz-Verzögerung, Persistenz-Dauer, Retries, Queue-Wartezeit, Manual-Review-Rate.
 - Concurrency-Limits: "10–15 parallele Provider-Jobs" ist eine operative Schätzung, kein vollständig load-getestetes hartes Limit. Vor breiterem Launch validieren und anheben.
+- Topaz-Validierungsphase (v2-Schätzer, nur Testkonten): 9 echte Läufe erfasst. Auswertung über `video_enhance_topaz_drift_samples` / `video_enhance_topaz_drift_groups`. Offen: Apollo 4K überschätzt systematisch (~-41 % / -44 % / -41 %, auch mit Master-Encoder) — vor Vollfreigabe gezielt korrigieren; Kleinstjobs (<= 3 Credits) zeigen rundungsbedingte Ausreißer. Keine Vollfreigabe, bis Apollo-4K-Gruppe innerhalb ±15 % liegt.
 
 ## Bereit
 - Video Enhance: Live-Nachweis der Härtung mit dem QA-Konto (1 Estimate-Ablehnung 1080p→1080p, 1 Hochkant-4K-Routing-Estimate; keine Provider-Läufe nötig)
