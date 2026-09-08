@@ -869,7 +869,10 @@ export const LEGACY_ROUTE_TO_MODEL: Record<string, string> = {
   '/luma-video-studio':     'luma-standard',
   '/seedance-video-studio': 'seedance-standard',
   '/grok-video-studio':     'grok-imagine',
-  '/sora-video-studio':     'sora-2-standard',
+  // '/sora-video-studio' intentionally absent: Sora 2 is removed and the route
+  // redirects in App.tsx. It used to map to `sora-2-standard`, an id that
+  // exists in neither the registry nor the canonical specs.
+
   '/vidu-studio':           'vidu-q2-reference',
   '/happyhorse-video-studio': 'happyhorse-standard',
 };
