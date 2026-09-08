@@ -83,9 +83,34 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
     () => includeSelectedModel(models ?? AI_VIDEO_TOOLKIT_MODELS, value),
     [models, value],
   );
-  // Canonical price (from server catalog) with local-config fallback.
-  const priceFor = (m: ToolkitModel) =>
-    getPricePerSecond(m.id, billingCurrency) ?? m.costPerSecond[billingCurrency];
+  // Canonical price (from server catalog) with local-config fallback. The
+  // catalog is keyed by BILLING id, which is not always the model id (tiers).
+  const priceFor = (m: ToolkitModel) => {
+    for (const id of [m.id, ...pricingIdsOfModel(m.id)]) {
+      const p = getPricePerSecond(id, billingCurrency);
+      if (p != null) return p;
+    }
+    return m.costPerSecond[billingCurrency];
+  };
+
+  /**
+   * AVAILABILITY IS CANONICAL (v510).
+   * A model whose canonical spec is not available (removed / maintenance /
+   * preview) must not be selectable — previously only the hand-maintained
+   * registry `status` disabled an entry, so a dead route stayed clickable and
+   * only failed at generation time.
+   */
+  const canonicalLock = (m: ToolkitModel): string | null => {
+    const spec = getVideoModelSpec(m.id);
+    if (!spec || spec.available) return null;
+    return tx({
+      de: `Derzeit nicht verfügbar (${spec.releaseStatus}).`,
+      en: `Currently unavailable (${spec.releaseStatus}).`,
+      es: `No disponible actualmente (${spec.releaseStatus}).`,
+    });
+  };
+
+
 
   const grouped = useMemo(() => {
     const map: Record<UiGroup, ToolkitModel[]> = {
