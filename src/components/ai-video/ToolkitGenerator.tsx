@@ -50,7 +50,8 @@ import { QuickSettingsBar } from './generate/QuickSettingsBar';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
-import { extractEdgeErrorMessage } from '@/lib/edgeFunctionError';
+import { extractEdgeErrorMessage, extractEdgeErrorPayload } from '@/lib/edgeFunctionError';
+import { findDuplicateReferences, isReferenceRole } from '@/lib/ai-video/referenceBinding';
 import { friendlyVideoErrorMessage } from '@/lib/videoErrorMessages';
 
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
@@ -249,7 +250,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   } | null>(null);
   const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
   const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
-  const [viduReferences, setViduReferences] = useState<ViduReferenceSlot[]>([]);
+  // Reference slots survive a reload: same order, same roles → identical
+  // provider binding after resume (see referenceBinding.ts).
+  const [viduReferences, setViduReferences] = useState<ViduReferenceSlot[]>(() => {
+    const raw = setupDraft.viduReferences;
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((s: any) => s && typeof s.url === 'string' && s.url.length > 0)
+      .map((s: any) => ({
+        url: s.url as string,
+        role: isReferenceRole(s.role) ? s.role : 'character',
+        hash: typeof s.hash === 'string' ? s.hash : undefined,
+      }));
+  });
+  /** UI index of the reference thumbnail the provider rejected (content[N] → slot). */
+  const [rejectedReferenceIndex, setRejectedReferenceIndex] = useState<number | null>(null);
+  const rejectedSlotRef = useRef<number | null>(null);
+  useEffect(() => { setRejectedReferenceIndex(null); }, [viduReferences]);
   const [uploading, setUploading] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -323,10 +340,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       castLocationId,
       castBuildingId,
       castPropIds,
+      viduReferences,
     }),
     [
       modelId, duration, aspectRatio, resolution, generateAudio, startImageUrl,
       referencePlacement, omniLines, castCharacterIds, castLocationId, castBuildingId, castPropIds,
+      viduReferences,
     ],
   );
   const setupSnapshotRef = useRef(setupSnapshot);
@@ -1081,12 +1100,29 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           return;
         }
         if (viduReferences.length > 0 && refConstraintMet) {
+          // Duplicate guard: one asset must never occupy two provider slots.
+          const dups = findDuplicateReferences(viduReferences);
+          if (dups.length > 0) {
+            const d = dups[0];
+            setRejectedReferenceIndex(d.uiIndex);
+            toast.error(tx({
+              de: `Referenzbild ${d.uiIndex + 1} ist identisch mit Referenzbild ${d.duplicateOf + 1}. Bitte entferne das Duplikat.`,
+              en: `Reference image ${d.uiIndex + 1} is identical to reference image ${d.duplicateOf + 1}. Please remove the duplicate.`,
+              es: `La imagen de referencia ${d.uiIndex + 1} es idéntica a la imagen ${d.duplicateOf + 1}. Elimina el duplicado.`,
+            }));
+            setGenerating(false);
+            return;
+          }
+          // Same UI order everywhere: index i here = provider content[i+1].
           const urls = viduReferences.map((s) => s.url);
+          const roles = viduReferences.map((s) => s.role);
           if (model.capabilities.multiRefRequired) {
             body.referenceImages = urls;
-            body.referenceRoles = viduReferences.map((s) => s.role);
+            body.referenceRoles = roles;
           } else {
             body.referenceImageUrls = urls;
+            body.referenceRoles = roles;
+            body.referenceHashes = viduReferences.map((s) => s.hash ?? null);
           }
         }
       } else if (composedSubjectRefs && composedSubjectRefs.length > 0 && !body.referenceImages) {
@@ -1166,7 +1202,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       }
 
       const { data, error } = await supabase.functions.invoke(model.edgeFunction, { body });
-      if (error) throw new Error(await extractEdgeErrorMessage(error));
+      if (error) {
+        // content[N] → UI slot: highlight the exact thumbnail the provider rejected.
+        const payload = await extractEdgeErrorPayload(error);
+        const idx = payload?.rejectedReferenceIndex;
+        if (typeof idx === 'number' && Number.isInteger(idx) && idx >= 0) {
+          rejectedSlotRef.current = idx;
+        }
+        throw new Error(await extractEdgeErrorMessage(error));
+      }
       if (data?.error) throw new Error(data.error);
 
 
@@ -1197,6 +1241,13 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       onAfterGenerate?.();
     } catch (err: any) {
       toast.error(friendlyVideoErrorMessage(err?.message));
+      if (rejectedSlotRef.current !== null) {
+        // Set after the state reset effect so the highlight survives.
+        const idx = rejectedSlotRef.current;
+        rejectedSlotRef.current = null;
+        setTimeout(() => setRejectedReferenceIndex(idx), 0);
+      }
+
 
     } finally {
       setGenerating(false);
@@ -1528,6 +1579,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
             brandCharacterUrl={brandCharacter?.reference_image_url ?? null}
             brandCharacterName={brandCharacter?.name ?? null}
+            rejectedIndex={rejectedReferenceIndex}
           />
         ) : (
           <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">

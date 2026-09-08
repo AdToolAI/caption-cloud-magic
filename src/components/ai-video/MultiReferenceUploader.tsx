@@ -40,6 +40,8 @@ import {
 export interface ViduReferenceSlot {
   url: string;
   role: ViduReferenceRole;
+  /** SHA-256 of the uploaded file — lets us catch the same picture uploaded twice. */
+  hash?: string;
 }
 
 interface Props {
@@ -56,6 +58,8 @@ interface Props {
   /** Optional: URL of the active Brand Character to offer "Load from Lock". */
   brandCharacterUrl?: string | null;
   brandCharacterName?: string | null;
+  /** 0-based slot the provider rejected (content[N] → UI index); drawn with a red ring. */
+  rejectedIndex?: number | null;
 }
 
 
@@ -66,6 +70,16 @@ const ROLE_ICON: Record<ViduReferenceRole, typeof UserCircle2> = {
   style: Palette,
   prop: Box,
 };
+
+async function hashFile(file: File): Promise<string | null> {
+  try {
+    const buf = await file.arrayBuffer();
+    const digest = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return null;
+  }
+}
 
 export function MultiReferenceUploader({
   slots,
@@ -79,6 +93,7 @@ export function MultiReferenceUploader({
 
   brandCharacterUrl,
   brandCharacterName,
+  rejectedIndex = null,
 }: Props) {
   const { user } = useAuth();
   const { language } = useTranslation();
@@ -112,6 +127,19 @@ export function MultiReferenceUploader({
       return;
     }
 
+    // Duplicate guard BEFORE the upload: the same picture may only fill one
+    // slot, otherwise the provider gets two identical references.
+    const hash = await hashFile(file);
+    if (hash && slots.some((s) => s.hash === hash)) {
+      const at = slots.findIndex((s) => s.hash === hash) + 1;
+      toast.info(tx({
+        de: `Dieses Bild ist bereits Referenz ${at}.`,
+        en: `This image is already reference ${at}.`,
+        es: `Esta imagen ya es la referencia ${at}.`,
+      }));
+      return;
+    }
+
     setUploadingIndex(slots.length);
     try {
       const ext = file.name.split('.').pop() ?? 'jpg';
@@ -123,7 +151,7 @@ export function MultiReferenceUploader({
       const { data: { publicUrl } } = supabase.storage
         .from('ai-video-reference')
         .getPublicUrl(path);
-      onChange([...slots, { url: publicUrl, role }]);
+      onChange([...slots, { url: publicUrl, role, ...(hash ? { hash } : {}) }]);
     } catch (err: any) {
       toast.error(err?.message ?? (language === 'de' ? tx({ de: 'Upload fehlgeschlagen.', en: 'Upload failed.', es: 'La carga falló.' }) : 'Upload failed.'));
     } finally {
@@ -212,14 +240,24 @@ export function MultiReferenceUploader({
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
         {slots.map((slot, idx) => {
           const Icon = ROLE_ICON[slot.role];
+          const isRejected = rejectedIndex === idx;
           return (
             <motion.div
               key={`${slot.url}-${idx}`}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="relative group rounded-lg overflow-hidden border border-primary/30 aspect-square bg-background/40"
+              data-reference-index={idx}
+              data-rejected={isRejected ? 'true' : undefined}
+              className={`relative group rounded-lg overflow-hidden border aspect-square bg-background/40 ${
+                isRejected ? 'border-destructive ring-2 ring-destructive/70' : 'border-primary/30'
+              }`}
             >
               <img src={slot.url} alt={`Ref ${idx + 1}`} className="w-full h-full object-cover" />
+              {isRejected && (
+                <Badge variant="destructive" className="absolute top-1 left-1 text-[9px] px-1.5 py-0">
+                  {tx({ de: 'Abgelehnt', en: 'Rejected', es: 'Rechazada' })}
+                </Badge>
+              )}
               <button
                 type="button"
                 onClick={() => removeSlot(idx)}
