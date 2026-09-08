@@ -132,38 +132,37 @@ describe('video enhance — stuck runs finish by themselves', () => {
   });
 
   it('closes deterministic output verdicts instead of re-downloading forever', () => {
-    const reconcile = fn('video-enhance-reconcile');
+    // The heavy persistence work lives in ONE shared cycle now; reconcile,
+    // the internal worker and the webhook trigger all run this same code.
+    const cycle = shared('video-enhance-persist-cycle.ts');
     // The verdict on the provider file is terminal after one confirming re-measure …
-    expect(reconcile).toMatch(/DETERMINISTIC_OUTPUT_FAILURES\s*=\s*new Set\(\[[^\]]*"OUTPUT_MISMATCH"/);
-    expect(reconcile).toMatch(/DETERMINISTIC_OUTPUT_FAILURES\s*=\s*new Set\(\[[^\]]*"OUTPUT_INVALID"/);
-    expect(reconcile).toMatch(/OUTPUT_VERDICT_CONFIRM_ATTEMPTS\s*=\s*2/);
+    expect(cycle).toMatch(/DETERMINISTIC_OUTPUT_FAILURES\s*=\s*new Set\(\[[^\]]*'OUTPUT_MISMATCH'/);
+    expect(cycle).toMatch(/DETERMINISTIC_OUTPUT_FAILURES\s*=\s*new Set\(\[[^\]]*'OUTPUT_INVALID'/);
+    expect(cycle).toMatch(/OUTPUT_VERDICT_CONFIRM_ATTEMPTS\s*=\s*2/);
     // … and it is closed through the failure path, which releases the reservation.
-    const branch = reconcile.slice(
-      reconcile.indexOf('const claim = Array.isArray(claimedRows)'),
-      reconcile.indexOf('const nowIso = new Date().toISOString();'),
-    );
+    const branch = cycle.slice(cycle.indexOf('const claim = Array.isArray(claimedRows)'));
     expect(branch).toContain('DETERMINISTIC_OUTPUT_FAILURES.has(claim.error_code)');
     expect(branch).toContain('finalizeFailure(');
     expect(branch.indexOf('finalizeFailure(')).toBeLessThan(branch.indexOf('finalizeSuccess('));
   });
 
   it('stops persistence retries at a bounded attempt count, without refunding', () => {
-    const reconcile = fn('video-enhance-reconcile');
-    const branch = reconcile.slice(
-      reconcile.indexOf('const claim = Array.isArray(claimedRows)'),
-      reconcile.indexOf('const nowIso = new Date().toISOString();'),
-    );
+    const cycle = shared('video-enhance-persist-cycle.ts');
+    const branch = cycle.slice(cycle.indexOf('const claim = Array.isArray(claimedRows)'));
     expect(branch).toContain('persistAttempts >= MAX_PERSIST_ATTEMPTS');
-    expect(branch).toContain('"manual_review"');
+    expect(branch).toContain("'manual_review'");
     // The bound sits before the retry, so a retry never bypasses it.
     expect(branch.indexOf('persistAttempts >= MAX_PERSIST_ATTEMPTS')).toBeLessThan(
       branch.indexOf('finalizeSuccess('),
     );
   });
 
-  it('claims persistence work atomically, one heavy transfer per invocation', () => {
+  it('claims persistence work atomically, through the DB claim only', () => {
+    const cycle = shared('video-enhance-persist-cycle.ts');
+    expect(cycle).toContain('video_enhance_claim_persist_run');
+    // The reconciler no longer owns the transfer, it only runs the shared cycle.
     const reconcile = fn('video-enhance-reconcile');
-    expect(reconcile).toContain('video_enhance_claim_persist_run');
+    expect(reconcile).toContain('runPersistCycle');
     // Persistence statuses must never be picked up by the plain provider loop.
     const open = reconcile.slice(
       reconcile.indexOf('const OPEN_STATUSES'),
@@ -173,6 +172,21 @@ describe('video enhance — stuck runs finish by themselves', () => {
     expect(open).not.toContain('asset_persisting');
     expect(open).not.toContain('asset_persist_failed');
   });
+
+  it('keeps the internal workers closed to the public and the browser out of job ownership', () => {
+    const guard = shared('video-enhance-reconcile-guard.ts');
+    expect(guard).toContain('export function isPrivilegedInternalCaller');
+    for (const worker of ['video-enhance-persist', 'video-enhance-poll']) {
+      const source = fn(worker);
+      expect(source).toContain('isPrivilegedInternalCaller');
+      expect(source).not.toMatch(/isInternalCaller\(/);
+    }
+    // Provider completion is discovered server-side, on a dense cadence.
+    const runtime = shared('video-enhance-runtime.ts');
+    expect(runtime).toMatch(/providerPollIntervalSeconds/);
+    expect(runtime).toContain('export async function triggerPoll');
+  });
+
 
 
   it('refunds on a closed output verdict through the existing release ledger', () => {
