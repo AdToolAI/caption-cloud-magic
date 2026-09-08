@@ -1,15 +1,22 @@
 /**
  * Topaz provider-cost estimator (CALIBRATED, not provider truth).
  *
- * v2 replaces the inferred v1 rate card with rates measured against real billed
- * Topaz runs (three dedicated calibration runs on 2026-09-08 plus five
- * historical runs). The measured law is very different from the v1 assumption:
+ * v2 replaced the inferred v1 rate card with rates measured against real billed
+ * Topaz runs. v3 recalibrates ONE cell of that card: Apollo at 4K.
  *
  *  - the precision upscale bills a FLAT ~0.017 credits per output frame,
  *    independent of the output resolution (verified at 2K and 4K),
  *  - Chronos interpolation is effectively free (verified at 2K and 4K),
- *  - Apollo is the real cost driver and DOES scale with output resolution
- *    (~0.0155/frame at 2K, ~0.040/frame at 4K).
+ *  - Apollo is the real cost driver. v2 assumed ~0.040/frame at 4K; three
+ *    repeated billed 4K/60 runs (300 frames -> 10, 596 frames -> 19, 300
+ *    frames Master -> 10) show a pooled Apollo share of 18.67 credits over
+ *    1196 frames = 0.0156/frame, i.e. essentially the measured 2K rate.
+ *
+ * Known anomaly: one historical 4K/60 run (15.0 s, 903 frames) billed 51
+ * credits, ~0.040/frame. No repetition of that behaviour was observed, and the
+ * Master-encoder hypothesis was tested and disproved. It is documented as an
+ * unexplained outlier and deliberately NOT fitted; drift logging stays on so a
+ * recurrence surfaces immediately.
  *
  * The rates are still INFERRED from our own billed runs, not from a published
  * provider table. Every price snapshot therefore carries
@@ -19,7 +26,7 @@
  * Client mirror of `supabase/functions/_shared/topaz-cost-estimator.ts`.
  */
 
-export const TOPAZ_COST_ESTIMATOR_VERSION = '2026-09-08-calibrated-v2';
+export const TOPAZ_COST_ESTIMATOR_VERSION = '2026-09-09-calibrated-v3';
 
 export type TopazEstimatorResolution = '720p' | '1080p' | '2k' | '4k';
 
@@ -51,7 +58,8 @@ export const TOPAZ_INTERPOLATION_CREDITS_PER_FRAME: Record<
   'chronos-fast': { '720p': 0.0003, '1080p': 0.0003, '2k': 0.0003, '4k': 0.0005 },
   chronos: { '720p': 0.0005, '1080p': 0.0005, '2k': 0.0005, '4k': 0.001 },
   'apollo-fast': { '720p': 0.004, '1080p': 0.006, '2k': 0.011, '4k': 0.028 },
-  apollo: { '720p': 0.006, '1080p': 0.008, '2k': 0.0155, '4k': 0.04 },
+  // 4K recalibrated in v3 from three repeated billed runs (pooled 0.0156).
+  apollo: { '720p': 0.006, '1080p': 0.008, '2k': 0.0155, '4k': 0.0156 },
   aion: { '720p': 0.006, '1080p': 0.008, '2k': 0.0155, '4k': 0.04 },
 };
 

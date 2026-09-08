@@ -101,7 +101,7 @@ describe('post-discount loss policy', () => {
 
 describe('Topaz model-aware cost estimator', () => {
   it('is explicitly versioned', () => {
-    expect(TOPAZ_COST_ESTIMATOR_VERSION).toBe('2026-09-08-calibrated-v2');
+    expect(TOPAZ_COST_ESTIMATOR_VERSION).toBe('2026-09-09-calibrated-v3');
   });
 
   it('charges Apollo clearly more than Chronos for the same job', () => {
@@ -111,7 +111,9 @@ describe('Topaz model-aware cost estimator', () => {
     expect(apollo.credits).toBeGreaterThan(chronos.credits * 1.4);
   });
 
-  it('reproduces the billed 51-credit reference run within the drift threshold', () => {
+  it('documents the unexplained historical 51-credit 4K run as an outlier', () => {
+    // v3 fits the three repeated 4K/60 Apollo samples, not this single
+    // historical run. The drift monitor must still see it as flagged.
     const estimate = topazEstimatedCredits({
       durationSeconds: 15.042,
       creditFamily: 'precision',
@@ -120,7 +122,7 @@ describe('Topaz model-aware cost estimator', () => {
       interpolationModel: 'apollo',
       interpolationApplies: true,
     });
-    expect(Math.abs(topazCreditDrift(estimate.credits, 51).driftPct!)).toBeLessThanOrEqual(0.15);
+    expect(topazCreditDrift(estimate.credits, 51).flagged).toBe(true);
   });
 
   it('bills no interpolation when the frame rate stays the same', () => {
@@ -226,7 +228,9 @@ describe('Topaz estimator v2 — measured billing regression', () => {
     { name: '2K/24 no interpolation (calibration run 1)', duration: 9.917, fps: 24, resolution: '2k', interpolationApplies: false, billed: 4 },
     { name: '2K/60 Chronos (calibration run 2)', duration: 9.917, fps: 60, resolution: '2k', interpolationModel: 'chronos', interpolationApplies: true, billed: 10 },
     { name: '2K/60 Apollo (calibration run 3)', duration: 9.917, fps: 60, resolution: '2k', interpolationModel: 'apollo', interpolationApplies: true, billed: 19 },
-    { name: '4K/60 Apollo (historical 51-credit run)', duration: 15.042, fps: 60, resolution: '4k', interpolationModel: 'apollo', interpolationApplies: true, billed: 51 },
+    { name: '4K/60 Apollo 5.0s (v3 sample 1)', duration: 5.0, fps: 60, resolution: '4k', interpolationModel: 'apollo', interpolationApplies: true, billed: 10 },
+    { name: '4K/60 Apollo 9.92s (v3 sample 2)', duration: 9.917, fps: 60, resolution: '4k', interpolationModel: 'apollo', interpolationApplies: true, billed: 19 },
+    { name: '4K/60 Apollo 5.0s Master (v3 sample 3)', duration: 5.0, fps: 60, resolution: '4k', interpolationModel: 'apollo', interpolationApplies: true, billed: 10 },
     { name: '4K/60 Chronos (historical)', duration: 9.917, fps: 60, resolution: '4k', interpolationModel: 'chronos', interpolationApplies: true, billed: 10 },
     { name: '4K/30 Chronos (historical)', duration: 14.708, fps: 30, resolution: '4k', interpolationModel: 'chronos', interpolationApplies: true, billed: 8 },
     { name: '4K/24 no interpolation (historical)', duration: 17.083, fps: 24, resolution: '4k', interpolationApplies: false, billed: 7 },
