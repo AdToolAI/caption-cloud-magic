@@ -110,7 +110,20 @@ export async function finalizeSuccess(
   const alreadyComplete = stored !== null && stored > 0 && (size === 0 || stored >= size);
 
   if (!alreadyComplete) {
-    const head = await headProviderOutput(providerOutputUrl);
+    let head = await headProviderOutput(providerOutputUrl);
+    if (!head.ok && head.gone) {
+      // A download link can EXPIRE without the file being gone. Ask the
+      // provider once for a fresh link before declaring the result lost.
+      const fresh = await freshProviderUrl(run, providerOutputUrl);
+      if (fresh) {
+        providerOutputUrl = fresh;
+        await admin
+          .from('video_enhance_runs')
+          .update({ provider_output_url: fresh })
+          .eq('id', run.id);
+        head = await headProviderOutput(fresh);
+      }
+    }
     if (!head.ok) {
       // Provider link permanently gone: nothing left to recover. This is the
       // ONLY path that hands the run to the terminal provider-failure route.
