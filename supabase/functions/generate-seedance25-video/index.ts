@@ -24,6 +24,13 @@ import {
   preflightVideoRequest,
   type PreflightLocale,
 } from "../_shared/videoRequestPreflight.ts";
+import {
+  bindReferenceSlots,
+  composeReferencePrompt,
+  findDuplicateReferences,
+  resolveRejectedReference,
+  type BoundReferenceSlot,
+} from "../_shared/referenceBinding.ts";
 
 
 const corsHeaders = {
@@ -47,6 +54,14 @@ interface GenerateRequest {
   startImageUrl?: string;
   endImageUrl?: string;
   referenceImageUrls?: string[];
+  /**
+   * UI role per reference image, same order as `referenceImageUrls`
+   * (character | product | location | style | prop). Turned into explicit
+   * "@Image N is …" instructions server-side.
+   */
+  referenceRoles?: (string | null)[];
+  /** Optional client content hashes, same order — duplicate detection only. */
+  referenceHashes?: (string | null)[];
   /** Reference clips (role `reference_video`, max 10). */
   referenceVideoUrls?: string[];
   /** Single reference clip sent by the shared v2v UI. */
@@ -99,6 +114,8 @@ Deno.serve(async (req) => {
       startImageUrl,
       endImageUrl,
       referenceImageUrls,
+      referenceRoles,
+      referenceHashes,
       referenceVideoUrls,
       referenceVideoUrl,
       referenceAudioUrls,
@@ -141,19 +158,55 @@ Deno.serve(async (req) => {
       "[AUDIO] Ambient sound design only: room tone, foley, natural environment " +
       "and optional instrumental music. No spoken words, no dialogue, no narration, " +
       "no singing. Characters do not talk and their lips stay closed.";
+    const preLocale = ((req.headers.get("x-locale") ?? "en").slice(0, 2)) as PreflightLocale;
+
+    // ── Semantic reference binding ──────────────────────────────────────
+    // UI slot order is kept verbatim; slot i becomes provider content[i+1]
+    // and is addressed as "@Image i+1". Roles arrive from the UI and are
+    // written into the prompt here, so the user never types @ref-1.
+    let referenceSlots: BoundReferenceSlot[] = [];
+    if (Array.isArray(referenceImageUrls) && referenceImageUrls.length > 0) {
+      const urls = referenceImageUrls.filter((u) => typeof u === "string" && u.trim().length > 0);
+      const roles = Array.isArray(referenceRoles) ? referenceRoles.slice(0, urls.length) : undefined;
+      const hashes = Array.isArray(referenceHashes) ? referenceHashes : [];
+      const duplicates = findDuplicateReferences(
+        urls.map((url, i) => ({ url, hash: hashes[i] ?? null })),
+      );
+      if (duplicates.length > 0) {
+        const d = duplicates[0];
+        const msg = preLocale === "de"
+          ? `Referenzbild ${d.uiIndex + 1} ist identisch mit Referenzbild ${d.duplicateOf + 1}. Bitte entferne das Duplikat – jedes Bild darf nur einen Slot belegen.`
+          : preLocale === "es"
+            ? `La imagen de referencia ${d.uiIndex + 1} es idéntica a la imagen ${d.duplicateOf + 1}. Elimina el duplicado: cada imagen solo puede ocupar un espacio.`
+            : `Reference image ${d.uiIndex + 1} is identical to reference image ${d.duplicateOf + 1}. Please remove the duplicate – each image may occupy only one slot.`;
+        return new Response(
+          JSON.stringify({
+            error: msg,
+            code: "DUPLICATE_REFERENCE_IMAGES",
+            duplicates: duplicates.map((x) => ({ index: x.uiIndex, duplicateOf: x.duplicateOf, by: x.by })),
+            rejectedReferenceIndex: d.uiIndex,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      referenceSlots = bindReferenceSlots(urls, roles);
+    }
+    const boundPrompt = composeReferencePrompt(String(prompt ?? ""), referenceSlots);
+
     const effectivePrompt =
       generateAudio && suppressDialogue
-        ? `${String(prompt).trim()}\n\n${NO_SPEECH_CLAUSE}`
-        : prompt;
+        ? `${boundPrompt}\n\n${NO_SPEECH_CLAUSE}`
+        : boundPrompt;
 
     // Request-shape preflight (prompt length, exclusive input slots) — runs
     // before the wallet and before ModelArk. A provider 400/422 must never be
     // our first validation layer.
     {
-      const preLocale = ((req.headers.get("x-locale") ?? "en").slice(0, 2)) as PreflightLocale;
+      // The prompt-length check runs on the text the provider actually
+      // receives (user prompt + reference instructions), not on the raw input.
       const pre = preflightVideoRequest({
         modelId: MODEL_ID,
-        prompt: String(prompt ?? ""),
+        prompt: boundPrompt,
         startImageUrl,
         endImageUrl,
         referenceImageUrls: Array.isArray(referenceImageUrls) ? referenceImageUrls : null,

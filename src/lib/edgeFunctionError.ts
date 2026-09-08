@@ -9,6 +9,24 @@
  * status-code string.
  */
 
+/**
+ * Reads the JSON body of a FunctionsHttpError (if any) so callers can react
+ * to structured fields such as `rejectedReferenceIndex`. Returns `null` when
+ * the body is missing or not JSON.
+ */
+export async function extractEdgeErrorPayload(err: unknown): Promise<Record<string, unknown> | null> {
+  const ctx = (err as { context?: unknown } | null | undefined)?.context as Response | undefined;
+  if (!ctx || typeof (ctx as Response).text !== 'function') return null;
+  try {
+    const text = await ctx.clone().text();
+    if (!text) return null;
+    const json = JSON.parse(text);
+    return json && typeof json === 'object' ? (json as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function extractEdgeErrorMessage(err: unknown): Promise<string> {
   const anyErr = err as { message?: string; context?: unknown } | null | undefined;
   const fallback = anyErr?.message || '';
