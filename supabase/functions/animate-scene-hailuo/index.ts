@@ -52,10 +52,30 @@ serve(async (req) => {
       );
     }
 
+    // CANONICAL CAPABILITY GATE (v510) — this route used to call a hard-coded
+    // provider slug with no duration/aspect validation at all, so an invalid
+    // scene length was accepted here and rejected (or silently altered) by the
+    // provider. Model id, provider slug and the legal durations now come from
+    // the canonical registry, exactly like the Studio path.
+    const gate = capabilityGate(
+      { modelId: HAILUO_MODEL_ID, mode: 'i2v', resolution: '768p', durationSeconds: Number(duration) },
+      corsHeaders,
+    );
+    if ('response' in gate && gate.response) return gate.response;
+    const providerSlug = (gate as { routeIdentity?: { providerModelSlug?: string } })
+      .routeIdentity?.providerModelSlug;
+    if (!providerSlug) {
+      return new Response(
+        JSON.stringify({ error: 'No provider contract for hailuo scene animation' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     console.log(`🎬 Animating scene ${sceneId} with Hailuo 2.3`);
     console.log(`  - Image: ${imageUrl.substring(0, 80)}...`);
     console.log(`  - Audio: ${audioUrl ? 'Yes (lip-sync enabled)' : 'No'}`);
     console.log(`  - Duration: ${duration}s`);
+
     console.log(`  - Motion: ${motionType}`);
 
     // Build motion prompt based on intensity
