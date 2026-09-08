@@ -12,7 +12,8 @@ import {
 import {
   TOPAZ_COST_ESTIMATOR_VERSION,
   topazEstimatedCredits,
-  topazSourceResolutionMultiplier,
+  topazGeometryMultiplier,
+  topazInternalScale,
   topazUncertaintyBuffer,
   topazCreditDrift,
 } from '@/lib/videoEnhance/topazCostEstimator';
@@ -129,20 +130,21 @@ describe('Topaz model-aware cost estimator', () => {
     expect(Math.abs(drift.driftPct!)).toBeLessThanOrEqual(0.15);
   });
 
-  it('keeps the 1080p source as the neutral reference and never under-prices smaller sources', () => {
-    expect(topazSourceResolutionMultiplier('4k', 1080, 1920)).toBeCloseTo(1, 3);
-    expect(topazSourceResolutionMultiplier('4k', 1920, 1080)).toBeCloseTo(1, 3);
-    expect(topazSourceResolutionMultiplier('4k', 720, 1280)).toBeGreaterThan(1.7);
-    expect(topazSourceResolutionMultiplier('4k', 540, 960)).toBeGreaterThan(
-      topazSourceResolutionMultiplier('4k', 720, 1280),
-    );
-    // A smaller enlargement is never discounted below the reference.
-    expect(topazSourceResolutionMultiplier('2k', 1080, 1920)).toBe(1);
-    expect(topazSourceResolutionMultiplier('720p', 1080, 1920)).toBe(1);
-    // Unknown geometry must not silently discount the run.
-    expect(topazSourceResolutionMultiplier('4k', undefined, undefined)).toBe(1);
-    // Guard rails.
-    expect(topazSourceResolutionMultiplier('4k', 64, 64)).toBeLessThanOrEqual(3);
+  it('treats source pixels and internal scale as the geometry cost law', () => {
+    expect(topazInternalScale(1.33)).toBe(2);
+    expect(topazInternalScale(2)).toBe(2);
+    expect(topazInternalScale(3)).toBe(4);
+    expect(topazInternalScale(4)).toBe(4);
+    expect(topazInternalScale(6)).toBe(4);
+    // Reference geometry: 1080x1920 at 2x.
+    expect(topazGeometryMultiplier('4k', 1080, 1920)).toBeCloseTo(1, 3);
+    expect(topazGeometryMultiplier('2k', 1080, 1920)).toBeCloseTo(1, 3);
+    // 720p source: quarter-ish pixels, but a 4x internal scale to 4K.
+    expect(topazGeometryMultiplier('4k', 720, 1280)).toBeCloseTo(1.7778, 3);
+    expect(topazGeometryMultiplier('2k', 720, 1280)).toBeCloseTo(0.4444, 3);
+    expect(topazGeometryMultiplier('4k', 540, 960)).toBeCloseTo(1, 3);
+    // Unknown geometry falls back to the reference, never to a discount.
+    expect(topazGeometryMultiplier('4k', undefined, undefined)).toBe(1);
   });
 
   it('prices a smaller source higher for an identical target job', () => {
@@ -158,8 +160,8 @@ describe('Topaz model-aware cost estimator', () => {
     const from720 = topazEstimatedCredits({ ...base, sourceWidth: 720, sourceHeight: 1280 });
     const from540 = topazEstimatedCredits({ ...base, sourceWidth: 540, sourceHeight: 960 });
     expect(from720.credits).toBeGreaterThan(from1080.credits);
-    expect(from540.credits).toBeGreaterThan(from720.credits);
-    expect(from1080.sourceResolutionMultiplier).toBeCloseTo(1, 3);
+    expect(from540.credits).toBeLessThan(from720.credits);
+    expect(from1080.geometryMultiplier).toBeCloseTo(1, 3);
     expect(from1080.upscaleFactor).toBeCloseTo(2, 2);
   });
 
@@ -291,6 +293,9 @@ describe('Topaz estimator v2 — measured billing regression', () => {
     { name: '4K/60 Apollo 15.67s from a 720p source', duration: 15.667, fps: 60, resolution: '4k', interpolationModel: 'apollo', interpolationApplies: true, billed: 53, sourceWidth: 720, sourceHeight: 1280 },
     { name: '4K/24 no interpolation from a 720p source', duration: 15.042, fps: 24, resolution: '4k', interpolationApplies: false, billed: 11, sourceWidth: 720, sourceHeight: 1280 },
     { name: '2K/60 Apollo from a 1080p source (target below the reference)', duration: 9.917, fps: 60, resolution: '2k', interpolationModel: 'apollo', interpolationApplies: true, billed: 19, sourceWidth: 1080, sourceHeight: 1920 },
+    { name: '2K/60 Apollo from a 720p source (v4 calibration run)', duration: 15.042, fps: 60, resolution: '2k', interpolationModel: 'apollo', interpolationApplies: true, billed: 13, sourceWidth: 720, sourceHeight: 1280 },
+    { name: '4K/60 Apollo from a 540p source (v4 calibration run)', duration: 15.042, fps: 60, resolution: '4k', interpolationModel: 'apollo', interpolationApplies: true, billed: 29, sourceWidth: 540, sourceHeight: 960 },
+    { name: '2K/24 no interpolation from a 1080p source', duration: 9.917, fps: 24, resolution: '2k', interpolationApplies: false, billed: 4, sourceWidth: 1080, sourceHeight: 1920 },
   ];
 
   for (const c of cases) {
