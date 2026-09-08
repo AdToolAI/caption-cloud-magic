@@ -225,7 +225,10 @@ describe('customer projection of a run', () => {
 
   it('the status action and every run response go through the projection', () => {
     const index = readFileSync('supabase/functions/video-enhance/index.ts', 'utf8');
-    expect(index).toMatch(/return json\(\{ run: toClientRun\(run\) \}\)/);
+    // Single-run and multi-run responses both project before answering.
+    expect(index).toMatch(/return json\(\{ run: toClientRun\(/);
+    expect(index).toMatch(/toClientRun\(row\)/);
+
     // no raw row leaves the function
     expect(index).not.toMatch(/json\(\{\s*run:\s*(existing|current|run|inserted|updated|row)\s*[,}]/);
     const hook = readFileSync('src/hooks/useEnhanceVideo.ts', 'utf8');

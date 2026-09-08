@@ -848,7 +848,7 @@ export const VIDEO_MODEL_SPECS: VideoModelSpec[] = [
     verificationNotes:
       'Nativer Dialog (EN). Referenzbilder max. 7, mit Referenzvideo max. 4. ' +
       'Routen-Audit 07.09.2026 (openapi_schema von kwaivgi/kling-v3-omni-video): mode = standard (720p) | pro (1080p, default) | 4k. ' +
-      'Die frühere Annahme "max. 1080p" war falsch — 4K ist routen-dokumentiert und daher als GESPERRTES Tier hinterlegt (t2v/i2v/reference). ' +
+      'The earlier assumption "max. 1080p" was wrong — 4K is route-documented and therefore kept as a LOCKED tier (t2v/i2v/reference). ' +
       'Harte Routen-Regel: "4K does not support reference_video" — deshalb KEIN 4K-Tier auf v2v. ' +
       'Dauer 3–15 s und aspect_ratio 16:9|9:16|1:1 sind laut Schema modus- und auflösungsunabhängig; das Schema nennt für 4K KEINE exakten Pixel, ' +
       'daher bleibt sizingRuleVerified=false, bis ein Smoke-Test auf UNSEREM Endpoint die Frames misst. ' +

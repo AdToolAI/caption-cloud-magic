@@ -856,3 +856,11 @@ timeout_sec = 30
 [functions.brand-trends-radar]
 verify_jwt = true
 timeout_sec = 90
+
+[functions.video-enhance-persist]
+verify_jwt = false
+timeout_sec = 120
+
+[functions.video-enhance-poll]
+verify_jwt = false
+timeout_sec = 60
