@@ -35,7 +35,7 @@ Die Claim-RPC bekommt zwei Parameter, ausgewertet gegen aktive Leases:
 - `p_max_global` (Standard 3),
 - `p_max_per_user` (Standard 1).
 
-Werte kommen aus einer einzigen Konstantenquelle (`_shared/video-enhance-runtime.ts`, per Function-Secret überschreibbar) — keine verstreuten Zahlen. Überzählige Runs bleiben einfach `provider_output_ready` und werden beim nächsten freien Platz geclaimt; nichts schlägt fehl.
+Werte kommen aus einer einzigen Konstantenquelle (`_shared/video-enhance-runtime.ts`, per Function-Secret überschreibbar) — keine verstreuten Zahlen. Überzählige Runs bleiben einfach `provider_output_ready` und werden beim nächsten freien Platz geclaimt; nichts schlägt fehl. Fairness: die Claim-Auswahl sortiert nach ältestem Run pro Nutzer, sodass ein Nutzer mit vielen Jobs die anderen nicht aushungern kann.
 
 ## D. Mehrere Jobs im Frontend
 
