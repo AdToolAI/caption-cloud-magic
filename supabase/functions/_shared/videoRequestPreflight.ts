@@ -50,9 +50,12 @@ export type PreflightViolation =
   | { kind: "prompt_too_long"; length: number; limit: number }
   | { kind: "frame_and_reference_media" };
 
-export type PreflightResult =
-  | { ok: true }
-  | { ok: false; code: string; violation: PreflightViolation };
+export interface PreflightResult {
+  ok: boolean;
+  /** Machine code for a refused request (absent when ok). */
+  code?: string;
+  violation?: PreflightViolation;
+}
 
 export function preflightVideoRequest(input: PreflightInput): PreflightResult {
   const prompt = String(input.prompt ?? "");

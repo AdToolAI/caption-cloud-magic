@@ -1153,12 +1153,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         const pre = preflightVideoRequest({
           modelId: model.id,
           prompt: String(body.prompt ?? ''),
-          startImageUrl: body.startImageUrl ?? null,
-          endImageUrl: body.endImageUrl ?? null,
+          startImageUrl: (body.startImageUrl ?? null) as string | null,
+          endImageUrl: (body.endImageUrl ?? null) as string | null,
           referenceImageUrls: (body.referenceImageUrls ?? body.referenceImages ?? null) as string[] | null,
           referenceVideoUrls: body.referenceVideoUrl ? [body.referenceVideoUrl as string] : null,
         });
-        if (!pre.ok) {
+        if (!pre.ok && pre.violation) {
           toast.error(describePreflightViolation(pre.violation, language as PreflightLocale, model.name));
           setGenerating(false);
           return;

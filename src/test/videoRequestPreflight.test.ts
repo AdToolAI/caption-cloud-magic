@@ -18,10 +18,8 @@ describe('video request preflight — prompt length', () => {
     expect(preflightVideoRequest({ modelId: 'seedance-pro', prompt: long(4000) }).ok).toBe(true);
     const over = preflightVideoRequest({ modelId: 'seedance-pro', prompt: long(4001) });
     expect(over.ok).toBe(false);
-    if (!over.ok) {
-      expect(over.code).toBe('PROMPT_TOO_LONG');
-      expect(over.violation).toEqual({ kind: 'prompt_too_long', length: 4001, limit: 4000 });
-    }
+    expect(over.code).toBe('PROMPT_TOO_LONG');
+    expect(over.violation).toEqual({ kind: 'prompt_too_long', length: 4001, limit: 4000 });
   });
 
   it('never blocks a model without a documented limit', () => {
@@ -38,7 +36,7 @@ describe('video request preflight — exclusive input slots', () => {
       referenceImageUrls: ['https://x/b.png'],
     });
     expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.code).toBe('INCOMPATIBLE_INPUT_COMBINATION');
+    expect(res.code).toBe('INCOMPATIBLE_INPUT_COMBINATION');
   });
 
   it('refuses an end frame together with a reference clip', () => {
