@@ -18588,6 +18588,13 @@ export type Database = {
             referencedRelation: "video_enhance_runs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "video_enhance_admin_actions_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "video_enhance_topaz_drift_samples"
+            referencedColumns: ["run_id"]
+          },
         ]
       }
       video_enhance_cost_closure_audit: {
@@ -18622,6 +18629,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "video_enhance_runs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_enhance_cost_closure_audit_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "video_enhance_topaz_drift_samples"
+            referencedColumns: ["run_id"]
           },
         ]
       }
@@ -18663,6 +18677,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "video_enhance_runs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_enhance_ledger_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "video_enhance_topaz_drift_samples"
+            referencedColumns: ["run_id"]
           },
         ]
       }
@@ -20450,6 +20471,86 @@ export type Database = {
           shares?: number | null
           user_id?: string | null
           views?: never
+        }
+        Relationships: []
+      }
+      video_enhance_topaz_drift_groups: {
+        Row: {
+          avg_drift_pct: number | null
+          avg_effective_multiple: number | null
+          cost_estimator_version: string | null
+          duration_bucket: string | null
+          flagged_samples: number | null
+          interpolation_model: string | null
+          max_drift_pct: number | null
+          min_drift_pct: number | null
+          samples: number | null
+          subsidized_samples: number | null
+          target_fps: number | null
+          target_resolution: string | null
+        }
+        Relationships: []
+      }
+      video_enhance_topaz_drift_samples: {
+        Row: {
+          actual_provider_credits: number | null
+          charged_price_eur: number | null
+          cost_estimator_version: string | null
+          created_at: string | null
+          duration_bucket: string | null
+          effective_multiple_after_discount: number | null
+          estimated_provider_credits: number | null
+          interpolation_model: string | null
+          mode: string | null
+          profitability_class: string | null
+          provider_credit_drift_flagged: boolean | null
+          provider_credit_drift_pct: number | null
+          run_id: string | null
+          source_duration_seconds: number | null
+          source_fps: number | null
+          target_fps: number | null
+          target_resolution: string | null
+          user_id: string | null
+        }
+        Insert: {
+          actual_provider_credits?: number | null
+          charged_price_eur?: number | null
+          cost_estimator_version?: string | null
+          created_at?: string | null
+          duration_bucket?: never
+          effective_multiple_after_discount?: number | null
+          estimated_provider_credits?: number | null
+          interpolation_model?: never
+          mode?: string | null
+          profitability_class?: string | null
+          provider_credit_drift_flagged?: boolean | null
+          provider_credit_drift_pct?: number | null
+          run_id?: string | null
+          source_duration_seconds?: never
+          source_fps?: number | null
+          target_fps?: number | null
+          target_resolution?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          actual_provider_credits?: number | null
+          charged_price_eur?: number | null
+          cost_estimator_version?: string | null
+          created_at?: string | null
+          duration_bucket?: never
+          effective_multiple_after_discount?: number | null
+          estimated_provider_credits?: number | null
+          interpolation_model?: never
+          mode?: string | null
+          profitability_class?: string | null
+          provider_credit_drift_flagged?: boolean | null
+          provider_credit_drift_pct?: number | null
+          run_id?: string | null
+          source_duration_seconds?: never
+          source_fps?: number | null
+          target_fps?: number | null
+          target_resolution?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
