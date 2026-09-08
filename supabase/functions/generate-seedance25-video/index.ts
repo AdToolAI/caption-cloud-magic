@@ -3,6 +3,7 @@ import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
+import { resolvePricingId } from "../_shared/videoModelSpecs.ts";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 import {
   createSeedance25Task,
