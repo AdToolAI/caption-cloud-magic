@@ -168,13 +168,15 @@ export function ModelSelector({ value, onChange, currency, models, className, lo
                 {SPEC_GROUP_LABELS[g][lang]}
               </SelectLabel>
               {models.map((m) => {
-                const isMaintenance = m.status === 'maintenance';
+                const canonicalReason = canonicalLock(m);
+                const isMaintenance = m.status === 'maintenance' || !!canonicalReason;
                 const isComingSoon = m.status === 'coming_soon';
                 const isPlacementLocked = !!lockedModelIds?.includes(m.id);
                 const locked = isMaintenance || isComingSoon || isPlacementLocked;
                 const lockTitle = isPlacementLocked
                   ? lockedReason
-                  : (locked ? m.statusReason : undefined);
+                  : (canonicalReason ?? (locked ? m.statusReason : undefined));
+
                 return (
                   <SelectItem
                     key={m.id}
