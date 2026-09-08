@@ -9,6 +9,7 @@ import {
   backoffMinutes,
   extractProviderCost,
   manualReviewAfterMinutes,
+  providerCreditPatch,
   setStatus,
   STAGING_BUCKET,
   triggerPersist,
