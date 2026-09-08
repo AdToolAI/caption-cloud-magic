@@ -46,7 +46,7 @@ Werte kommen aus einer einzigen Konstantenquelle (`_shared/video-enhance-runtime
 
 ## E. Globales Job-Center
 
-Kleiner App-weiter Indikator (Popover im Header, sichtbar sobald offene Runs existieren), gespeist aus `open_runs`: Titel/Vorschaubild sofern vorhanden, Anbieter/Modell, Zielauflösung + FPS, aktuelle Phase, Abbrechen für genau diesen Job. Zusätzlich zeigt die History (`VideoGenerationHistory` / `videoHistory/model.ts`) offene Runs als laufende Einträge — derselbe Eintrag wechselt beim Abschluss auf „Fertig", ohne zweite Zeile.
+Kleiner App-weiter Indikator (Popover im Header, sichtbar sobald offene Runs existieren), gespeist aus `open_runs`: Titel/Vorschaubild sofern vorhanden, Anbieter/Modell, Zielauflösung + FPS, aktuelle Phase, Abbrechen für genau diesen Job. Angezeigte Phasen: In Warteschlange · Verbessern · Anbieter rechnet · Datei wird gesichert · Sicherung wird wiederholt · Manuelle Prüfung. Zusätzlich zeigt die History (`VideoGenerationHistory` / `videoHistory/model.ts`) offene Runs als laufende Einträge — derselbe Eintrag wechselt beim Abschluss auf „Fertig", ohne zweite Zeile.
 
 ## F. Topaz Backend-Poller
 
