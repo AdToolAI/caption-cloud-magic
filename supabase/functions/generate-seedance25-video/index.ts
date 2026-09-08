@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
           ...(referenceVideoUrl ? [referenceVideoUrl] : []),
         ],
       });
-      if (!pre.ok) {
+      if (!pre.ok && pre.violation) {
         return new Response(
           JSON.stringify({
             error: describePreflightViolation(pre.violation, preLocale, "Seedance 2.5"),

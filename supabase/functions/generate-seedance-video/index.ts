@@ -115,7 +115,7 @@ serve(async (req) => {
         startImageUrl,
         endImageUrl,
       });
-      if (!pre.ok) {
+      if (!pre.ok && pre.violation) {
         return new Response(
           JSON.stringify({
             error: describePreflightViolation(pre.violation, preLocale, "Seedance"),
