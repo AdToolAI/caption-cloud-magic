@@ -58,12 +58,13 @@ describe('provider-specific degressive curves', () => {
     }
   });
 
-  it('flags a configuration whose cent rounding leaves the band', () => {
+  it('tolerates sub-cent rounding overshoot instead of flagging every micro-run', () => {
     const p = evaluateCurvePricing(0.002, VCUBE_CURVE);
     expect(p.listPriceEur).toBe(0.01);
-    expect(p.gate).toBe('review_required');
-    expect(p.gateReason).toBe('floor_conflict');
+    expect(p.gate).toBe('ok');
+    expect(p.gateReason).toBeNull();
   });
+
 
   it('maps model ids to their own curve', () => {
     expect(curveFor('bytedance-vcube')).toBe(VCUBE_CURVE);
