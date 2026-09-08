@@ -21214,6 +21214,7 @@ export type Database = {
         Args: {
           p_amount_euros: number
           p_generation_id: string
+          p_refund_key?: string
           p_user_id: string
         }
         Returns: number

@@ -61,6 +61,11 @@ import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
 import { applySceneAssetsToPrompt } from '@/lib/motion-studio/applySceneAssetsToPrompt';
 import { toolkitModelToClipSource } from '@/lib/ai-video/toolkitModelToClipSource';
 import { validateImageForModel } from '@/lib/ai-video/imageRequirements';
+import {
+  describePreflightViolation,
+  preflightVideoRequest,
+  type PreflightLocale,
+} from '@/lib/ai-video/requestPreflight';
 
 import type { MotionStudioCharacter, MotionStudioLocation } from '@/types/motion-studio';
 import type { CharacterShot, ComposerCharacter, ComposerScene } from '@/types/video-composer';
@@ -1140,6 +1145,24 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         toast.info(
           tx({ de: 'Sora 2 nutzt nur die Beschreibung (~70 % Konsistenz). Für längere Storys → Kling oder Hailuo.', en: 'Sora 2 uses only the description (~70 % consistency). For longer stories switch to Kling or Hailuo.', es: 'Sora 2 usa solo la descripción (~70 % de consistencia). Para historias más largas, cambia a Kling o Hailuo.' }),
         );
+      }
+
+      // Same contract the edge function enforces: prompt length and exclusive
+      // input slots are refused here, before any credits move.
+      {
+        const pre = preflightVideoRequest({
+          modelId: model.id,
+          prompt: String(body.prompt ?? ''),
+          startImageUrl: (body.startImageUrl ?? null) as string | null,
+          endImageUrl: (body.endImageUrl ?? null) as string | null,
+          referenceImageUrls: (body.referenceImageUrls ?? body.referenceImages ?? null) as string[] | null,
+          referenceVideoUrls: body.referenceVideoUrl ? [body.referenceVideoUrl as string] : null,
+        });
+        if (!pre.ok && pre.violation) {
+          toast.error(describePreflightViolation(pre.violation, language as PreflightLocale, model.name));
+          setGenerating(false);
+          return;
+        }
       }
 
       const { data, error } = await supabase.functions.invoke(model.edgeFunction, { body });

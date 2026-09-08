@@ -175,6 +175,9 @@ export async function walletOperation(
       p_user_id: params.userId,
       p_amount_euros: params.amountEur,
       p_generation_id: params.runId,
+      // Release and true-up are two distinct, legitimate credits for the same
+      // run — each is idempotent on its own key.
+      p_refund_key: `enhance:${params.runId}:${params.operation}`,
     });
     if (error) return { applied: false, reason: 'wallet_error', error: error.message };
   }
