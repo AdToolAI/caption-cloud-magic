@@ -2422,6 +2422,15 @@ export function resolvePricingId(
   return tiers.length === 1 ? tiers[0].pricingId : null;
 }
 
+/**
+ * Canonical availability of a model — the ONLY source any surface may use to
+ * decide whether a route may be dispatched or offered. Unknown id = not
+ * available (fail closed).
+ */
+export function isVideoModelAvailable(modelId: string): boolean {
+  return getVideoModelSpec(modelId)?.available === true;
+}
+
 /** Every distinct billing id a model can be charged on, across all its modes. */
 export function pricingIdsOfModel(modelId: string): string[] {
   const spec = getVideoModelSpec(modelId);

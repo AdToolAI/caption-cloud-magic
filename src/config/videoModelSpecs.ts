@@ -4,7 +4,7 @@
 // Regenerate with: node scripts/generate-video-model-specs.mjs
 // =============================================================================
 
-export const SPECS_SOURCE_HASH = '87de2aa79d7200b7f6c425a85f80624e4aacaf48615894b89ea7cea90dda7ae3';
+export const SPECS_SOURCE_HASH = '648188c3e53621353040537ff9967812f3e82baaa1c2ab054f5a22d69cb0eedf';
 
 // ============================================================================
 // CANONICAL VIDEO MODEL CAPABILITY REGISTRY
@@ -2428,6 +2428,15 @@ export function resolvePricingId(
   // No tier named: only unambiguous for a single-tier mode (same rule the
   // capability gate enforces for the generation request itself).
   return tiers.length === 1 ? tiers[0].pricingId : null;
+}
+
+/**
+ * Canonical availability of a model — the ONLY source any surface may use to
+ * decide whether a route may be dispatched or offered. Unknown id = not
+ * available (fail closed).
+ */
+export function isVideoModelAvailable(modelId: string): boolean {
+  return getVideoModelSpec(modelId)?.available === true;
 }
 
 /** Every distinct billing id a model can be charged on, across all its modes. */
