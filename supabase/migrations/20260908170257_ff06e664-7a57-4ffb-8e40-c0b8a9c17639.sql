@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.video_enhance_claim_persist_run(text, integer);

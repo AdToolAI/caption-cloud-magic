@@ -55,6 +55,7 @@ import {
  *   start    — idempotent run creation, reservation and provider submit
  *   status   — run state for polling
  *   open_run — newest non-terminal run of the caller (reload / device switch)
+ *   open_runs — ALL unfinished runs of the caller (job center, History)
  *   cancel   — records a cancel WISH; money only moves on provider confirmation
  */
 
@@ -147,7 +148,7 @@ async function providerOutageActive(admin: any, modelId: string): Promise<boolea
 }
 
 interface RequestBody {
-  action?: "estimate" | "start" | "status" | "cancel" | "open_run";
+  action?: "estimate" | "start" | "status" | "cancel" | "open_run" | "open_runs";
   idempotencyKey?: string;
   /** Validation-only switch, honoured for allowlisted test accounts only. */
   testFailPersistOnce?: boolean;
@@ -365,6 +366,23 @@ serve(async (req) => {
         .maybeSingle();
       return json({ run: toClientRun(open) });
     }
+
+    // ---- open_runs: ALL unfinished runs of the caller ----------------------
+    // A user may enhance several videos at once, and every one of them keeps
+    // running in the backend while the browser is away. This is what lets the
+    // job center and History show them again after reload, navigation or a
+    // fresh login — still read-only, still scoped to the caller.
+    if (action === "open_runs") {
+      const { data: open } = await admin
+        .from("video_enhance_runs")
+        .select("*")
+        .eq("user_id", user.id)
+        .not("status", "in", "(completed,provider_failed,output_lost,provider_cancelled_confirmed)")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      return json({ runs: (open ?? []).map((row) => toClientRun(row)) });
+    }
+
 
     // ---- status ------------------------------------------------------------
     if (action === "status") {

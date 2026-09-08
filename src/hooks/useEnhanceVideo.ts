@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  dismissEnhanceRun,
+  getEnhanceRuns,
+  hydrateEnhanceRuns,
+  isEnhanceLive,
+  subscribeEnhanceRuns,
+  upsertEnhanceRun,
+} from '@/lib/videoEnhance/runStore';
 import type { EnhanceConfig } from '@/config/videoEnhanceModels';
 
 /**
@@ -196,7 +204,14 @@ export interface ServerSourceMeta {
 }
 
 export function useEnhanceVideo() {
-  const [run, setRun] = useState<EnhanceRunRow | null>(null);
+  /**
+   * Every unfinished job of the user, not just this panel's. The backend owns
+   * them; this component only watches, so starting a second upscale never
+   * replaces the first and navigating away never loses one.
+   */
+  const [runs, setRuns] = useState<EnhanceRunRow[]>(() => getEnhanceRuns());
+  /** The run this panel started or attached to — kept for the single-run UI. */
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [estimate, setEstimate] = useState<EnhanceEstimate | null>(null);
   const [plan, setPlan] = useState<EnhancePlan | null>(null);
   const [sourceMeta, setSourceMeta] = useState<ServerSourceMeta | null>(null);
@@ -206,7 +221,17 @@ export function useEnhanceVideo() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   /** Sub-reason of the code, e.g. `downscale` vs `no_op`. */
   const [errorReason, setErrorReason] = useState<string | null>(null);
-  const pollRef = useRef<number | null>(null);
+
+  useEffect(() => subscribeEnhanceRuns(setRuns), []);
+  useEffect(() => {
+    void hydrateEnhanceRuns();
+  }, []);
+
+  const run = runs.find((r) => r.id === activeRunId) ?? null;
+  const setRun = useCallback((next: EnhanceRunRow) => {
+    upsertEnhanceRun(next);
+    setActiveRunId(next.id);
+  }, []);
 
   const clearFailure = useCallback(() => {
     setError(null);
@@ -235,14 +260,6 @@ export function useEnhanceVideo() {
     }
   }, []);
 
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      window.clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => stopPolling, [stopPolling]);
 
   /**
    * Authoritative price preview — the server measures the source itself.
@@ -302,24 +319,6 @@ export function useEnhanceVideo() {
   );
 
 
-  const pollUntilDone = useCallback(
-    (runId: string) => {
-      stopPolling();
-      pollRef.current = window.setInterval(async () => {
-        try {
-          const data = await callEngine({ action: 'status', runId });
-          if (data?.run) {
-            setRun(data.run);
-            if (TERMINAL.includes(data.run.status)) stopPolling();
-          }
-        } catch {
-          // A polling hiccup is not a verdict — keep polling.
-        }
-      }, POLL_INTERVAL_MS);
-    },
-    [stopPolling],
-  );
-
   /**
    * Starts a run. The idempotency key makes double clicks, network retries and
    * parallel calls collapse into exactly one run and one reservation.
@@ -338,10 +337,8 @@ export function useEnhanceVideo() {
           sourceUrl: source.url,
           ...config,
         });
-        if (data?.run) {
-          setRun(data.run);
-          if (!TERMINAL.includes(data.run.status)) pollUntilDone(data.run.id);
-        }
+        // The store starts this run's own poll loop; other jobs keep theirs.
+        if (data?.run) setRun(data.run);
         return data?.run as EnhanceRunRow | undefined;
       } catch (e) {
         recordFailure(e);
@@ -350,7 +347,7 @@ export function useEnhanceVideo() {
         setIsStarting(false);
       }
     },
-    [pollUntilDone, clearFailure, recordFailure],
+    [setRun, clearFailure, recordFailure],
   );
 
   /**
@@ -358,52 +355,57 @@ export function useEnhanceVideo() {
    *
    * A run does not live in this tab: after a reload, a crash or a device
    * switch the server still has it, so the panel asks for the newest
-   * unfinished run of the signed-in user and keeps watching it. Nothing is
-   * started here — this only observes.
+   * unfinished runs of the signed-in user and keeps watching all of them.
+   * Nothing is started here — this only observes.
    */
   const resumeOpenRun = useCallback(async () => {
-    try {
-      const data = await callEngine({ action: 'open_run' });
-      const open = data?.run as EnhanceRunRow | undefined;
-      if (open && !TERMINAL.includes(open.status)) {
-        setRun(open);
-        pollUntilDone(open.id);
-        return open;
-      }
-    } catch {
-      // No session or a transient hiccup: the panel simply starts empty.
+    await hydrateEnhanceRuns(true);
+    const open = getEnhanceRuns().find((r) => isEnhanceLive(r.status));
+    if (open) {
+      setActiveRunId(open.id);
+      return open;
     }
     return undefined;
-  }, [pollUntilDone]);
+  }, []);
 
   /** Records a cancel wish. Money only moves when the provider confirms. */
   const cancelEnhance = useCallback(async (runId: string) => {
     try {
+      // Scoped to this one run: no other job is touched.
       await callEngine({ action: 'cancel', runId });
       const data = await callEngine({ action: 'status', runId });
-      if (data?.run) setRun(data.run);
+      if (data?.run) upsertEnhanceRun(data.run);
     } catch (e) {
       recordFailure(e);
     }
   }, [recordFailure]);
 
 
+  /** Clears only this panel's view — other jobs keep running and stay visible. */
   const reset = useCallback(() => {
-    stopPolling();
-    setRun(null);
+    const current = activeRunId;
+    if (current) {
+      const row = getEnhanceRuns().find((r) => r.id === current);
+      if (row && !isEnhanceLive(row.status)) dismissEnhanceRun(current);
+    }
+    setActiveRunId(null);
     setEstimate(null);
     setPlan(null);
     setSourceMeta(null);
     clearFailure();
-  }, [stopPolling, clearFailure]);
+  }, [activeRunId, clearFailure]);
 
   return {
     run,
+    /** All unfinished jobs of the user, newest first. */
+    runs,
     estimate,
     plan,
     sourceMeta,
     isStarting,
     isRunning: !!run && !TERMINAL.includes(run.status),
+    /** True while ANY job of this user is still working. */
+    isAnyRunning: runs.some((r) => isEnhanceLive(r.status)),
     error,
     errorCode,
     errorReason,

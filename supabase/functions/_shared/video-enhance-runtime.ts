@@ -289,3 +289,66 @@ export function reconcileCost(
     _block: drift.block,
   };
 }
+
+/**
+ * Concurrency of the HEAVY persistence transfers.
+ *
+ * One place, overridable per environment — never a number sprinkled through
+ * the functions. Extra runs are not rejected: they simply stay claimable and
+ * are picked up as soon as a slot frees.
+ */
+export const PERSIST_MAX_GLOBAL = 3;
+export const PERSIST_MAX_PER_USER = 1;
+
+export function persistLimits(
+  env: ((key: string) => string | undefined) | undefined =
+    (globalThis as any).Deno?.env?.get?.bind((globalThis as any).Deno.env),
+): { maxGlobal: number; maxPerUser: number } {
+  const read = (key: string, fallback: number) => {
+    const raw = env?.(key);
+    const parsed = raw ? Number(raw) : NaN;
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+  };
+  return {
+    maxGlobal: read('VIDEO_ENHANCE_PERSIST_MAX_GLOBAL', PERSIST_MAX_GLOBAL),
+    maxPerUser: read('VIDEO_ENHANCE_PERSIST_MAX_PER_USER', PERSIST_MAX_PER_USER),
+  };
+}
+
+/**
+ * Backoff of the SERVER-side provider poll (Topaz has no signed webhook).
+ * Dense while a job is young, calm afterwards — the browser is never the
+ * owner of completion detection.
+ */
+export function providerPollIntervalSeconds(ageSeconds: number): number {
+  if (ageSeconds < 120) return 15;
+  if (ageSeconds < 300) return 30;
+  return 60;
+}
+
+/**
+ * Fire-and-forget kick of the internal persistence worker.
+ *
+ * Never awaited for its work: the claim in the database decides who actually
+ * transfers, so a lost, duplicated or racing kick is harmless — the watchdog
+ * cron still covers a kick that never arrives.
+ */
+export async function triggerPersist(tag = '[video-enhance]'): Promise<void> {
+  const env = (globalThis as any).Deno?.env;
+  const url = env?.get('SUPABASE_URL');
+  const serviceKey = env?.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !serviceKey) return;
+  try {
+    await fetch(`${url}/functions/v1/video-enhance-persist`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: '{}',
+    });
+  } catch (error) {
+    console.warn(`${tag} persist trigger failed:`, error instanceof Error ? error.message : error);
+  }
+}

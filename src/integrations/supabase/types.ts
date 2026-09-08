@@ -18711,6 +18711,7 @@ export type Database = {
           net_revenue_eur: number | null
           next_late_check_at: string | null
           next_persist_at: string | null
+          next_provider_poll_at: string | null
           next_reconcile_at: string | null
           output_asset_id: string | null
           output_bitrate_kbps: number | null
@@ -18825,6 +18826,7 @@ export type Database = {
           net_revenue_eur?: number | null
           next_late_check_at?: string | null
           next_persist_at?: string | null
+          next_provider_poll_at?: string | null
           next_reconcile_at?: string | null
           output_asset_id?: string | null
           output_bitrate_kbps?: number | null
@@ -18939,6 +18941,7 @@ export type Database = {
           net_revenue_eur?: number | null
           next_late_check_at?: string | null
           next_persist_at?: string | null
+          next_provider_poll_at?: string | null
           next_reconcile_at?: string | null
           output_asset_id?: string | null
           output_bitrate_kbps?: number | null
@@ -21412,7 +21415,12 @@ export type Database = {
         }[]
       }
       video_enhance_claim_persist_run: {
-        Args: { p_lease_seconds?: number; p_worker: string }
+        Args: {
+          p_lease_seconds?: number
+          p_max_global?: number
+          p_max_per_user?: number
+          p_worker: string
+        }
         Returns: {
           actual_contribution_eur: number | null
           actual_height: number | null
@@ -21457,6 +21465,7 @@ export type Database = {
           net_revenue_eur: number | null
           next_late_check_at: string | null
           next_persist_at: string | null
+          next_provider_poll_at: string | null
           next_reconcile_at: string | null
           output_asset_id: string | null
           output_bitrate_kbps: number | null

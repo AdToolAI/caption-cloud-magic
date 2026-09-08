@@ -4,7 +4,6 @@ import {
   applyLateCostTrueUp,
   finalizeCancelConfirmed,
   finalizeFailure,
-  finalizeSuccess,
 } from "../_shared/video-enhance-finalize.ts";
 import {
   backoffMinutes,
@@ -12,8 +11,9 @@ import {
   manualReviewAfterMinutes,
   setStatus,
   STAGING_BUCKET,
+  triggerPersist,
 } from "../_shared/video-enhance-runtime.ts";
-import { MAX_PERSIST_ATTEMPTS } from "../_shared/video-enhance-transfer.ts";
+import { runPersistCycle } from "../_shared/video-enhance-persist-cycle.ts";
 import { decideCycle, isInternalCaller } from "../_shared/video-enhance-reconcile-guard.ts";
 import { classifyProviderFailure } from "../_shared/video-enhance-provider-errors.ts";
 
@@ -52,14 +52,6 @@ const corsHeaders = {
 
 const TAG = "[video-enhance-reconcile]";
 const BATCH_SIZE = 25;
-
-/**
- * Error codes that describe the provider FILE itself, not our infrastructure.
- * Re-fetching the same file can never change them, so they are terminal after
- * one confirming re-measure (`OUTPUT_VERDICT_CONFIRM_ATTEMPTS`).
- */
-const DETERMINISTIC_OUTPUT_FAILURES = new Set(["OUTPUT_MISMATCH", "OUTPUT_INVALID"]);
-const OUTPUT_VERDICT_CONFIRM_ATTEMPTS = 2;
 
 /**
  * One provider read for the whole engine — shared with the customer's status
@@ -128,48 +120,17 @@ serve(async (req) => {
       return json({ error: "no provider API key configured" }, 500);
     }
 
-    // ---- persistence phase: at most ONE heavy transfer per invocation -------
-    // The claim is a single atomic statement (state + due time + free lease in
-    // one UPDATE ... RETURNING), so two concurrent cycles can never pick the
-    // same run and never fetch the same large file twice.
-    const worker = crypto.randomUUID();
-    const { data: claimedRows, error: claimError } = await admin.rpc(
-      "video_enhance_claim_persist_run",
-      { p_worker: worker, p_lease_seconds: 240 },
-    );
-    if (claimError) console.error(`${TAG} persist claim failed:`, claimError.message);
-    const claim = Array.isArray(claimedRows) ? claimedRows[0] : claimedRows;
-    if (claim) {
-      const persistAttempts = Number(claim.persist_attempts ?? 0);
-      // A verdict about the provider FILE is deterministic — re-fetching it can
-      // never change it. That is a provider failure (with release), not ours.
-      if (
-        DETERMINISTIC_OUTPUT_FAILURES.has(claim.error_code) &&
-        persistAttempts >= OUTPUT_VERDICT_CONFIRM_ATTEMPTS
-      ) {
-        const verdict = await finalizeFailure(
-          admin,
-          claim,
-          claim.error_code,
-          claim.error_message ?? "provider output does not match the order",
-          "persist",
-        );
-        return json({ ok: true, phase: "persist", result: verdict.status });
-      }
-      // Retries exhausted: visible for recovery, WITHOUT refunding — the
-      // provider file may still be there and is preserved on the row.
-      if (persistAttempts >= MAX_PERSIST_ATTEMPTS) {
-        await setStatus(admin, claim.id, "manual_review", {
-          failure_stage: "persist",
-          next_persist_at: null,
-          next_reconcile_at: null,
-          persist_lease_until: null,
-        });
-        return json({ ok: true, phase: "persist", result: "manual_review" });
-      }
-      const persisted = await finalizeSuccess(admin, claim, claim.provider_output_url);
-      return json({ ok: true, phase: "persist", result: persisted.status });
+    // ---- persistence phase: watchdog only ----------------------------------
+    // Normal runs no longer wait for this cron: the provider webhook and the
+    // server-side poller kick `video-enhance-persist` within seconds. This
+    // cycle exists for what can still slip through — a missed webhook, an
+    // expired lease, an interrupted transfer. It shares the exact same claim,
+    // so a race with those triggers still yields exactly one transfer.
+    const persist = await runPersistCycle(admin, { budgetMs: 60_000 });
+    if (persist.claimed > 0) {
+      return json({ ok: true, phase: "persist", ...persist });
     }
+
 
     const nowIso = new Date().toISOString();
     // Configurable, so a slow provider queue can be absorbed without a deploy.
@@ -246,6 +207,8 @@ serve(async (req) => {
             reconciliation_attempts: attempts,
             last_reconciled_at: nowIso,
           });
+          // Do not wait for the next cycle to store it.
+          await triggerPersist(TAG);
           summary.pending++;
         } else {
           await finalizeFailure(admin, run, "NO_OUTPUT", "provider returned no video");
