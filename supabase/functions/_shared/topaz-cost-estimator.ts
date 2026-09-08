@@ -148,6 +148,15 @@ export function topazUncertaintyBuffer(estimate: TopazCostEstimate, costEur: num
     : 0;
 }
 
+/** Relative drift that puts a run into review. */
+export const TOPAZ_DRIFT_PCT_THRESHOLD = 0.15;
+/**
+ * Absolute guard. Topaz bills whole credits, so a 2-credit job that lands on 3
+ * is a 50 % "drift" with no financial meaning. A run is only reviewed when the
+ * relative AND the absolute miss are material. The raw drift is still stored.
+ */
+export const TOPAZ_DRIFT_ABS_THRESHOLD = 2;
+
 /** Estimated vs. actually billed credits. */
 export function topazCreditDrift(estimatedCredits: number, actualCredits: number) {
   if (!Number.isFinite(actualCredits) || actualCredits <= 0) {
@@ -155,5 +164,10 @@ export function topazCreditDrift(estimatedCredits: number, actualCredits: number
   }
   if (estimatedCredits <= 0) return { driftPct: 1, flagged: true };
   const driftPct = (actualCredits - estimatedCredits) / estimatedCredits;
-  return { driftPct, flagged: Math.abs(driftPct) > 0.15 };
+  const absDelta = Math.abs(actualCredits - estimatedCredits);
+  return {
+    driftPct,
+    flagged:
+      Math.abs(driftPct) > TOPAZ_DRIFT_PCT_THRESHOLD && absDelta >= TOPAZ_DRIFT_ABS_THRESHOLD,
+  };
 }
