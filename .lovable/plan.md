@@ -1,63 +1,87 @@
-# Video Enhance — Orchestrierung: Ist-Zustand und Zielarchitektur
+# Video Enhance — Orchestrierung: sofortige Speicherung, mehrere Jobs, Job-Center
 
-Read-only-Review. Keine Änderungen vorgenommen.
+Umgebaut wird ausschließlich die **Auslösung** der Speicherung und die **Sichtbarkeit** laufender Jobs. Die bereits validierte Übertragung bleibt Zeile für Zeile bestehen.
 
-## Ist-Zustand (verifiziert im Code)
+## Bestätigung: was NICHT angefasst wird
 
-**Zustandsautomat** (`video_enhance_runs.status`, Autorität liegt vollständig im Backend):
-`credits_reserved → provider_submitting → provider_submitted → provider_processing → provider_output_ready → asset_staging → asset_persisting → completed`
-Nebenwege: `cancel_requested`, `local_poll_timeout`, `asset_persist_failed`, `provider_failed`, `output_lost`, `provider_cancelled_confirmed`, `manual_review`.
+`supabase/functions/_shared/video-enhance-transfer.ts` und der Transferteil von `video-enhance-finalize.ts` bleiben unverändert: fortsetzbarer Upload, 6-MB-Chunks, gespeicherter Byte-Offset, deterministischer Zielpfad `<user>/video-enhance/<run>.mp4`, 60-s-Zeitbudget, Retry `[0, 2, 5, 15, 30]` Minuten, `manual_review` ohne Erstattung. Kein Zurück zu `arrayBuffer`. Ebenso unverändert: Preise, Wallet, Erstattungsschlüssel, Provider-Routing, Lip-Sync, Director's Cut.
 
-**Provider-Pfade**
-- Replicate / ByteDance vCube: signierter Webhook (`video-enhance-webhook`, Callback-Token → genau ein Run, danach autoritatives Nachlesen beim Provider). Der Webhook setzt bei Erfolg `provider_output_ready` + `next_persist_at = now()` — er speichert die Datei aber nicht selbst.
-- Topaz: `video-enhance/index.ts:798` — kein signierter Webhook. Erfolg wird ausschließlich vom Reconciler entdeckt. Der Status-Poll des Browsers (`fastProviderVerdict`) wertet bewusst nur Ablehnungen aus.
+## Ist-Zustand (im Code verifiziert)
 
-**Wann die Speicherung beginnt.** Nie im Erkennungspfad. Der einzige Ausführer ist `video-enhance-reconcile`, per pg_cron alle 5 Minuten, und dort pro Aufruf **genau ein** `video_enhance_claim_persist_run` (atomarer `UPDATE ... FOR UPDATE SKIP LOCKED` mit Lease). Daraus folgt der gemessene Leerlauf: bis zu 5 Minuten Wartezeit plus Warteschlange, wenn parallel weitere 4K-Runs anstehen.
+- Zustände: `credits_reserved → provider_submitting → provider_submitted → provider_processing → provider_output_ready → asset_staging → asset_persisting → completed`, daneben `cancel_requested`, `local_poll_timeout`, `asset_persist_failed`, `provider_failed`, `output_lost`, `provider_cancelled_confirmed`, `manual_review`.
+- Replicate/vCube: signierter Webhook setzt `provider_output_ready` + `next_persist_at = now()`, speichert aber nicht.
+- Topaz: kein Webhook; Erfolg wird heute nur vom Reconciler erkannt. Der Browser-Poll wertet nur Ablehnungen aus.
+- Speicherung läuft ausschließlich in `video-enhance-reconcile`, alle 5 Minuten, **ein** `video_enhance_claim_persist_run` pro Aufruf → 5–10+ Minuten Wartezeit.
+- `open_run` liefert nur den neuesten offenen Run; `useEnhanceVideo` hält genau einen Run.
 
-**Transfer.** `video-enhance-transfer.ts`: 6-MB-Chunks, resumable Upload-URL + Offset in der DB, deterministischer Zielpfad `<user>/video-enhance/<run>.mp4`, Zeitbudget 60 s pro Aufruf, Lease 240 s, Retry-Plan `[0, 2, 5, 15, 30]` Minuten, danach `manual_review` **ohne** Refund. Diese Schicht ist gesund; der Engpass ist ausschließlich die Auslösung.
+## A. Sofortige Speicherung
 
-**UI.** `useEnhanceVideo.ts` hält genau einen Run, ein Poll-Intervall, ein `isRunning`. `open_run` liefert nur den neuesten nicht-terminalen Run. Der Anzeigezustand existiert nur, solange `EnhanceVideoPanel` gemountet ist — Backend läuft weiter, die Anzeige verschwindet.
+Neue interne Edge-Funktion **`video-enhance-persist`** (gleicher Guard wie der Reconciler, kein Nutzer-JWT, Body wird nie gelesen): claimt in einer Schleife bis zu ihrem Zeitbudget Runs über dieselbe Claim-RPC und ruft dieselbe `finalizeSuccess`-Logik. Kein zweiter Transferpfad.
 
-**Queue.** Es gibt generische Tabellen (`ai_jobs`, `auto_post_queue`), aber `video_enhance_runs` ist bereits eine vollwertige Job-Tabelle mit Lease-, Backoff- und Idempotenzfeldern. Eine zweite Queue wäre reiner Zusatzaufwand.
+Ausgelöst wird sie fire-and-forget direkt nach dem Setzen von `provider_output_ready` durch:
+- `video-enhance-webhook` (Replicate/ByteDance vCube — primärer Trigger),
+- `video-enhance-poll` (Topaz, siehe F),
+- `video-enhance-reconcile` (nur Wächter).
 
-## Zielarchitektur — Empfehlung zu den sechs Fragen
+Der Browser löst nichts aus und besitzt keinen Job. Fehler beim Trigger werden nur protokolliert — der Cron fängt sie auf.
 
-1. **Ja, sofort finalisieren.** Erkennung und Ausführung entkoppeln über einen internen Trigger-Aufruf: Webhook (Replicate) bzw. Status-Poll und Reconciler (Topaz) rufen nach dem Setzen von `provider_output_ready` `video-enhance-persist` per `fetch` mit Service-Role auf. Cron bleibt reiner Wächter.
-2. **Ja, DB-Claim-Worker beibehalten** — `video_enhance_claim_persist_run` bleibt der einzige Einstieg in schwere Arbeit; die neue Funktion ruft dieselbe Claim-RPC. Keine neue Queue-Tabelle.
-3. **Ja, Nebenläufigkeit begrenzen:** global 3 gleichzeitige Transfers, pro Nutzer 1. Umsetzung als Zählabfrage innerhalb der Claim-RPC (`persist_lease_until > now()`), nicht im Anwendungscode.
-4. **Ja, `open_runs`** (Plural) als neue Aktion, rückwärtskompatibel neben `open_run`; darauf ein app-weites Job-Center-Symbol.
-5. **Ja, Trennung beibehalten.** Provider-Arbeit, Persistenz, Geld und UI bleiben eigene Zustände — das ist heute schon richtig gelöst.
-6. **Idempotenz** ergibt sich aus: deterministischer Zielpfad, `completed`-Kurzschluss in `finalizeSuccess`, Lease + `SKIP LOCKED`, deterministische Refund-Schlüssel. Zusätzlich nötig: der neue Sofort-Trigger darf nur anstoßen, nie selbst schreiben, und muss bei belegtem Claim geräuschlos aufgeben.
+## B. Claim/Lease bleibt
 
-## Konkrete Änderungen (kleinstmöglich)
+`video_enhance_claim_persist_run` bleibt der einzige Eingang in schwere Arbeit: ein atomares `UPDATE ... FOR UPDATE SKIP LOCKED` mit Lease (240 s). Webhook, Poller und Cron dürfen rennen — genau einer bekommt den Run, die anderen bekommen `null` und beenden geräuschlos. Auslösen ist damit idempotent; `finalizeSuccess` schließt zusätzlich bei `completed` kurz.
 
-**Neu**
-- Edge-Funktion `video-enhance-persist`: nur intern aufrufbar (gleicher Guard wie der Reconciler), claimt bis zu N Runs in einer Schleife bis zum Zeitbudget, sonst identische Logik.
-- Spalte `persist_priority timestamptz` nicht nötig — `created_at` reicht als Reihenfolge.
-- Aktion `open_runs` in `video-enhance/index.ts` (alle nicht-terminalen Runs des Nutzers).
-- `src/hooks/useEnhanceVideo.ts`: Run-Map statt Einzel-Run, Polling je Run, abgeleitete Altfelder bleiben erhalten.
-- Globales Job-Center (kleine Leiste/Popover), gespeist aus `open_runs`.
+## C. Nebenläufigkeit
 
-**Geändert**
-- `video-enhance-webhook`, `video-enhance-reconcile`, `fastProviderVerdict`: nach `provider_output_ready` den Sofort-Trigger feuern (fire-and-forget, Fehler nur protokollieren).
-- `fastProviderVerdict`: auch Erfolg auswerten, damit Topaz nicht auf den 5-Minuten-Takt wartet.
-- `video_enhance_claim_persist_run`: Parameter `p_max_global` (3) und `p_max_per_user` (1).
+Die Claim-RPC bekommt zwei Parameter, ausgewertet gegen aktive Leases:
+- `p_max_global` (Standard 3),
+- `p_max_per_user` (Standard 1).
 
-**Unverändert**: Cron alle 5 Minuten (jetzt nur Wächter), Transfer-/Chunk-Logik, Preise, Wallet, Refund-Schlüssel, Lip-Sync, Director's Cut.
+Werte kommen aus einer einzigen Konstantenquelle (`_shared/video-enhance-runtime.ts`, per Function-Secret überschreibbar) — keine verstreuten Zahlen. Überzählige Runs bleiben einfach `provider_output_ready` und werden beim nächsten freien Platz geclaimt; nichts schlägt fehl.
 
-## Zeit- und Wiederholungspolitik
+## D. Mehrere Jobs im Frontend
 
-- Lease 240 s, Transferbudget 60 s pro Aufruf, Selbst-Weiterreichung solange Bytes fehlen.
-- Persistenz-Retry `[0, 2, 5, 15, 30]` Minuten, danach `manual_review` ohne Refund (unverändert).
-- Provider-Poll-Backoff unverändert; Horizont für `manual_review` unverändert.
+- Neue Aktion `open_runs` in `video-enhance/index.ts`: alle nicht-terminalen Runs des angemeldeten Nutzers. `open_run` bleibt unverändert erhalten.
+- `src/hooks/useEnhanceVideo.ts`: Map `runId → run` mit eigenem Poll je Run; `run`/`isRunning` bleiben als abgeleitete Felder für bestehende Aufrufer.
+- `EnhanceVideoPanel`: Start ist nie blockiert, Auswahl bleibt bedienbar, je Job eine eigene Fortschritts- und Abbruchkarte. Abbruch wirkt nur auf die übergebene `runId`.
+- Nach Neuladen/Navigation werden alle offenen Runs wiederhergestellt.
 
-## Rollout-Reihenfolge
+## E. Globales Job-Center
 
-1. Claim-RPC um Nebenläufigkeitsgrenzen erweitern (verhaltensneutral bei N=1).
-2. `video-enhance-persist` deployen, zunächst nur vom Reconciler aufgerufen.
-3. Sofort-Trigger im Webhook aktivieren, ByteDance-Lauf messen.
-4. Erfolgserkennung im Status-Poll für Topaz aktivieren.
-5. `open_runs` + Hook-Umbau + Job-Center.
-6. Tests: paralleler Start, unabhängiger Abbruch, Wiederherstellung nach Neuladen, Webhook+Poll+Cron-Rennen führt zu genau einem Transfer und genau einer Abrechnung.
+Kleiner App-weiter Indikator (Popover im Header, sichtbar sobald offene Runs existieren), gespeist aus `open_runs`: Titel/Vorschaubild sofern vorhanden, Anbieter/Modell, Zielauflösung + FPS, aktuelle Phase, Abbrechen für genau diesen Job. Zusätzlich zeigt die History (`VideoGenerationHistory` / `videoHistory/model.ts`) offene Runs als laufende Einträge — derselbe Eintrag wechselt beim Abschluss auf „Fertig", ohne zweite Zeile.
 
-**Erwartetes Ergebnis:** Speicherbeginn von bis zu 5 Minuten auf wenige Sekunden nach Provider-Ende, bis zu 3 parallele Speicherungen, laufende Jobs überall in der App sichtbar.
+## F. Topaz Backend-Poller
+
+Neue Edge-Funktion **`video-enhance-poll`** (intern, per pg_cron jede Minute): liest fällige Topaz-Runs über `next_reconcile_at` und die bestehende `readProviderPrediction`, setzt bei Erfolg `provider_output_ready` und stößt sofort `video-enhance-persist` an. Backoff: 15 s in den ersten 2 Minuten, dann 30 s bis 10 Minuten, danach 60 s, gedeckelt bei 5 Minuten — je Run in `next_reconcile_at` gespeichert, damit ein zusätzlicher Aufruf nie Provider-Verkehr erzeugt. Der bestehende 5-Minuten-Reconciler bleibt daneben als Wächter.
+
+## G. Sicherheit bleibt
+
+Siehe oben — Transfer, Retry, `manual_review`, Wallet und Erstattungen bleiben unverändert.
+
+## H. Tests
+
+Neu bzw. erweitert:
+- Provider-Abschluss → Speicherung startet in Sekunden (Trigger-Aufruf nachgewiesen, nicht Cron-abhängig).
+- Webhook + Poller + Cron gleichzeitig → genau ein Transfer (Claim gibt einmal einen Run zurück).
+- Zwei parallele Jobs eines Nutzers koexistieren; Grenzen 3 global / 1 pro Nutzer greifen.
+- Abbruch eines Jobs lässt andere unberührt.
+- Neuladen/Navigation stellt alle offenen Jobs wieder her.
+- Fortsetzung großer Dateien ab gespeichertem Offset; kein Vollpuffer im Speicher.
+- Keine doppelte Belastung/Erstattung.
+- Abgeschlossene Jobs erscheinen in History/Mediathek — derselbe Eintrag, kein Duplikat.
+
+## Manueller Abnahmetest
+
+Upscale starten → wegnavigieren → History zeigt den laufenden Job mit Backend-Status → Neuladen → weiterhin sichtbar und aktualisierend → Tab schließen, neu anmelden → Job wieder da → nach Abschluss wechselt derselbe Eintrag auf „Fertig", kein Duplikat.
+
+## Rollout
+
+1. Claim-RPC um `p_max_global`/`p_max_per_user` erweitern (bei 1/1 verhaltensneutral).
+2. `video-enhance-persist` deployen, zunächst nur vom Reconciler gerufen.
+3. Sofort-Trigger im Webhook aktivieren, vCube-Lauf messen.
+4. `video-enhance-poll` + Minuten-Cron für Topaz.
+5. `open_runs`, Hook-Umbau, Job-Center, History-Anzeige offener Runs.
+6. Tests, Typecheck, Build, danach manueller Abnahmetest.
+
+## Betroffene Dateien
+
+Neu: `supabase/functions/video-enhance-persist/index.ts`, `supabase/functions/video-enhance-poll/index.ts`, `src/components/jobs/EnhanceJobCenter.tsx`, Testdateien.
+Geändert: `supabase/functions/video-enhance/index.ts` (`open_runs`), `video-enhance-webhook/index.ts`, `video-enhance-reconcile/index.ts`, `_shared/video-enhance-runtime.ts` (Grenzwerte + Trigger-Helfer), Migration für die Claim-RPC, `src/hooks/useEnhanceVideo.ts`, `src/components/ai-video/EnhanceVideoPanel.tsx`, `src/lib/videoHistory/model.ts` + `VideoGenerationHistory.tsx`, Übersetzungen EN/DE/ES.
