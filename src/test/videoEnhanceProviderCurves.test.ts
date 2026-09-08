@@ -105,7 +105,7 @@ describe('Topaz model-aware cost estimator', () => {
   });
 
   it('charges Apollo clearly more than Chronos for the same job', () => {
-    const base = { durationSeconds: 15, creditFamily: 'proteus' as const, targetFps: 60, resolution: '4k' as const, interpolationApplies: true };
+    const base = { durationSeconds: 15, creditFamily: 'precision' as const, targetFps: 60, resolution: '4k' as const, interpolationApplies: true };
     const apollo = topazEstimatedCredits({ ...base, interpolationModel: 'apollo' });
     const chronos = topazEstimatedCredits({ ...base, interpolationModel: 'chronos' });
     expect(apollo.credits).toBeGreaterThan(chronos.credits * 1.4);
@@ -114,7 +114,7 @@ describe('Topaz model-aware cost estimator', () => {
   it('reproduces the billed 51-credit reference run within the drift threshold', () => {
     const estimate = topazEstimatedCredits({
       durationSeconds: 15.042,
-      creditFamily: 'proteus',
+      creditFamily: 'precision',
       targetFps: 60,
       resolution: '4k',
       interpolationModel: 'apollo',
@@ -126,7 +126,7 @@ describe('Topaz model-aware cost estimator', () => {
   it('bills no interpolation when the frame rate stays the same', () => {
     const e = topazEstimatedCredits({
       durationSeconds: 10,
-      creditFamily: 'proteus',
+      creditFamily: 'precision',
       targetFps: 30,
       resolution: '1080p',
       interpolationModel: 'apollo',
@@ -136,7 +136,7 @@ describe('Topaz model-aware cost estimator', () => {
     expect(e.credits).toBeLessThan(
       topazEstimatedCredits({
         durationSeconds: 10,
-        creditFamily: 'proteus',
+        creditFamily: 'precision',
         targetFps: 30,
         resolution: '1080p',
         interpolationModel: 'apollo',
@@ -148,7 +148,7 @@ describe('Topaz model-aware cost estimator', () => {
   it('adds a safety buffer only to uncertain, expensive chains', () => {
     const uncertain = topazEstimatedCredits({
       durationSeconds: 15,
-      creditFamily: 'proteus',
+      creditFamily: 'precision',
       targetFps: 60,
       resolution: '4k',
       interpolationModel: 'apollo',
@@ -158,7 +158,7 @@ describe('Topaz model-aware cost estimator', () => {
     expect(topazUncertaintyBuffer(uncertain, 0.5)).toBe(0);
     const certain = topazEstimatedCredits({
       durationSeconds: 15,
-      creditFamily: 'proteus',
+      creditFamily: 'precision',
       targetFps: 60,
       resolution: '4k',
       interpolationModel: 'chronos',
