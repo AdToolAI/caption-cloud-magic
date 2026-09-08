@@ -38,6 +38,12 @@ import {
   backoffMinutes,
   walletOperation,
 } from "../_shared/video-enhance-runtime.ts";
+import { finalizeFailure } from "../_shared/video-enhance-finalize.ts";
+import { readProviderPrediction } from "../_shared/video-enhance-provider-read.ts";
+import {
+  classifyProviderFailure,
+  PROVIDER_ACCOUNT_CREDITS,
+} from "../_shared/video-enhance-provider-errors.ts";
 
 /**
  * THE Video Enhance engine. Every surface (AI Video Studio, media library,
