@@ -92,6 +92,9 @@ export interface VideoCostConfig {
   outputSeconds: number;
   /** Measured source frame rate — decides whether interpolation is billed. */
   sourceFps?: number;
+  /** Measured source geometry — drives the Topaz upscale-factor dimension. */
+  sourceWidth?: number;
+  sourceHeight?: number;
   /** Topaz interpolation model id, when the frame rate changes. */
   interpolationModel?: string;
 }
@@ -252,6 +255,8 @@ export function videoProviderCostDetail(
           creditFamily: topazModelView(config.mode)?.creditFamily,
           interpolationModel: config.interpolationModel,
           interpolationApplies: topazInterpolationAppliesView(sourceFps, config.fps),
+          sourceWidth: config.sourceWidth,
+          sourceHeight: config.sourceHeight,
         });
         return { costUsd: card.unitUsd * estimate.credits, topaz: estimate };
       }
