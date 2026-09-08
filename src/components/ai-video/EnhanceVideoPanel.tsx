@@ -594,6 +594,16 @@ export function EnhanceVideoPanel({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">{tx('motionOnlyWhenFps', lang)}</p>
+                {TOPAZ_INTERPOLATION_VIEWS.find((m) => m.id === interpolationModel)?.premium && (
+                  <p className="text-xs text-amber-400">
+                    {{
+                      en: 'Premium motion model: costs clearly more than Chronos. The price shown already includes it.',
+                      de: 'Premium-Bewegungsmodell: deutlich teurer als Chronos. Der angezeigte Preis enthält das bereits.',
+                      es: 'Modelo de movimiento premium: claramente más caro que Chronos. El precio mostrado ya lo incluye.',
+                    }[lang]}
+                  </p>
+                )}
+
               </div>
             )}
 

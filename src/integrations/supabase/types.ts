@@ -18668,28 +18668,35 @@ export type Database = {
       }
       video_enhance_runs: {
         Row: {
+          account_discount_percent: number
           actual_contribution_eur: number | null
           actual_height: number | null
           actual_margin_pct: number | null
+          actual_provider_credits: number | null
           actual_units: number | null
           actual_width: number | null
           calibration_reason: string | null
           calibration_status: string
           callback_token: string
           cancel_requested_at: string | null
+          charged_price_eur: number | null
           contribution_eur: number | null
           cost_closed_at: string | null
           cost_closed_by: string | null
           cost_closure_reason: string | null
           cost_drift_ratio: number | null
+          cost_estimator_version: string | null
+          cost_uncertainty_buffer: number
           created_at: string
           credits_reserved: number
           currency: string
           delivery_strategy: string | null
           destination_object_path: string | null
+          effective_multiple_after_discount: number | null
           effective_multiplier: number | null
           error_code: string | null
           error_message: string | null
+          estimated_provider_credits: number | null
           estimated_units: number | null
           executing_topaz_model: string | null
           expected_content_length: number | null
@@ -18706,6 +18713,8 @@ export type Database = {
           margin_pct: number | null
           mode: string
           model_id: string
+          multiplier_band_max: number | null
+          multiplier_band_min: number | null
           multiplier_cap: number | null
           multiplier_used: number | null
           net_revenue_eur: number | null
@@ -18732,6 +18741,7 @@ export type Database = {
           pricing_gate_reason: string | null
           pricing_version: string
           processing_seconds: number | null
+          profitability_class: string | null
           projected_height: number | null
           projected_width: number | null
           projection_confidence: string | null
@@ -18742,6 +18752,8 @@ export type Database = {
           provider_cost_source: string
           provider_cost_usd_actual: number | null
           provider_cost_usd_estimated: number
+          provider_credit_drift_flagged: boolean
+          provider_credit_drift_pct: number | null
           provider_output_expires_at: string | null
           provider_output_url: string | null
           provider_prediction_id: string | null
@@ -18770,6 +18782,7 @@ export type Database = {
           status: string
           submit_lease_expires_at: string | null
           submit_lease_owner: string | null
+          subsidy_eur: number
           target_height: number | null
           target_width: number | null
           test_fail_persist_once: boolean
@@ -18783,28 +18796,35 @@ export type Database = {
           verified_effective_multiplier: number | null
         }
         Insert: {
+          account_discount_percent?: number
           actual_contribution_eur?: number | null
           actual_height?: number | null
           actual_margin_pct?: number | null
+          actual_provider_credits?: number | null
           actual_units?: number | null
           actual_width?: number | null
           calibration_reason?: string | null
           calibration_status?: string
           callback_token: string
           cancel_requested_at?: string | null
+          charged_price_eur?: number | null
           contribution_eur?: number | null
           cost_closed_at?: string | null
           cost_closed_by?: string | null
           cost_closure_reason?: string | null
           cost_drift_ratio?: number | null
+          cost_estimator_version?: string | null
+          cost_uncertainty_buffer?: number
           created_at?: string
           credits_reserved?: number
           currency?: string
           delivery_strategy?: string | null
           destination_object_path?: string | null
+          effective_multiple_after_discount?: number | null
           effective_multiplier?: number | null
           error_code?: string | null
           error_message?: string | null
+          estimated_provider_credits?: number | null
           estimated_units?: number | null
           executing_topaz_model?: string | null
           expected_content_length?: number | null
@@ -18821,6 +18841,8 @@ export type Database = {
           margin_pct?: number | null
           mode: string
           model_id: string
+          multiplier_band_max?: number | null
+          multiplier_band_min?: number | null
           multiplier_cap?: number | null
           multiplier_used?: number | null
           net_revenue_eur?: number | null
@@ -18847,6 +18869,7 @@ export type Database = {
           pricing_gate_reason?: string | null
           pricing_version: string
           processing_seconds?: number | null
+          profitability_class?: string | null
           projected_height?: number | null
           projected_width?: number | null
           projection_confidence?: string | null
@@ -18857,6 +18880,8 @@ export type Database = {
           provider_cost_source?: string
           provider_cost_usd_actual?: number | null
           provider_cost_usd_estimated: number
+          provider_credit_drift_flagged?: boolean
+          provider_credit_drift_pct?: number | null
           provider_output_expires_at?: string | null
           provider_output_url?: string | null
           provider_prediction_id?: string | null
@@ -18885,6 +18910,7 @@ export type Database = {
           status?: string
           submit_lease_expires_at?: string | null
           submit_lease_owner?: string | null
+          subsidy_eur?: number
           target_height?: number | null
           target_width?: number | null
           test_fail_persist_once?: boolean
@@ -18898,28 +18924,35 @@ export type Database = {
           verified_effective_multiplier?: number | null
         }
         Update: {
+          account_discount_percent?: number
           actual_contribution_eur?: number | null
           actual_height?: number | null
           actual_margin_pct?: number | null
+          actual_provider_credits?: number | null
           actual_units?: number | null
           actual_width?: number | null
           calibration_reason?: string | null
           calibration_status?: string
           callback_token?: string
           cancel_requested_at?: string | null
+          charged_price_eur?: number | null
           contribution_eur?: number | null
           cost_closed_at?: string | null
           cost_closed_by?: string | null
           cost_closure_reason?: string | null
           cost_drift_ratio?: number | null
+          cost_estimator_version?: string | null
+          cost_uncertainty_buffer?: number
           created_at?: string
           credits_reserved?: number
           currency?: string
           delivery_strategy?: string | null
           destination_object_path?: string | null
+          effective_multiple_after_discount?: number | null
           effective_multiplier?: number | null
           error_code?: string | null
           error_message?: string | null
+          estimated_provider_credits?: number | null
           estimated_units?: number | null
           executing_topaz_model?: string | null
           expected_content_length?: number | null
@@ -18936,6 +18969,8 @@ export type Database = {
           margin_pct?: number | null
           mode?: string
           model_id?: string
+          multiplier_band_max?: number | null
+          multiplier_band_min?: number | null
           multiplier_cap?: number | null
           multiplier_used?: number | null
           net_revenue_eur?: number | null
@@ -18962,6 +18997,7 @@ export type Database = {
           pricing_gate_reason?: string | null
           pricing_version?: string
           processing_seconds?: number | null
+          profitability_class?: string | null
           projected_height?: number | null
           projected_width?: number | null
           projection_confidence?: string | null
@@ -18972,6 +19008,8 @@ export type Database = {
           provider_cost_source?: string
           provider_cost_usd_actual?: number | null
           provider_cost_usd_estimated?: number
+          provider_credit_drift_flagged?: boolean
+          provider_credit_drift_pct?: number | null
           provider_output_expires_at?: string | null
           provider_output_url?: string | null
           provider_prediction_id?: string | null
@@ -19000,6 +19038,7 @@ export type Database = {
           status?: string
           submit_lease_expires_at?: string | null
           submit_lease_owner?: string | null
+          subsidy_eur?: number
           target_height?: number | null
           target_width?: number | null
           test_fail_persist_once?: boolean
@@ -21422,28 +21461,35 @@ export type Database = {
           p_worker: string
         }
         Returns: {
+          account_discount_percent: number
           actual_contribution_eur: number | null
           actual_height: number | null
           actual_margin_pct: number | null
+          actual_provider_credits: number | null
           actual_units: number | null
           actual_width: number | null
           calibration_reason: string | null
           calibration_status: string
           callback_token: string
           cancel_requested_at: string | null
+          charged_price_eur: number | null
           contribution_eur: number | null
           cost_closed_at: string | null
           cost_closed_by: string | null
           cost_closure_reason: string | null
           cost_drift_ratio: number | null
+          cost_estimator_version: string | null
+          cost_uncertainty_buffer: number
           created_at: string
           credits_reserved: number
           currency: string
           delivery_strategy: string | null
           destination_object_path: string | null
+          effective_multiple_after_discount: number | null
           effective_multiplier: number | null
           error_code: string | null
           error_message: string | null
+          estimated_provider_credits: number | null
           estimated_units: number | null
           executing_topaz_model: string | null
           expected_content_length: number | null
@@ -21460,6 +21506,8 @@ export type Database = {
           margin_pct: number | null
           mode: string
           model_id: string
+          multiplier_band_max: number | null
+          multiplier_band_min: number | null
           multiplier_cap: number | null
           multiplier_used: number | null
           net_revenue_eur: number | null
@@ -21486,6 +21534,7 @@ export type Database = {
           pricing_gate_reason: string | null
           pricing_version: string
           processing_seconds: number | null
+          profitability_class: string | null
           projected_height: number | null
           projected_width: number | null
           projection_confidence: string | null
@@ -21496,6 +21545,8 @@ export type Database = {
           provider_cost_source: string
           provider_cost_usd_actual: number | null
           provider_cost_usd_estimated: number
+          provider_credit_drift_flagged: boolean
+          provider_credit_drift_pct: number | null
           provider_output_expires_at: string | null
           provider_output_url: string | null
           provider_prediction_id: string | null
@@ -21524,6 +21575,7 @@ export type Database = {
           status: string
           submit_lease_expires_at: string | null
           submit_lease_owner: string | null
+          subsidy_eur: number
           target_height: number | null
           target_width: number | null
           test_fail_persist_once: boolean

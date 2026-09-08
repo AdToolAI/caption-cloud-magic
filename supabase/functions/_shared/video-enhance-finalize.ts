@@ -16,6 +16,7 @@ import { probeRemoteVideo } from './mp4-probe.ts';
 import { refreshProviderOutputUrl } from './video-enhance-provider-read.ts';
 import { frameMeetsTarget, resolveTargetFrame } from './video-enhance-frame.ts';
 import {
+  topazCreditDrift,
   VIDEO_PRICING_HARD_MULTIPLIER_CAP,
   verifiedPricing,
   type VideoResolution,
@@ -394,7 +395,23 @@ export async function finalizeSuccess(
   delete costPatch._block;
 
   // Calibration telemetry — observation only, never a gate.
-  if (providerCost.units !== undefined) costPatch.actual_units = providerCost.units;
+  if (providerCost.units !== undefined) {
+    costPatch.actual_units = providerCost.units;
+    // Topaz bills in credits: compare them with what the calibrated estimator
+    // predicted so a mis-calibrated chain becomes visible instead of silent.
+    if (run.estimated_provider_credits !== null && run.estimated_provider_credits !== undefined) {
+      const drift = topazCreditDrift(
+        Number(run.estimated_provider_credits),
+        Number(providerCost.units),
+      );
+      costPatch.actual_provider_credits = providerCost.units;
+      costPatch.provider_credit_drift_pct =
+        drift.driftPct === null ? null : Math.round(drift.driftPct * 10000) / 100;
+      costPatch.provider_credit_drift_flagged = drift.flagged;
+
+    }
+  }
+
   const processingSeconds = providerCost.processingSeconds ??
     (run.provider_submitted_at
       ? (Date.now() - new Date(run.provider_submitted_at).getTime()) / 1000

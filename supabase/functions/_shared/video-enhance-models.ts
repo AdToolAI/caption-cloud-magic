@@ -11,17 +11,29 @@
 
 import {
   bufferedProviderCostEur,
-  evaluatePricing,
   evaluateTrueUp,
   FX_RATE_USD_EUR,
   FX_SAFETY_BUFFER,
   marginMetrics,
-  multiplierForCost,
   PRICING_VERSION,
   type TrueUpEvaluation,
 } from './picture-pricing.ts';
 import { resolveTargetFrame } from './video-enhance-frame.ts';
 import { topazContainer, TOPAZ_CREDIT_USD_DEFAULT } from './topaz-client.ts';
+import {
+  curveBand,
+  curveFor,
+  evaluateCurvePricing,
+  evaluatePostDiscount,
+  type PostDiscountPricing,
+} from './video-enhance-curves.ts';
+
+import {
+  TOPAZ_COST_ESTIMATOR_VERSION,
+  topazEstimatedCredits,
+  topazUncertaintyBuffer,
+  type TopazCostEstimate,
+} from './topaz-cost-estimator.ts';
 import {
   TOPAZ_CREDITS_PER_SECOND as TOPAZ_FAMILY_CREDITS,
   TOPAZ_DEFAULT_MODEL_ID,
@@ -30,6 +42,7 @@ import {
   TOPAZ_VIDEO_MODELS,
   isTopazInterpolationId,
   isTopazOutputQuality,
+  topazCreditFamilyForMode,
   topazInterpolationApplies,
   topazInterpolationModel,
   topazManualFilterParams,
@@ -40,6 +53,9 @@ import {
 
 
 export * from './topaz-video-catalog.ts';
+export * from './video-enhance-curves.ts';
+export * from './topaz-cost-estimator.ts';
+
 
 
 export type VideoResolution = '720p' | '1080p' | '2k' | '4k';
@@ -385,6 +401,8 @@ interface RateCardMeta {
   costUnverified?: boolean;
   /** true while the units/seconds estimator is not calibrated from real runs. */
   estimatorCalibrating?: boolean;
+  /** Version of a calibrated estimator, frozen into every price snapshot. */
+  estimatorVersion?: string;
 }
 
 export type VideoRateCard = RateCardMeta &
@@ -398,8 +416,11 @@ export type VideoRateCard = RateCardMeta &
         /** Per-mode override; a mode missing here falls back to the table above. */
         unitsPerOutputSecondByMode?: Record<string, Partial<Record<VideoResolution, number>>>;
         fpsFactor?: Record<number, number>;
+        /** Model-aware estimator that replaces the flat units x fps factor. */
+        estimator?: 'topaz_credits';
         entries?: MatrixEntry[];
       }
+
     | { type: 'tiered'; tiers: { maxOutputSeconds: number; usd: number }[] }
   );
 
@@ -506,13 +527,18 @@ export const VIDEO_RATE_CARDS: Record<string, VideoRateCard> = {
     unitsPerOutputSecond: TOPAZ_CREDITS_PER_SECOND,
     unitsPerOutputSecondByMode: TOPAZ_CREDITS_BY_MODE,
     fpsFactor: TOPAZ_FPS_FACTOR,
+    // Model-aware, per-output-frame estimator: the interpolation model (Apollo
+    // vs Chronos) drives the credits, not a blanket fps factor.
+    estimator: 'topaz_credits',
     source:
-      'Topaz direct API credit pricing (published Proteus + Nyx/Themis credit tables); credit USD value from TOPAZ_CREDIT_USD',
-    checkedAt: '2026-09-07',
+      'Topaz direct API credits, model-aware per-frame estimator calibrated on billed AdTool runs',
+    checkedAt: '2026-09-08',
     costUnverified: true,
     estimatorCalibrating: true,
+    estimatorVersion: TOPAZ_COST_ESTIMATOR_VERSION,
     entries: TOPAZ_ENTRIES,
   },
+
 };
 
 
@@ -529,9 +555,22 @@ export interface VideoCostConfig {
   fps: number;
   tier: QualityTier;
   outputSeconds: number;
+  /** Measured source frame rate — decides whether interpolation is billed. */
+  sourceFps?: number;
+  /** Topaz interpolation model id, when the frame rate changes. */
+  interpolationModel?: string;
 }
 
-export function videoProviderCostUsd(card: VideoRateCard, config: VideoCostConfig): number {
+export interface VideoCostDetail {
+  costUsd: number;
+  /** Present for the model-aware Topaz estimator. */
+  topaz?: TopazCostEstimate;
+}
+
+export function videoProviderCostDetail(
+  card: VideoRateCard,
+  config: VideoCostConfig,
+): VideoCostDetail {
   const seconds = Math.max(0, config.outputSeconds);
   switch (card.type) {
     case 'per_second_matrix': {
@@ -547,26 +586,43 @@ export function videoProviderCostUsd(card: VideoRateCard, config: VideoCostConfi
           `no rate for ${config.mode}/${config.resolution}/${config.fps}fps/${config.tier}`,
         );
       }
-      return entry.usdPerSecond * seconds;
+      return { costUsd: entry.usdPerSecond * seconds };
     }
     case 'per_output_second':
-      return card.usdPerSecond * seconds;
+      return { costUsd: card.usdPerSecond * seconds };
     case 'per_unit': {
+      if (card.estimator === 'topaz_credits') {
+        const sourceFps = Math.round(config.sourceFps ?? config.fps) || 30;
+        const estimate = topazEstimatedCredits({
+          durationSeconds: seconds,
+          targetFps: config.fps,
+          resolution: config.resolution,
+          creditFamily: topazCreditFamilyForMode(config.mode),
+          interpolationModel: config.interpolationModel,
+          interpolationApplies: topazInterpolationApplies(sourceFps, config.fps),
+        });
+        return { costUsd: card.unitUsd * estimate.credits, topaz: estimate };
+      }
       const table = card.unitsPerOutputSecondByMode?.[config.mode] ?? card.unitsPerOutputSecond;
       const perSecond = table[config.resolution];
       if (perSecond === undefined) throw new UnpriceableRunError(`no unit rate for ${config.resolution}`);
       const fpsFactor = card.fpsFactor?.[config.fps] ?? 1;
       const units = Math.ceil(perSecond * fpsFactor * seconds);
-      return card.unitUsd * Math.max(1, units);
+      return { costUsd: card.unitUsd * Math.max(1, units) };
     }
     case 'tiered': {
       const tier =
         card.tiers.find((t) => seconds <= t.maxOutputSeconds) ?? card.tiers[card.tiers.length - 1];
       if (!tier) throw new UnpriceableRunError('empty tier table');
-      return tier.usd;
+      return { costUsd: tier.usd };
     }
   }
 }
+
+export function videoProviderCostUsd(card: VideoRateCard, config: VideoCostConfig): number {
+  return videoProviderCostDetail(card, config).costUsd;
+}
+
 
 export function costDrift(predictedUsd: number, actualUsd: number) {
   if (predictedUsd <= 0) {
@@ -602,8 +658,19 @@ export interface VideoPriceSnapshot {
   costUnverified: boolean;
   /** true while the estimator is not calibrated from real billed runs. */
   estimatorCalibrating: boolean;
+  /** Version of the calibrated provider-cost estimator, when one was used. */
+  costEstimatorVersion: string | null;
+  /** Topaz: credits the estimator expects for this exact chain. */
+  estimatedProviderCredits: number | null;
+  /** Interpolation model the price was calculated for ('none' when unchanged fps). */
+  interpolationModel: string | null;
+  /** Uncertainty buffer added to the estimated provider cost (0 = none). */
+  costUncertaintyBuffer: number;
   /** price / buffered estimated provider cost. */
   effectiveMultiplier: number | null;
+  /** The provider's own degressive band this price must sit in. */
+  multiplierBandMin: number;
+  multiplierBandMax: number;
   multiplierCap: number;
   /** 'review_required' means the config may not be priced as-is. */
   pricingGate: 'ok' | 'review_required';
@@ -622,24 +689,30 @@ export function priceVideoEnhanceRun(
   if (!spec) throw new UnpriceableRunError(`unknown model ${config.modelId}`);
   const card = VIDEO_RATE_CARDS[config.modelId];
   if (!card) throw new UnpriceableRunError(`no rate card for ${config.modelId}`);
+  const curve = curveFor(config.modelId);
+  if (!curve) throw new UnpriceableRunError(`no pricing curve for ${config.modelId}`);
 
   const fps = effectiveFps(config, source);
   const outputSeconds = source.durationSeconds;
-  const costUsd = videoProviderCostUsd(card, {
+  const detail = videoProviderCostDetail(card, {
     mode: config.mode,
     resolution: config.resolution,
     fps,
     tier: config.tier,
     outputSeconds,
+    sourceFps: source.fps,
+    interpolationModel: config.interpolationModel,
   });
-  const costEur = bufferedProviderCostEur(costUsd);
-  const evaluation = evaluatePricing(costEur, {
-    hardMultiplierCap: VIDEO_PRICING_HARD_MULTIPLIER_CAP,
-    // A price floor may never silently lift a run above the cap.
-    allowFloorAboveCap: false,
-  });
-  const price = evaluation.priceEur;
+  const baseCostEur = bufferedProviderCostEur(detail.costUsd);
+  // An uncertain, expensive Topaz chain gets a safety buffer on the ASSUMED
+  // cost — never on the multiple.
+  const uncertainty = detail.topaz ? topazUncertaintyBuffer(detail.topaz, baseCostEur) : 0;
+  const costEur = Math.round(baseCostEur * (1 + uncertainty) * 1e6) / 1e6;
+
+  const evaluation = evaluateCurvePricing(costEur, curve);
+  const price = evaluation.listPriceEur;
   const metrics = marginMetrics(price, costEur);
+  const band = curveBand(curve);
 
   return {
     modelId: config.modelId,
@@ -651,24 +724,49 @@ export function priceVideoEnhanceRun(
     pricingVersion: PRICING_VERSION,
     providerPricingVersion: VIDEO_PROVIDER_PRICING_VERSION,
     rateCardVersion: `${card.source} @ ${card.checkedAt}`,
-    providerCostUsdEstimated: costUsd,
+    providerCostUsdEstimated: detail.costUsd,
     providerCostEurBuffered: costEur,
     fxRateUsed: FX_RATE_USD_EUR,
     fxSafetyBufferUsed: FX_SAFETY_BUFFER,
-    multiplierUsed: multiplierForCost(costEur),
+    multiplierUsed: evaluation.multiplier,
     userPriceEur: price,
     netRevenueEur: metrics.netRevenueEUR,
     contributionEur: metrics.contributionEUR,
     marginPct: metrics.marginPct,
     costUnverified: card.costUnverified === true,
     estimatorCalibrating: card.estimatorCalibrating === true,
+    costEstimatorVersion: card.estimatorVersion ?? null,
+    estimatedProviderCredits: detail.topaz?.credits ?? null,
+    interpolationModel: detail.topaz?.interpolationModel ?? null,
+    costUncertaintyBuffer: uncertainty,
     effectiveMultiplier: evaluation.effectiveMultiplier,
+    multiplierBandMin: band.min,
+    multiplierBandMax: band.max,
     multiplierCap: VIDEO_PRICING_HARD_MULTIPLIER_CAP,
     pricingGate: evaluation.gate,
     pricingGateReason:
       evaluation.gateReason ?? (card.estimatorCalibrating === true ? 'estimator_calibrating' : null),
   };
 }
+
+/**
+ * Post-discount profitability of a priced run.
+ *
+ * The discount itself is applied once, by `deduct_ai_video_credits`. This only
+ * classifies the resulting charge so a subsidised run is observable — it never
+ * changes the price.
+ */
+export function classifyRunProfitability(
+  snapshot: VideoPriceSnapshot,
+  discountPercent: unknown,
+): PostDiscountPricing {
+  return evaluatePostDiscount(
+    snapshot.userPriceEur,
+    discountPercent,
+    snapshot.providerCostEurBuffered,
+  );
+}
+
 
 export function actualMargin(userPriceEur: number, providerCostUsdActual: number) {
   const costEur = bufferedProviderCostEur(providerCostUsdActual);

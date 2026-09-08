@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { probeRemoteVideo } from "../_shared/mp4-probe.ts";
 import {
   adaptConfigToSpec,
+  classifyRunProfitability,
   isModelUnlocked,
   isTestAllowlisted,
   priceVideoEnhanceRun,
@@ -20,6 +21,8 @@ import {
   type SourceMetadata,
   type VideoResolution,
 } from "../_shared/video-enhance-models.ts";
+import { resolveAccountDiscountFactor } from "../_shared/accountVideoPricing.ts";
+
 
 import { evaluateUpscale, planDelivery } from "../_shared/video-enhance-frame.ts";
 import { toClientPricing, toClientRun } from "../_shared/video-enhance-client-view.ts";
@@ -575,6 +578,16 @@ serve(async (req) => {
       throw error;
     }
 
+    // Post-discount observability: the discount itself is applied once by the
+    // wallet RPC — this only classifies the resulting charge so a subsidised
+    // configuration is visible instead of silently loss-making.
+    const discountFactor = await resolveAccountDiscountFactor(admin, user.id);
+    const postDiscount = classifyRunProfitability(
+      pricing,
+      Math.round((1 - discountFactor) * 10000) / 100,
+    );
+
+
     // No truthful route to the promised frame: reject instead of quietly
     // delivering a smaller video. This applies to the price preview too.
     if (delivery.strategy === "unreachable") {
@@ -675,13 +688,24 @@ serve(async (req) => {
       rate_card_version: pricing.rateCardVersion,
       provider_cost_usd_estimated: pricing.providerCostUsdEstimated,
       provider_cost_eur_buffered: pricing.providerCostEurBuffered,
+      cost_estimator_version: pricing.costEstimatorVersion,
+      estimated_provider_credits: pricing.estimatedProviderCredits,
+      cost_uncertainty_buffer: pricing.costUncertaintyBuffer,
       fx_rate_used: pricing.fxRateUsed,
       fx_safety_buffer_used: pricing.fxSafetyBufferUsed,
       multiplier_used: pricing.multiplierUsed,
       effective_multiplier: pricing.effectiveMultiplier,
+      multiplier_band_min: pricing.multiplierBandMin,
+      multiplier_band_max: pricing.multiplierBandMax,
       multiplier_cap: pricing.multiplierCap,
+      account_discount_percent: postDiscount.discountPercent,
+      charged_price_eur: postDiscount.chargedPriceEur,
+      effective_multiple_after_discount: postDiscount.effectiveMultipleAfterDiscount,
+      profitability_class: postDiscount.profitability,
+      subsidy_eur: postDiscount.subsidyEur,
       pricing_gate: pricing.pricingGate,
       pricing_gate_reason: pricing.pricingGateReason,
+
       user_price_eur: pricing.userPriceEur,
       net_revenue_eur: pricing.netRevenueEur,
       contribution_eur: pricing.contributionEur,
