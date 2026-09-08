@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { capabilityGate } from "../_shared/videoCapabilityGate.ts";
+
+/** Canonical model this route animates with (registry id, not a raw slug). */
+const HAILUO_MODEL_ID = 'hailuo-standard';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -92,6 +96,9 @@ serve(async (req) => {
     const input: Record<string, unknown> = {
       image: imageUrl,
       prompt: motionDescription,
+      // Duration was validated by the gate and is now actually submitted —
+      // it used to be logged and then dropped.
+      duration: Number(duration),
     };
 
     // If audio is provided, enable lip-sync
@@ -104,7 +111,7 @@ serve(async (req) => {
 
     // Run the model
     const output = await replicate.run(
-      "minimax/hailuo-2.3",
+      providerSlug as `${string}/${string}`,
       { input }
     );
 
