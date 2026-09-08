@@ -16,6 +16,8 @@ import { useUserRoles } from '@/hooks/useUserRoles';
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
 import { EnhanceRunProgress } from '@/components/ai-video/EnhanceRunProgress';
+import { runPhaseLabel } from '@/lib/videoEnhance/runPresentation';
+import { isEnhanceLive } from '@/lib/videoEnhance/runStore';
 import type { CanonicalVideoAsset } from '@/lib/videoEnhance/canonicalVideoAsset';
 import { isAiGeneratedSource } from '@/lib/videoEnhance/recommend';
 import { engineErrorText } from '@/lib/videoEnhance/engineErrors';
@@ -121,6 +123,7 @@ const COPY = {
   price: { en: 'Price', de: 'Preis', es: 'Precio' },
   calculating: { en: 'Calculating…', de: 'Wird berechnet …', es: 'Calculando…' },
   start: { en: 'Enhance video', de: 'Video verbessern', es: 'Mejorar vídeo' },
+  otherJobs: { en: 'Your other enhancements', de: 'Deine weiteren Verbesserungen', es: 'Tus otras mejoras' },
   running: { en: 'Enhancing…', de: 'Wird verbessert …', es: 'Mejorando…' },
   cancel: { en: 'Cancel', de: 'Abbrechen', es: 'Cancelar' },
   done: { en: 'Your enhanced video is ready.', de: 'Dein verbessertes Video ist fertig.', es: 'Tu vídeo mejorado está listo.' },
@@ -743,7 +746,7 @@ export function EnhanceVideoPanel({
                 {other.model_id} · {other.resolution} · {other.fps} fps
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-xs">{enhancePhaseLabel(other.status, lang)}</span>
+                <span className="text-xs">{runPhaseLabel(other.status, lang)}</span>
                 <Button
                   size="sm"
                   variant="ghost"
