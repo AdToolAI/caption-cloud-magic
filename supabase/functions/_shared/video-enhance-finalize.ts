@@ -55,6 +55,22 @@ export interface FinalizeResult {
 const TAG = '[video-enhance]';
 
 /**
+ * One re-request of the provider download link, and only one: the fresh URL is
+ * returned exclusively when it actually differs from the expired one, so a
+ * provider that keeps handing back the same dead link can never loop here.
+ */
+async function freshProviderUrl(run: Run, expiredUrl: string): Promise<string | null> {
+  const env = (globalThis as any).Deno?.env;
+  const fresh = await refreshProviderOutputUrl(run.provider_prediction_id, {
+    topaz: env?.get('TOPAZ_API_KEY'),
+    replicate: env?.get('REPLICATE_API_KEY'),
+  });
+  if (!fresh || fresh === expiredUrl) return null;
+  console.log(`${TAG} refreshed expired provider link for run ${run.id}`);
+  return fresh;
+}
+
+/**
  * Our storage failed, the provider did NOT. The provider reference is kept so
  * the next cycle (or an admin) can still recover the finished video; money is
  * never released here.
