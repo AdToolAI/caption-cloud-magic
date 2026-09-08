@@ -101,7 +101,7 @@ describe('post-discount loss policy', () => {
 
 describe('Topaz model-aware cost estimator', () => {
   it('is explicitly versioned', () => {
-    expect(TOPAZ_COST_ESTIMATOR_VERSION).toBe('2026-09-08-calibrated-v1');
+    expect(TOPAZ_COST_ESTIMATOR_VERSION).toBe('2026-09-08-calibrated-v2');
   });
 
   it('charges Apollo clearly more than Chronos for the same job', () => {
@@ -146,12 +146,13 @@ describe('Topaz model-aware cost estimator', () => {
   });
 
   it('adds a safety buffer only to uncertain, expensive chains', () => {
+    // Apollo is calibrated against billed runs at 2K and 4K; Aion never was.
     const uncertain = topazEstimatedCredits({
       durationSeconds: 15,
       creditFamily: 'precision',
       targetFps: 60,
       resolution: '4k',
-      interpolationModel: 'apollo',
+      interpolationModel: 'aion',
       interpolationApplies: true,
     });
     expect(topazUncertaintyBuffer(uncertain, 4)).toBe(0.15);
@@ -161,7 +162,7 @@ describe('Topaz model-aware cost estimator', () => {
       creditFamily: 'precision',
       targetFps: 60,
       resolution: '4k',
-      interpolationModel: 'chronos',
+      interpolationModel: 'apollo',
       interpolationApplies: true,
     });
     expect(topazUncertaintyBuffer(certain, 4)).toBe(0);
@@ -208,4 +209,42 @@ describe('priced runs', () => {
     expect(p.effectiveMultiplier!).toBeLessThanOrEqual(2.5 + 0.05);
     expect(p.effectiveMultiplier!).toBeGreaterThanOrEqual(1.6 - 0.05);
   });
+});
+
+describe('Topaz estimator v2 — measured billing regression', () => {
+  // Every case below is a real billed Topaz run. Estimate must stay within the
+  // 15 percent drift threshold of what the provider actually charged.
+  const cases: Array<{
+    name: string;
+    duration: number;
+    fps: number;
+    resolution: '720p' | '1080p' | '2k' | '4k';
+    interpolationModel?: string;
+    interpolationApplies: boolean;
+    billed: number;
+  }> = [
+    { name: '2K/24 no interpolation (calibration run 1)', duration: 9.917, fps: 24, resolution: '2k', interpolationApplies: false, billed: 4 },
+    { name: '2K/60 Chronos (calibration run 2)', duration: 9.917, fps: 60, resolution: '2k', interpolationModel: 'chronos', interpolationApplies: true, billed: 10 },
+    { name: '2K/60 Apollo (calibration run 3)', duration: 9.917, fps: 60, resolution: '2k', interpolationModel: 'apollo', interpolationApplies: true, billed: 19 },
+    { name: '4K/60 Apollo (historical 51-credit run)', duration: 15.042, fps: 60, resolution: '4k', interpolationModel: 'apollo', interpolationApplies: true, billed: 51 },
+    { name: '4K/60 Chronos (historical)', duration: 9.917, fps: 60, resolution: '4k', interpolationModel: 'chronos', interpolationApplies: true, billed: 10 },
+    { name: '4K/30 Chronos (historical)', duration: 14.708, fps: 30, resolution: '4k', interpolationModel: 'chronos', interpolationApplies: true, billed: 8 },
+    { name: '4K/24 no interpolation (historical)', duration: 17.083, fps: 24, resolution: '4k', interpolationApplies: false, billed: 7 },
+  ];
+
+  for (const c of cases) {
+    it(`stays within drift for ${c.name}`, () => {
+      const estimate = topazEstimatedCredits({
+        durationSeconds: c.duration,
+        targetFps: c.fps,
+        resolution: c.resolution,
+        creditFamily: 'precision',
+        interpolationModel: c.interpolationModel,
+        interpolationApplies: c.interpolationApplies,
+      });
+      const drift = topazCreditDrift(estimate.credits, c.billed);
+      expect(drift.flagged).toBe(false);
+      expect(Math.abs(drift.driftPct!)).toBeLessThanOrEqual(0.15);
+    });
+  }
 });
