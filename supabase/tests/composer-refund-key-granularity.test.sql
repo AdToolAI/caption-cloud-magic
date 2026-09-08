@@ -13,7 +13,6 @@
 -- Run inside a transaction and ROLLBACK — it touches no real data.
 
 BEGIN;
-SET LOCAL ROLE service_role;
 
 DO $$
 DECLARE
