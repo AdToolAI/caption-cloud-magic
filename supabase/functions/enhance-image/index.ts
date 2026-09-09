@@ -10,6 +10,12 @@ import {
   type EnhanceRunInput,
 } from "../_shared/picture-enhance-models.ts";
 import { getWorkflowTypeForEnhanceModel, persistStudioImage } from "../_shared/studio-image-persist.ts";
+import {
+  PICTURE_ENHANCE_PREMIUM_REQUIRED,
+  PICTURE_FALLBACK_ENHANCE_MODEL,
+  isPictureStudioPremiumEntitled,
+  isPremiumEnhanceModel,
+} from "../_shared/picture-studio-premium.ts";
 import { awaitTopazImage, submitTopazImage } from "../_shared/topaz-client.ts";
 
 const corsHeaders = {

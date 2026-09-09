@@ -8,6 +8,12 @@ import {
   resolveSize,
 } from "../_shared/pictureModelCapabilities.ts";
 import { readImageDimensions } from "../_shared/imageDimensions.ts";
+import {
+  PICTURE_FALLBACK_TIER,
+  PICTURE_SPECIALIST_PREMIUM_REQUIRED,
+  isPictureStudioPremiumEntitled,
+  isSpecialistTier,
+} from "../_shared/picture-studio-premium.ts";
 import { SOURCE_FORMAT } from "../_shared/pictureFormatResolution.ts";
 import { persistStudioImage } from "../_shared/studio-image-persist.ts";
 import {
