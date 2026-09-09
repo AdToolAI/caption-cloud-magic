@@ -48,6 +48,10 @@ import {
   type SourceDimensions,
 } from "@/config/pictureFormatResolution";
 import { detectTransparencyWish, detectEditIntent } from "@/config/pictureIntentHints";
+import { usePicturePremium } from "@/hooks/usePicturePremium";
+import { PicturePremiumDialog } from "./PicturePremiumDialog";
+import { isSpecialistTier, PICTURE_FALLBACK_TIER } from "@/lib/pictureStudio/premium";
+import { Lock } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Eye, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -87,8 +91,10 @@ const TIER_META: Record<QualityTier, { label: string; model: string; icon: any; 
   qwen: { label: 'Qwen', model: 'Qwen Image', icon: ImageIcon, gradient: 'from-cyan-500/20 to-sky-500/20' },
 };
 
-const MAIN_TIERS: QualityTier[] = ['standard', 'fast', 'pro', 'ultra'];
-const SPECIALIST_TIERS: QualityTier[] = ['gptimage', 'flux', 'ideogram', 'recraft', 'qwen'];
+/** Core models — usable by everyone (still billed with AI credits). */
+const MAIN_TIERS: QualityTier[] = ['standard', 'gptimage', 'ideogram', 'recraft', 'qwen'];
+/** Specialist models — subscription required (see picture-studio-premium.ts). */
+const SPECIALIST_TIERS: QualityTier[] = ['fast', 'pro', 'ultra', 'flux'];
 
 
 export function ImageGenerator() {
