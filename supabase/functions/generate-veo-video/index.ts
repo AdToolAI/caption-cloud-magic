@@ -12,7 +12,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Pricing in EUR/USD per second — normalized 14.07.2026 to 3.00× Replicate cost margin
+// Customer pricing comes exclusively from the canonical catalog (_shared/videoPricingCatalog.ts).
 /** Provider-side capacity errors (Google Veo "code: 8" / RESOURCE_EXHAUSTED,
  *  Replicate 503 / "high load"). Transient and unrelated to our own load. */
 function isProviderOverload(err: any): boolean {

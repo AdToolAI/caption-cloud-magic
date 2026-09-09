@@ -224,7 +224,7 @@ serve(async (req) => {
       );
     }
 
-    // Margin policy: exactly 3.00× cost (normalized 14.07.2026). Runway Gen-4 Aleph V2V ~$0.08/s → user €0.24/s.
+    // Canonical catalog price only — no local margin table (policy: net margin floor, see videoPricingCatalog.ts).
     const costPerSecond = await resolveAccountCostPerSecond(
       supabaseAdmin, user.id, 'runway-gen4-aleph', (wallet.currency === 'USD' ? 'USD' : 'EUR'),
     );

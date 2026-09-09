@@ -6,7 +6,7 @@
  * (`compose-video-clips`), the refund path (`compose-clip-webhook`) and the
  * recovery job can never drift from the price the user was quoted.
  *
- * Margin policy: sell = exactly 3.00× provider cost.
+ * Margin policy: canonical catalog (net revenue >= 1.75x provider cost).
  * Mirrored client-side in `src/types/video-composer.ts` (CLIP_SOURCE_COSTS),
  * guarded by `src/lib/cost/__tests__/pricingCatalogParity.test.ts`.
  */
