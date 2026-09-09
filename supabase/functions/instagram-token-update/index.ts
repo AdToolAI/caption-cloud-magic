@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { isSocialPremiumEntitled, socialPremiumDeniedResponse } from '../_shared/social-premium.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,6 +31,12 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       throw new Error('Unauthorized');
+    }
+
+    // Subscription gate: storing a new social token requires an active
+    // subscription or a Creator account. Existing connections stay untouched.
+    if (!(await isSocialPremiumEntitled(supabase, user.id, (k) => Deno.env.get(k)))) {
+      return socialPremiumDeniedResponse(corsHeaders);
     }
 
     const { newToken, action } = await req.json();
