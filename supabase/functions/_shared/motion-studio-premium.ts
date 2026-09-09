@@ -90,3 +90,20 @@ export async function motionStudioGate(
   );
   return entitled ? null : motionStudioPremiumDeniedResponse(corsHeaders);
 }
+
+/**
+ * Self-contained gate: builds its own service-role client, so a call site only
+ * needs the user id. Returns a ready 403 Response, or `null` when allowed.
+ */
+export async function motionStudioGateForUser(
+  userId: string | null | undefined,
+  corsHeaders: Record<string, string>,
+): Promise<Response | null> {
+  if (!userId) return null;
+  const { createClient } = await import("npm:@supabase/supabase-js@2.75.0");
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  );
+  return await motionStudioGate(admin as any, userId, corsHeaders);
+}
