@@ -6,7 +6,12 @@
  * and can safely race each other.
  */
 
-import { actualMargin, costDrift, VIDEO_RATE_CARDS } from './video-enhance-models.ts';
+import {
+  actualMargin,
+  costDrift,
+  videoProviderCostDetail,
+  VIDEO_RATE_CARDS,
+} from './video-enhance-models.ts';
 import { topazCreditDrift } from './topaz-cost-estimator.ts';
 
 // deno-lint-ignore no-explicit-any
@@ -142,7 +147,8 @@ export function extractProviderCost(
     if (card && card.type === 'per_unit') {
       return { usd: units * card.unitUsd, source: 'provider_usage', units, processingSeconds };
     }
-    return { usd: undefined, source: 'provider_usage', units, processingSeconds };
+    const matrixUsd = matrixUsageUsd(card, run, units);
+    return { usd: matrixUsd, source: 'provider_usage', units, processingSeconds };
   }
   return { source: 'unavailable', processingSeconds };
 }
