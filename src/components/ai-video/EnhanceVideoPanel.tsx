@@ -555,8 +555,17 @@ export function EnhanceVideoPanel({
                 <SelectContent>
                   {models.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.name} — {m.positioning[lang]}
+                      <span className="flex items-center gap-2">
+                        <span>{m.name} — {m.positioning[lang]}</span>
+                        {m.id === 'topaz-video-upscale' && !topazEntitled && (
+                          <Badge variant="outline" className="gap-1 text-[10px]">
+                            <Lock className="w-3 h-3" aria-hidden="true" />
+                            {tx('premiumBadge', lang)}
+                          </Badge>
+                        )}
+                      </span>
                     </SelectItem>
+
                   ))}
                 </SelectContent>
               </Select>
