@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { tl, withLang } from "../_shared/i18n.ts";
+import { isSocialPremiumEntitled, socialPremiumDeniedResponse } from '../_shared/social-premium.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -55,6 +56,12 @@ Deno.serve((req: Request) => withLang(req, () => (async (req) => {
         JSON.stringify({ error: 'Nicht authentifiziert - Bitte neu anmelden' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
+    }
+
+    // Subscription gate: creating a NEW social connection requires an active
+    // subscription or a Creator account. Existing connections stay untouched.
+    if (!(await isSocialPremiumEntitled(supabase, user.id, (k) => Deno.env.get(k)))) {
+      return socialPremiumDeniedResponse(corsHeaders);
     }
 
     let safeReturnTo: string | null = null;

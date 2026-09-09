@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { isSocialPremiumEntitled, socialPremiumDeniedResponse } from '../_shared/social-premium.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,6 +34,12 @@ Deno.serve(async (req) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       throw new Error('Unauthorized');
+    }
+
+    // Subscription gate: creating a NEW social connection requires an active
+    // subscription or a Creator account. Existing connections stay untouched.
+    if (!(await isSocialPremiumEntitled(createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''), user.id, (k) => Deno.env.get(k)))) {
+      return socialPremiumDeniedResponse(corsHeaders);
     }
 
     // Get LinkedIn OAuth credentials

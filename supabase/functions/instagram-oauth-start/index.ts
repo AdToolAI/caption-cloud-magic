@@ -2,6 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { decryptToken } from '../_shared/crypto.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { recordOAuthStart } from '../_shared/meta-oauth-diagnostics.ts';
+import { isSocialPremiumEntitled, socialPremiumDeniedResponse } from '../_shared/social-premium.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -64,6 +65,12 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Not authenticated' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Subscription gate: creating a NEW social connection requires an active
+    // subscription or a Creator account. Existing connections stay untouched.
+    if (!(await isSocialPremiumEntitled(supabase, user.id, (k) => Deno.env.get(k)))) {
+      return socialPremiumDeniedResponse(corsHeaders);
     }
 
     const clientId = Deno.env.get('META_APP_ID');
