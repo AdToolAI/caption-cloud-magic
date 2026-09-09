@@ -24,6 +24,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useUserRoles } from '@/hooks/useUserRoles';
 import { useAuth } from '@/hooks/useAuth';
 import { useTrialAccess } from '@/hooks/useTrialAccess';
+import { useAccountType } from '@/hooks/useAccountType';
 
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
