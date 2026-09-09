@@ -194,7 +194,8 @@ describe('provider entitlement', () => {
     const hi60 = priceServer({ ...base, fps: 60, tier: 'standard' }, source);
     const hi120 = priceServer({ ...base, fps: 120, tier: 'standard' }, source);
     expect(hi120.providerCostUsdEstimated).toBeCloseTo(hi60.providerCostUsdEstimated, 9);
-    expect(hi120.providerCostUsdEstimated).toBeCloseTo(std.providerCostUsdEstimated * 2, 6);
+    // published high band ($0.006887/s) is the rounded double of the low band
+    expect(hi120.providerCostUsdEstimated).toBeCloseTo(std.providerCostUsdEstimated * 2, 4);
   });
 
   it('prices every vCube scene identically — the provider does not bill by scene', () => {
