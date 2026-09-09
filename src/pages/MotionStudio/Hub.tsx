@@ -35,7 +35,7 @@ import { MotionStudioUpgradeDialog } from '@/components/access/MotionStudioGate'
 import { Lock } from 'lucide-react';
 
 /** Routes that require an active subscription or a Creator account. */
-const GATED_HREFS = ['/motion-studio/studio', '/video-composer', '/motion-studio/library'];
+const GATED_HREFS = ['/motion-studio/studio', '/video-composer'];
 
 interface RecentProject {
   id: string;
