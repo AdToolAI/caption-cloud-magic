@@ -17,6 +17,9 @@ import { Sparkles, Wand2, Loader2, Film, Clock, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
+import { Switch } from '@/components/ui/switch';
+import { useActiveBrandKit } from '@/hooks/useActiveBrandKit';
+import { buildMotionStudioBrandContext } from '@/lib/brandContext';
 
 export interface DirectorScene {
   shot: string;
@@ -52,9 +55,11 @@ export default function AIDirectorBriefDialog({
   onApply,
 }: Props) {
   const { language } = useTranslation();
+  const { data: activeKit } = useActiveBrandKit();
   const [brief, setBrief] = useState('');
   const [duration, setDuration] = useState<number>(30);
   const [loading, setLoading] = useState(false);
+  const [useBrand, setUseBrand] = useState(true);
   const [plan, setPlan] = useState<DirectorPlan | null>(null);
 
   const reset = () => {
@@ -149,6 +154,26 @@ export default function AIDirectorBriefDialog({
                 step={5}
               />
             </div>
+
+            {activeKit && (
+              <div className="flex items-start justify-between gap-3 rounded-lg border border-border/40 bg-muted/30 p-3">
+                <div className="space-y-0.5">
+                  <Label htmlFor="use-brand" className="text-sm">
+                    {tx({ de: 'Marken-Set verwenden', en: 'Use brand kit', es: 'Usar kit de marca' })}
+                    {activeKit.brand_name ? ` — ${activeKit.brand_name}` : ''}
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    {tx({
+                      de: 'Stil, Ton, Stimmung, Zielgruppe, Keywords, Werte und Farben fließen in die Szenen ein. Logo, Schriften und Overlays bleiben unverändert.',
+                      en: 'Style, tone, mood, audience, keywords, values and colors guide the scenes. Logo, fonts and overlays stay unchanged.',
+                      es: 'Estilo, tono, ambiente, público, palabras clave, valores y colores guían las escenas. Logo, fuentes y superposiciones no cambian.',
+                    })}
+                  </p>
+                </div>
+                <Switch id="use-brand" checked={useBrand} onCheckedChange={setUseBrand} />
+              </div>
+            )}
+
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="rounded-lg border border-border/40 bg-muted/30 p-3">
