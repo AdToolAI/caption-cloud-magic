@@ -378,9 +378,9 @@ const Pricing = () => {
                         es: "10 vídeos Fast AI / mes · 5 s · 720p",
                       }),
                       tx({
-                        de: "KI-Musik inklusive · bis zu 50 Songs / Monat",
-                        en: "AI Music included · up to 50 songs / month",
-                        es: "Música con IA incluida · hasta 50 canciones / mes",
+                        de: "KI-Musik mit MiniMax Music 1.5 — vollständige Songs mit Gesang, bis zu 50 / Monat",
+                        en: "AI Music with MiniMax Music 1.5 — full-length songs with vocals, up to 50 / month",
+                        es: "Música con IA con MiniMax Music 1.5: canciones completas con voces, hasta 50 / mes",
                       }),
                       tx({
                         de: "Text Studio mit Top-Modellen (u. a. ChatGPT Astra, Claude 4.1 Opus, Gemini)",
@@ -403,9 +403,9 @@ const Pricing = () => {
                         es: "Motion Studio, cola de renderizado, Content Command Center y conexiones sociales",
                       }),
                       tx({
-                        de: "Vergünstigte KI-Credits für alles darüber hinaus",
-                        en: "Discounted AI credits for everything beyond that",
-                        es: "Créditos de IA con descuento para todo lo demás",
+                        de: "Founders: 10 % auf bezahlte KI-Nutzung — 24 Monate",
+                        en: "Founders: 10% off all paid AI model usage — 24 months",
+                        es: "Founders: 10 % en todo el uso de IA de pago: 24 meses",
                       }),
                     ].map((item) => (
                       <li key={item} className="flex items-start gap-3">
