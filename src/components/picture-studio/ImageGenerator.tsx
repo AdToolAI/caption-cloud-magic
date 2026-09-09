@@ -921,7 +921,7 @@ export function ImageGenerator() {
               <summary className="cursor-pointer select-none px-3 py-2 text-xs text-muted-foreground">
                 {tx({ de: 'Spezialmodelle', en: 'Specialist models', es: 'Modelos especializados' })}
               </summary>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 p-2 pt-0">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-2 pt-0">
                 {SPECIALIST_TIERS.map((t) => {
                   const meta = TIER_META[t];
                   const Icon = meta.icon;
@@ -941,11 +941,17 @@ export function ImageGenerator() {
                       <div className="flex items-center gap-2 mb-1">
                         <Icon className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
                         <span className="font-semibold text-xs">{meta.label}</span>
+                        {!isEntitled && <Lock className="h-3 w-3 text-primary ml-auto" />}
                       </div>
                       <p className="text-[10px] text-muted-foreground mb-1">{PICTURE_MODELS[t].bestFor[0]}</p>
-                      <Badge variant="outline" className="text-[10px] h-5">
-                        {currencySymbol}{tierCost.toFixed(2)}
-                      </Badge>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <Badge variant="outline" className="text-[10px] h-5">
+                          {currencySymbol}{tierCost.toFixed(2)}
+                        </Badge>
+                        {!isEntitled && (
+                          <Badge variant="secondary" className="text-[10px] h-5">PRO</Badge>
+                        )}
+                      </div>
                     </button>
                   );
                 })}
