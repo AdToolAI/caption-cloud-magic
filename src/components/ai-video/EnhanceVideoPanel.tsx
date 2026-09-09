@@ -396,10 +396,27 @@ export function EnhanceVideoPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source, modelId, mode, modeTouched, resolution, fps, outputQuality, interpolationModel, hasSource]);
 
+  // Display-only premium gate. The server decides authoritatively; this only
+  // spares non-entitled customers a request that would be refused anyway and
+  // keeps their video + settings while they upgrade.
+  const topazEntitled = subscribed === true || isPaid === true || isEnhanceTestUser;
+  const topazLocked = modelId === 'topaz-video-upscale' && !topazEntitled;
+
   const onStart = useCallback(() => {
     if (!config || !hasSource) return;
+    if (topazLocked) {
+      setPremiumOpen(true);
+      return;
+    }
     void startEnhance(source, config);
-  }, [config, hasSource, source, startEnhance]);
+  }, [config, hasSource, source, startEnhance, topazLocked]);
+
+  // A direct API refusal (e.g. subscription expired in another tab) surfaces
+  // the same modal instead of a raw error code.
+  useEffect(() => {
+    if (errorCode === 'TOPAZ_PREMIUM_REQUIRED') setPremiumOpen(true);
+  }, [errorCode]);
+
 
   const otherRuns = runs.filter((r) => r.id !== run?.id && isEnhanceLive(r.status));
 
