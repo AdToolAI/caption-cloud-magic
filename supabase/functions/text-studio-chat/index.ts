@@ -3,6 +3,11 @@
 // Streams OpenAI-compatible SSE deltas to the client (uniform parser on frontend).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import {
+  TEXT_STUDIO_PREMIUM_MESSAGE,
+  TEXT_STUDIO_PREMIUM_REQUIRED,
+  isTextStudioEntitled,
+} from "../_shared/text-studio-premium.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
@@ -18,8 +23,9 @@ const PRICING: Record<string, { input: number; output: number }> = {
   "openai-gpt-5-6-luna": { input: 0.0004, output: 0.0026 },
   "openai-gpt-5-6-terra": { input: 0.0021, output: 0.0169 },
   "openai-gpt-5-6-sol": { input: 0.0195, output: 0.0975 },
+  "openai-gpt-6-astra": { input: 0.0195, output: 0.0975 },
   "google-gemini-3-1-flash-lite": { input: 0.00013, output: 0.0005 },
-  "google-gemini-3-6-flash": { input: 0.0005, output: 0.0033 },
+  "google-gemini-3-8-flash": { input: 0.0005, output: 0.0033 },
   "google-gemini-3-1-pro": { input: 0.0016, output: 0.013 },
   "anthropic-claude-4-1-opus": { input: 0.0195, output: 0.0975 },
 };
@@ -28,8 +34,9 @@ const PROVIDER_MAP: Record<string, { provider: "gateway" | "anthropic"; apiModel
   "openai-gpt-5-6-luna": { provider: "gateway", apiModel: "openai/gpt-5.6-luna" },
   "openai-gpt-5-6-terra": { provider: "gateway", apiModel: "openai/gpt-5.6-terra" },
   "openai-gpt-5-6-sol": { provider: "gateway", apiModel: "openai/gpt-5.6-sol" },
+  "openai-gpt-6-astra": { provider: "gateway", apiModel: "openai/gpt-6-astra" },
   "google-gemini-3-1-flash-lite": { provider: "gateway", apiModel: "google/gemini-3.1-flash-lite" },
-  "google-gemini-3-6-flash": { provider: "gateway", apiModel: "google/gemini-3.6-flash" },
+  "google-gemini-3-8-flash": { provider: "gateway", apiModel: "google/gemini-3.8-flash" },
   "google-gemini-3-1-pro": { provider: "gateway", apiModel: "google/gemini-3.1-pro-preview" },
   "anthropic-claude-4-1-opus": { provider: "anthropic", apiModel: "claude-opus-4-1" },
 };
@@ -37,7 +44,11 @@ const PROVIDER_MAP: Record<string, { provider: "gateway" | "anthropic"; apiModel
 // Legacy IDs from the previous registry
 const LEGACY_ALIASES: Record<string, string> = {
   "openai-gpt-5-5-pro": "openai-gpt-5-6-sol",
+  "google-gemini-3-6-flash": "google-gemini-3-8-flash",
 };
+
+/** Models that reject reasoning_effort "none" and must always reason. */
+const ALWAYS_REASONING_MODELS = new Set(["openai/gpt-6-astra"]);
 
 function estimateTokens(text: string): number {
   return Math.max(1, Math.ceil((text || "").length / 4));
@@ -72,6 +83,16 @@ Deno.serve(async (req) => {
     const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
     if (userErr || !userData?.user) return jsonResponse({ error: "Unauthorized" }, 401);
     const userId = userData.user.id;
+
+    // --- Premium gate: Text Studio is included in paid plans only. ---
+    // Checked before the conversation is created and before any provider
+    // request, so a direct API call cannot bypass the UI gate.
+    if (!(await isTextStudioEntitled(supabaseAdmin, userId, (k) => Deno.env.get(k)))) {
+      return jsonResponse(
+        { error: TEXT_STUDIO_PREMIUM_MESSAGE, code: TEXT_STUDIO_PREMIUM_REQUIRED },
+        403,
+      );
+    }
 
     const body = await req.json().catch(() => null);
     if (!body) return jsonResponse({ error: "Invalid body" }, 400);
@@ -196,7 +217,11 @@ Deno.serve(async (req) => {
       };
       if (isOpenAI) {
         // GPT-5.6 models require an explicit reasoning_effort; "none" disables thinking.
-        reqBody.reasoning_effort = reasoningEffort && reasoningEffort !== "none" ? reasoningEffort : "none";
+        // GPT-6 Astra always reasons and rejects "none"/"minimal" -> floor at "low".
+        const requested = reasoningEffort && reasoningEffort !== "none" ? reasoningEffort : "none";
+        reqBody.reasoning_effort = ALWAYS_REASONING_MODELS.has(route.apiModel)
+          ? (requested === "none" ? "low" : requested)
+          : requested;
         reqBody.max_completion_tokens = outputTokenCap;
       } else {
         reqBody.max_tokens = outputTokenCap;
@@ -250,7 +275,11 @@ Deno.serve(async (req) => {
     // --- Stream + capture full assistant text for DB write after end ---
     let fullAssistant = "";
     let outputTokens = 0;
-    let inputTokens = estInputTokens;
+    // Telemetry estimate from what we actually send; real provider usage
+    // overwrites it below when the stream reports it.
+    let inputTokens = estimateTokens(
+      [...sysMsg, ...cleanMessages].map((m) => m.content).join("\n"),
+    );
 
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
