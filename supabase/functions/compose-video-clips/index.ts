@@ -319,7 +319,10 @@ serve(async (req) => {
     if (!user) throw new Error("Unauthorized");
     // Motion Studio premium gate — subscription or Creator account required
     // before any generation, render or edit. Existing work stays untouched.
-    {
+    // Internal service-role chain resumes (v426) are exempt: their user-facing
+    // entry point was already gated when the chain was started.
+    const isInternalChainResume = !!serviceRoleKey && token === serviceRoleKey;
+    if (!isInternalChainResume) {
       const denied = await motionStudioGateForUser(user.id, corsHeaders);
       if (denied) return denied;
     }
