@@ -160,7 +160,7 @@ serve(async (req) => {
         });
         if (late.ok) {
           const latePrediction = await late.json();
-          const lateCost = extractProviderCost(latePrediction, run.model_id);
+          const lateCost = extractProviderCost(latePrediction, run.model_id, run);
           const applied = await applyLateCostTrueUp(admin, run, lateCost);
           return json({ ok: true, deduplicated: true, status: run.status, lateTrueUp: applied });
         }
@@ -189,7 +189,7 @@ serve(async (req) => {
     const providerStatus: string = prediction.status;
     // The provider does not guarantee a cost field; record what is there and
     // where it came from, and finalise either way.
-    const providerCost = extractProviderCost(prediction, run.model_id);
+    const providerCost = extractProviderCost(prediction, run.model_id, run);
 
     if (providerStatus === "succeeded") {
       const output = prediction.output;

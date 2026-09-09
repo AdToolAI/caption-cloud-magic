@@ -120,7 +120,7 @@ async function pollDueRuns(
       // fact and hand it to the persistence worker straight away.
       // Billed provider units are only readable HERE (the persistence worker
       // never re-reads the provider), so calibration telemetry is captured now.
-      const creditPatch = providerCreditPatch(run, extractProviderCost(prediction, run.model_id));
+      const creditPatch = providerCreditPatch(run, extractProviderCost(prediction, run.model_id, run));
       await admin
         .from("video_enhance_runs")
         .update({
@@ -154,7 +154,7 @@ async function pollDueRuns(
       await finalizeCancelConfirmed(
         admin,
         run,
-        extractProviderCost(prediction, run.model_id),
+        extractProviderCost(prediction, run.model_id, run),
       );
       summary.cancelled++;
     } else {
