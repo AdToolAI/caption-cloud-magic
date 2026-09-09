@@ -15,6 +15,13 @@
 - Seit dem 8.9. gab es 8 solcher Ablehnungen, die letzte am 9.9. um 02:19 Uhr. Das Geld wurde jedes Mal korrekt zurückgebucht.
 - Der Nutzer hat es als "echte Person" verstanden, weil im Bildbereich ein Hinweistext zu Fotos echter Personen steht — die eigentliche Ablehnung wird ihm nur als "Edge Function returned a non-2xx status code" angezeigt (siehe Screenshot 1).
 
+**3. Welcher Anbieter — und welche sind toleranter**
+
+- Er hat fast alles mit Seedance 2.5 erzeugt (12 Aufträge, davon 5 abgelehnt) plus einen mit Seedance Standard.
+- Über alle Konten der letzten zwei Wochen: Seedance 2.5 hatte 25 Urheberrechts-Ablehnungen bei 109 Aufträgen, Seedance Pro 1 von 21. Kling 3, Kling Omni, Kling 2.6, Wan 2.6 Pro, LTX und Grok Imagine hatten **null** solcher Ablehnungen.
+- Seedance (ByteDance) filtert also deutlich strenger als die Kling- und Wan-Modelle. Für Inhalte mit bekannten Figuren sind Kling oder Wan die bessere Wahl.
+
+
 ## Vorschlag
 
 Nur an der Verständlichkeit arbeiten, nichts an Abrechnung oder Erstattung anfassen:
