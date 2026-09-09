@@ -473,7 +473,7 @@ export function EnhanceVideoPanel({
   // Display-only premium gate. The server decides authoritatively with the same
   // rules; this only spares non-entitled customers a request that would be
   // refused anyway and keeps their video + settings while they upgrade.
-  const premiumEntitled = subscribed === true || isPaid === true || isEnhanceTestUser;
+  const premiumEntitled = subscribed === true || isPaid === true || isCreator === true || isEnhanceTestUser;
   const premiumBlock = premiumEntitled
     ? null
     : premiumCapabilityRequired({ provider: model?.provider ?? '', tier, fps });
