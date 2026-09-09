@@ -116,7 +116,7 @@ const VCUBE_PRO_FACTOR = 10;
 
 const VCUBE_MODES = ['aigc', 'short_series', 'ugc', 'old_film', 'common'];
 const VCUBE_RESOLUTIONS: VideoResolution[] = ['720p', '1080p', '2k', '4k'];
-const VCUBE_FPS = [24, 30, 60];
+const VCUBE_FPS = [24, 30, 60, 120];
 
 const VCUBE_ENTRIES: MatrixEntry[] = VCUBE_MODES.flatMap((mode) =>
   VCUBE_RESOLUTIONS.flatMap((resolution) =>

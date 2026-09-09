@@ -160,10 +160,12 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
     providerSchemaRef: 'replicate/bytedance-video-upscaler@2026-09-05',
     modes: [...VCUBE_SCENES],
     outputs: [
-      { resolution: '720p', fps: [24, 30, 60] },
-      { resolution: '1080p', fps: [24, 30, 60] },
-      { resolution: '2k', fps: [24, 30, 60] },
-      { resolution: '4k', fps: [24, 30, 60] },
+      // 120 fps VERIFIED 2026-09-09 (prediction hfysnz10mxrmr0d0geyaha22h8):
+      // real 120/1 fps output, billed in the provider's >30 fps band.
+      { resolution: '720p', fps: [24, 30, 60, 120] },
+      { resolution: '1080p', fps: [24, 30, 60, 120] },
+      { resolution: '2k', fps: [24, 30, 60, 120] },
+      { resolution: '4k', fps: [24, 30, 60, 120] },
     ],
     tiers: ['standard', 'pro'],
     entitlementTiers: ['pro'],
@@ -448,7 +450,7 @@ const VCUBE_PRO_FACTOR = 10;
 
 const VCUBE_MODES: string[] = [...VCUBE_SCENES];
 const VCUBE_RESOLUTIONS: VideoResolution[] = ['720p', '1080p', '2k', '4k'];
-const VCUBE_FPS = [24, 30, 60];
+const VCUBE_FPS = [24, 30, 60, 120];
 
 const VCUBE_ENTRIES: MatrixEntry[] = VCUBE_MODES.flatMap((mode) =>
   VCUBE_RESOLUTIONS.flatMap((resolution) =>
