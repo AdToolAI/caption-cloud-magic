@@ -166,9 +166,9 @@ const Legal = () => {
                   <ul className="list-disc list-inside space-y-2 text-muted-foreground">
                     <li>
                       {tx({
-                        de: 'Die ersten 1.000 Abonnenten („Founders") erhalten für 24 Monate ab Reservierung des Founders-Platzes 20 % Rabatt auf jeden Kauf von KI-Credits (Video, Bild, Audio). Der Rabatt wird beim Checkout automatisch angewendet.',
-                        en: 'The first 1,000 subscribers ("Founders") receive a 20% discount on every purchase of AI credits (video, image, audio) for 24 months from the reservation of their Founders slot. The discount is applied automatically at checkout.',
-                        es: 'Los primeros 1.000 suscriptores («Founders») reciben un 20 % de descuento en cada compra de créditos de IA (vídeo, imagen, audio) durante 24 meses desde la reserva de su plaza Founders. El descuento se aplica automáticamente en el pago.',
+                        de: 'Die ersten 1.000 Abonnenten („Founders") erhalten für 24 Monate ab Reservierung des Founders-Platzes 10 % Rabatt auf jeden Kauf von KI-Credits (Video, Bild, Audio). Der Rabatt wird beim Checkout automatisch angewendet.',
+                        en: 'The first 1,000 subscribers ("Founders") receive a 10% discount on every purchase of AI credits (video, image, audio) for 24 months from the reservation of their Founders slot. The discount is applied automatically at checkout.',
+                        es: 'Los primeros 1.000 suscriptores («Founders») reciben un 10 % de descuento en cada compra de créditos de IA (vídeo, imagen, audio) durante 24 meses desde la reserva de su plaza Founders. El descuento se aplica automáticamente en el pago.',
                       })}
                     </li>
                     <li>

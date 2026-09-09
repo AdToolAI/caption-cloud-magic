@@ -130,7 +130,7 @@ const DeleteAccount = () => {
                 <Crown className="h-5 w-5 text-primary mt-0.5 shrink-0" />
                 <div className="text-sm text-muted-foreground">
                   <p className="font-medium text-primary mb-1">{tx({ de: "Sie verlieren Ihren Gründer-Status", en: "You lose your founder status", es: "Pierdes tu estatus de fundador" })}</p>
-                  <p>{tx({ de: "Mit der Löschung endet Ihr 24-Monats-Founders-Vorteil (20 % Rabatt auf alle KI-Credits). Ihr Slot wird für einen neuen Nutzer freigegeben und kann nicht wiederhergestellt werden.", en: "Deleting your account ends your 24-month founders benefit (20% off all AI credits). Your slot is released to a new user and cannot be restored.", es: "Al eliminar la cuenta finaliza tu ventaja de fundador de 24 meses (20 % de descuento en todos los créditos de IA). Tu plaza se libera para otro usuario y no se puede recuperar." })}</p>
+                  <p>{tx({ de: "Mit der Löschung endet Ihr 24-Monats-Founders-Vorteil (10 % Rabatt auf alle KI-Credits). Ihr Slot wird für einen neuen Nutzer freigegeben und kann nicht wiederhergestellt werden.", en: "Deleting your account ends your 24-month founders benefit (10% off all AI credits). Your slot is released to a new user and cannot be restored.", es: "Al eliminar la cuenta finaliza tu ventaja de fundador de 24 meses (10 % de descuento en todos los créditos de IA). Tu plaza se libera para otro usuario y no se puede recuperar." })}</p>
                 </div>
               </CardContent>
             </Card>

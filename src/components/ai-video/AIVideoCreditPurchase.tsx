@@ -42,7 +42,7 @@ export const AIVideoCreditPurchase = () => {
       {founder.isActive && (
         <div className="flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-primary">
           <Crown className="h-4 w-4" />
-          <span className="font-medium">{tx({ de: "Gründer-Vorteil aktiv: −20 % auf alle Video-Credits (24 Monate).", en: "Founder benefit active: −20% on all video credits (24 months).", es: "Beneficio de fundador activo: −20% en todos los créditos de video (24 meses)." })}</span>
+          <span className="font-medium">{tx({ de: "Gründer-Vorteil aktiv: −10 % auf alle Video-Credits (24 Monate).", en: "Founder benefit active: −10% on all video credits (24 months).", es: "Beneficio de fundador activo: −10% en todos los créditos de video (24 meses)." })}</span>
         </div>
       )}
       {currency === 'EUR' && (
@@ -84,7 +84,7 @@ export const AIVideoCreditPurchase = () => {
                       <span className="text-sm text-muted-foreground line-through">
                         {formatPrice(pack.price[currency], currency)}
                       </span>
-                      <Badge variant="secondary" className="ml-1">−20%</Badge>
+                      <Badge variant="secondary" className="ml-1">−10%</Badge>
                     </>
                   ) : (
                     <span className="text-3xl font-bold">{formatPrice(pack.price[currency], currency)}</span>

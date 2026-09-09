@@ -25,8 +25,8 @@ const benefits = [
   },
   {
     icon: Percent,
-    title: tx({ de: "20 % auf alle KI-Credits — 24 Monate", en: "20% on all AI credits — 24 months", es: "20 % en todos los créditos de IA: 24 meses" }),
-    text: tx({ de: "Als einer der ersten 1.000 Founders bekommst du 24 Monate lang 20 % Rabatt auf jeden Kauf von KI-Credits (Video, Bild, Audio). Der Rabatt wird an der Kasse automatisch abgezogen — kein Code nötig.", en: "As one of the first 1,000 Founders, you get a 20% discount for 24 months on every purchase of AI credits (video, image, audio). The discount is automatically applied at checkout — no code needed.", es: "Como uno de los primeros 1.000 Founders, obtendrás un 20% de descuento durante 24 meses en cada compra de créditos de IA (video, imagen, audio). El descuento se aplica automáticamente al finalizar la compra, sin necesidad de código." }),
+    title: tx({ de: "10 % auf alle KI-Credits — 24 Monate", en: "10% on all AI credits — 24 months", es: "10 % en todos los créditos de IA: 24 meses" }),
+    text: tx({ de: "Als einer der ersten 1.000 Founders bekommst du 24 Monate lang 10 % Rabatt auf jeden Kauf von KI-Credits (Video, Bild, Audio). Der Rabatt wird an der Kasse automatisch abgezogen — kein Code nötig.", en: "As one of the first 1,000 Founders, you get a 10% discount for 24 months on every purchase of AI credits (video, image, audio). The discount is automatically applied at checkout — no code needed.", es: "Como uno de los primeros 1.000 Founders, obtendrás un 10% de descuento durante 24 meses en cada compra de créditos de IA (video, imagen, audio). El descuento se aplica automáticamente al finalizar la compra, sin necesidad de código." }),
   },
   {
     icon: Sparkles,
