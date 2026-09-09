@@ -820,9 +820,18 @@ export function EnhanceVideoPanel({
                   <SelectItem value="source">{tx('keepFps', lang)}</SelectItem>
                   {fpsChoices.map((f) => (
                     <SelectItem key={f} value={String(f)}>
-                      {f} FPS{f > 60 ? ` · ${tx('fpsAdvanced', lang)}` : ''}
+                      <span className="flex items-center gap-2">
+                        <span>{f} FPS{f > 60 ? ` · ${tx('fpsAdvanced', lang)}` : ''}</span>
+                        {f > 60 && !premiumEntitled && (
+                          <Badge variant="outline" className="gap-1 text-[10px]">
+                            <Lock className="w-3 h-3" aria-hidden="true" />
+                            {tx('premiumAdvancedBadge', lang)}
+                          </Badge>
+                        )}
+                      </span>
                     </SelectItem>
                   ))}
+
                 </SelectContent>
               </Select>
               {fps !== null && fps > 30 && (
