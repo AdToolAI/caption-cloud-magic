@@ -277,6 +277,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         output = await replicate.run(engine.replicateModel as `${string}/${string}`, { input });
       } catch (err: any) {
         console.error(`[generate-music-track] Replicate error (${engineId}):`, err);
+        await releaseIncluded();
         let providerDetail: string | undefined;
         try {
           if (err?.response && typeof err.response.json === 'function') {
@@ -294,12 +295,14 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
       const audioUrl = extractAudioUrl(output);
       if (!audioUrl) {
+        await releaseIncluded();
         return new Response(JSON.stringify({ error: `No audio returned from ${engine.label}`, code: "NO_OUTPUT" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
       const audioRes = await fetch(audioUrl);
       if (!audioRes.ok) {
+        await releaseIncluded();
         return new Response(JSON.stringify({ error: "Failed to fetch generated audio" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
@@ -309,10 +312,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
 
     if (!audioBuffer || audioBuffer.byteLength < 1000) {
+      await releaseIncluded();
       return new Response(JSON.stringify({ error: "Generated audio too small / invalid" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
+
 
     // ===== Upload to Storage =====
     const storagePath = `${user.id}/music/${engineId}-${Date.now()}.mp3`;
