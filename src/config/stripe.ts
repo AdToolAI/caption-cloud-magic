@@ -62,12 +62,12 @@ export const getStripeProductId = (plan: PlanId): string => {
 /**
  * Founders-Programm
  *  - Es gibt genau EIN Abomodell: Beta-Basic 14,95 €/Monat, ohne Rabatt.
- *  - Der Founders-Vorteil ist ein 20-%-Rabatt auf JEDEN Credit-Kauf
- *    (Stripe-Coupon `FOUNDERS_VIDEO_20`), gültig 24 Monate ab Slot-Claim.
+ *  - Der Founders-Vorteil ist ein 10-%-Rabatt auf JEDEN Credit-Kauf
+ *    (Stripe-Coupon `FOUNDERS_VIDEO_10`), gültig 24 Monate ab Slot-Claim.
  *    Angewendet wird er in der Edge-Function `ai-video-purchase-credits`.
  */
 export const FOUNDERS_MAX_SLOTS = 1000;
-export const FOUNDERS_CREDIT_COUPON = 'FOUNDERS_VIDEO_20';
-export const FOUNDERS_CREDIT_DISCOUNT_PERCENT = 20;
+export const FOUNDERS_CREDIT_COUPON = 'FOUNDERS_VIDEO_10';
+export const FOUNDERS_CREDIT_DISCOUNT_PERCENT = 10;
 export const FOUNDERS_DISCOUNT_MONTHS = 24;
 export const BETA_BASIC_PRICE_EUR = 14.95;

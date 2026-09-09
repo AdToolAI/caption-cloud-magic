@@ -3,6 +3,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { tl, withLang } from "../_shared/i18n.ts";
+import { allowanceJobKey, claimIncludedAllowance, releaseIncludedAllowance } from "../_shared/included-allowance.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -159,29 +161,53 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const duration = Math.max(5, Math.min(engine.maxDuration, durationSeconds));
 
     // Wallet check
-    const { data: wallet, error: walletError } = await supabaseAdmin
+    const { data: wallet } = await supabaseAdmin
       .from('ai_video_wallets')
       .select('balance_euros, currency')
       .eq('user_id', user.id)
       .single();
-    if (walletError || !wallet) {
-      return new Response(JSON.stringify({
-        error: "No AI Credits wallet found. Please purchase credits first.",
-        code: "NO_WALLET", needsPurchase: true
-      }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const currency = (wallet.currency || 'EUR') as 'EUR' | 'USD';
-    const cost = computeCharge(engine, duration);
+
+    const currency = (wallet?.currency || 'EUR') as 'EUR' | 'USD';
+    const listCost = computeCharge(engine, duration);
     const currencySymbol = currency === 'USD' ? '$' : '€';
-    if (wallet.balance_euros < cost) {
-      return new Response(JSON.stringify({
-        error: `Insufficient credits. Need ${currencySymbol}${cost.toFixed(2)}, have ${currencySymbol}${wallet.balance_euros.toFixed(2)}`,
-        code: "INSUFFICIENT_CREDITS", needsPurchase: true, required: cost, available: wallet.balance_euros, currency,
-      }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    // Monthly included usage: MiniMax Music 1.5 is included with an active
+    // subscription / Creator account. Claimed BEFORE the provider call and
+    // released again whenever the generation does not succeed.
+    const includedEligible = engineId === 'minimax-15';
+    const jobKey = includedEligible
+      ? await allowanceJobKey([
+          (body as { requestId?: string }).requestId,
+          user.id, engineId, duration, prompt.trim(), (lyrics ?? '').trim(),
+          (body as { requestId?: string }).requestId ? null : Math.floor(Date.now() / 60_000),
+        ])
+      : '';
+    const included = includedEligible
+      ? await claimIncludedAllowance(supabaseAdmin, user.id, 'music', jobKey, Deno.env.get('STRIPE_SECRET_KEY'))
+      : { claimed: false, duplicate: false, used: 0, limit: 0 };
+    const cost = included.claimed ? 0 : listCost;
+    const releaseIncluded = async () => {
+      if (included.claimed) await releaseIncludedAllowance(supabaseAdmin, user.id, 'music', jobKey);
+    };
+
+    if (!included.claimed) {
+      if (!wallet) {
+        return new Response(JSON.stringify({
+          error: "No AI Credits wallet found. Please purchase credits first.",
+          code: "NO_WALLET", needsPurchase: true
+        }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (wallet.balance_euros < cost) {
+        return new Response(JSON.stringify({
+          error: `Insufficient credits. Need ${currencySymbol}${cost.toFixed(2)}, have ${currencySymbol}${wallet.balance_euros.toFixed(2)}`,
+          code: "INSUFFICIENT_CREDITS", needsPurchase: true, required: cost, available: wallet.balance_euros, currency,
+        }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     const enhancedPrompt = buildEnhancedPrompt(body);
-    console.log(`[generate-music-track] engine=${engineId} duration=${duration}s cost=${currencySymbol}${cost}`);
+    console.log(`[generate-music-track] engine=${engineId} duration=${duration}s cost=${currencySymbol}${cost} included=${included.claimed}`);
+
 
     let audioBuffer: ArrayBuffer | null = null;
     let engineUsed = engine.label;
@@ -253,6 +279,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         output = await replicate.run(engine.replicateModel as `${string}/${string}`, { input });
       } catch (err: any) {
         console.error(`[generate-music-track] Replicate error (${engineId}):`, err);
+        await releaseIncluded();
         let providerDetail: string | undefined;
         try {
           if (err?.response && typeof err.response.json === 'function') {
@@ -270,12 +297,14 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
       const audioUrl = extractAudioUrl(output);
       if (!audioUrl) {
+        await releaseIncluded();
         return new Response(JSON.stringify({ error: `No audio returned from ${engine.label}`, code: "NO_OUTPUT" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
       const audioRes = await fetch(audioUrl);
       if (!audioRes.ok) {
+        await releaseIncluded();
         return new Response(JSON.stringify({ error: "Failed to fetch generated audio" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
@@ -285,10 +314,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
 
     if (!audioBuffer || audioBuffer.byteLength < 1000) {
+      await releaseIncluded();
       return new Response(JSON.stringify({ error: "Generated audio too small / invalid" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
+
 
     // ===== Upload to Storage =====
     const storagePath = `${user.id}/music/${engineId}-${Date.now()}.mp3`;
@@ -300,10 +331,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       });
     if (uploadError) {
       console.error('[generate-music-track] Storage upload error:', uploadError);
+      await releaseIncluded();
       return new Response(JSON.stringify({ error: `Storage error: ${uploadError.message}` }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
+
     const { data: publicUrlData } = supabaseAdmin.storage.from('audio-studio').getPublicUrl(storagePath);
     const publicUrl = publicUrlData.publicUrl;
 
@@ -343,12 +376,16 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       console.warn('[generate-music-track] Asset insert warning:', insertError);
     }
 
-    const { data: newBalance, error: deductError } = await supabaseAdmin.rpc(
-      'deduct_ai_video_credits',
-      { p_user_id: user.id, p_amount: cost, p_generation_id: asset?.id || null }
-    );
-    if (deductError) {
-      console.error('[generate-music-track] Deduct error:', deductError);
+    let newBalance: number | null = null;
+    if (!included.claimed) {
+      const { data: balanceAfter, error: deductError } = await supabaseAdmin.rpc(
+        'deduct_ai_video_credits',
+        { p_user_id: user.id, p_amount: cost, p_generation_id: asset?.id || null }
+      );
+      if (deductError) {
+        console.error('[generate-music-track] Deduct error:', deductError);
+      }
+      newBalance = balanceAfter ?? null;
     }
 
     return new Response(JSON.stringify({
@@ -362,9 +399,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       },
       cost,
       currency,
-      newBalance: newBalance ?? (wallet.balance_euros - cost),
+      included: included.claimed,
+      includedUsed: included.claimed ? included.used : undefined,
+      includedLimit: included.claimed ? included.limit : undefined,
+      newBalance: newBalance ?? ((wallet?.balance_euros ?? 0) - cost),
       tier: engineId,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
 
   } catch (error: any) {
     console.error("[generate-music-track] Error:", error);

@@ -2,8 +2,10 @@ import { tx } from '@/lib/i18nText';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { upgradeCtaLabel } from '@/lib/pricingDisplay';
 import {
   Dialog,
+
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -52,11 +54,7 @@ export function PicturePremiumDialog({
         <DialogFooter className="flex-col gap-2 sm:flex-col">
           <Button className="w-full" onClick={() => navigate('/pricing')}>
             <Sparkles className="h-4 w-4 mr-2" />
-            {tx({
-              de: 'Upgrade auf Beta Basic – 14,95 €/Monat',
-              en: 'Upgrade to Beta Basic – €14.95/month',
-              es: 'Mejora a Beta Basic – 14,95 €/mes',
-            })}
+            {upgradeCtaLabel()}
           </Button>
           {onFallback && (
             <Button

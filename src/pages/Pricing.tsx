@@ -362,6 +362,68 @@ const Pricing = () => {
                   ))}
                 </ul>
 
+                <div className="mb-8 rounded-xl border border-primary/20 bg-primary/5 p-5">
+                  <h3 className="text-sm font-semibold mb-3">
+                    {tx({
+                      de: "Im Abo enthalten — jeden Monat",
+                      en: "Included every month",
+                      es: "Incluido cada mes",
+                    })}
+                  </h3>
+                  <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
+                    {[
+                      tx({
+                        de: "10 Fast AI Videos / Monat · 5 Sek. · 720p",
+                        en: "10 Fast AI Videos / month · 5 sec · 720p",
+                        es: "10 vídeos Fast AI / mes · 5 s · 720p",
+                      }),
+                      tx({
+                        de: "KI-Musik inklusive · bis zu 50 Songs / Monat",
+                        en: "AI Music included · up to 50 songs / month",
+                        es: "Música con IA incluida · hasta 50 canciones / mes",
+                      }),
+                      tx({
+                        de: "Text Studio mit Top-Modellen (u. a. ChatGPT Astra, Claude 4.1 Opus, Gemini)",
+                        en: "Text Studio with top models (ChatGPT Astra, Claude 4.1 Opus, Gemini and more)",
+                        es: "Text Studio con los mejores modelos (ChatGPT Astra, Claude 4.1 Opus, Gemini y más)",
+                      }),
+                      tx({
+                        de: "Standard-Bildmodelle wie GPT Image und Gemini Image",
+                        en: "Standard image models such as GPT Image and Gemini Image",
+                        es: "Modelos de imagen estándar como GPT Image y Gemini Image",
+                      }),
+                      tx({
+                        de: "Specialist-Bildmodelle und professionelle Topaz-Verbesserung",
+                        en: "Specialist image models and professional Topaz enhancement",
+                        es: "Modelos de imagen Specialist y mejora profesional Topaz",
+                      }),
+                      tx({
+                        de: "Motion Studio, Render-Queue, Content Command Center und Social-Verbindungen",
+                        en: "Motion Studio, render queue, Content Command Center and social connections",
+                        es: "Motion Studio, cola de renderizado, Content Command Center y conexiones sociales",
+                      }),
+                      tx({
+                        de: "Vergünstigte KI-Credits für alles darüber hinaus",
+                        en: "Discounted AI credits for everything beyond that",
+                        es: "Créditos de IA con descuento para todo lo demás",
+                      }),
+                    ].map((item) => (
+                      <li key={item} className="flex items-start gap-3">
+                        <Sparkles className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary" />
+                        <span className="text-sm text-muted-foreground">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {tx({
+                      de: "Enthaltene Kontingente setzen sich mit jedem Abrechnungsmonat zurück und werden nicht übertragen. Fehlgeschlagene Generierungen zählen nicht.",
+                      en: "Included allowances reset each billing month and do not roll over. Failed generations do not count.",
+                      es: "Los cupos incluidos se reinician cada mes de facturación y no se acumulan. Las generaciones fallidas no cuentan.",
+                    })}
+                  </p>
+                </div>
+
+
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
                   <Button
                     size="lg"

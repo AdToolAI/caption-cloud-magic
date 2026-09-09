@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import Stripe from "npm:stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
-import { FOUNDERS_CREDIT_COUPON } from "../_shared/stripe-config.ts";
+import { FOUNDERS_CREDIT_COUPON, FOUNDERS_CREDIT_DISCOUNT_PERCENT } from "../_shared/stripe-config.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
 
 const corsHeaders = {
@@ -100,7 +100,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
     }
 
-    // Founders 20% discount (24 months from claim, forfeits on account deletion/subscription cancel)
+    // Founders 10% discount (24 months from claim, forfeits on account deletion/subscription cancel)
     let isFounder = false;
     try {
       const { data: founderRes } = await supabaseClient.rpc('is_founder_active', { _user_id: user.id });
@@ -171,7 +171,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       invoice_creation: {
         enabled: true,
         invoice_data: {
-          description: `AI Video Credits - ${packId.charAt(0).toUpperCase() + packId.slice(1)} Pack${isFounder ? ' (Founders -20%)' : ''}`,
+          description: `AI Video Credits - ${packId.charAt(0).toUpperCase() + packId.slice(1)} Pack${isFounder ? ' (Founders -10%)' : ''}`,
           metadata: {
             user_id: user.id,
             pack_id: packId,
@@ -192,7 +192,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         base_amount: pack.credits.toString(),
         bonus_amount: pack.bonus.toString(),
         bonus_percent: pack.bonusPercent.toString(),
-        founders_discount: isFounder ? '20' : '0',
+        founders_discount: isFounder ? String(FOUNDERS_CREDIT_DISCOUNT_PERCENT) : '0',
         type: 'ai_video_credits',
       },
     });

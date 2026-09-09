@@ -11,7 +11,7 @@ interface Props {
 
 /**
  * Live counter showing how many of the first 1000 Founders slots are still available.
- * Founders pay the same €14.95 subscription — their benefit is 20% off every AI credit purchase for 24 months.
+ * Founders pay the same €14.95 subscription — their benefit is 10% off every AI credit purchase for 24 months.
  *
  * ANONYMITY CONTRACT: hidden for users who already hold a founder slot — the
  * counter combined with their own join time would let them infer their position.
@@ -64,7 +64,7 @@ export const FoundersSlotBadge = ({ className = "" }: Props) => {
               {remaining}
             </span>{" "}
             / {FOUNDERS_MAX_SLOTS} {tx({ de: "Founders-Plätze frei —", en: "founders slots left —", es: "plazas Founders libres —" })}{" "}
-            <span className="text-primary">{tx({ de: "20 % auf alle KI-Credits, 24 Monate", en: "20% off all AI credits, 24 months", es: "20 % en todos los créditos de IA, 24 meses" })}</span>
+            <span className="text-primary">{tx({ de: "10 % auf alle KI-Credits, 24 Monate", en: "10% off all AI credits, 24 months", es: "10 % en todos los créditos de IA, 24 meses" })}</span>
           </span>
         )}
       </div>

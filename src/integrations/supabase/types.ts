@@ -9689,6 +9689,75 @@ export type Database = {
           },
         ]
       }
+      included_allowance_claims: {
+        Row: {
+          created_at: string
+          id: string
+          job_key: string
+          kind: string
+          period_start: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_key: string
+          kind: string
+          period_start: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_key?: string
+          kind?: string
+          period_start?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      included_allowances: {
+        Row: {
+          created_at: string
+          fast_video_limit: number
+          fast_video_used: number
+          music_limit: number
+          music_used: number
+          period_end: string
+          period_start: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          fast_video_limit?: number
+          fast_video_used?: number
+          music_limit?: number
+          music_used?: number
+          period_end?: string
+          period_start?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          fast_video_limit?: number
+          fast_video_used?: number
+          music_limit?: number
+          music_used?: number
+          period_end?: string
+          period_start?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       instant_avatar_rate: {
         Row: {
           created_at: string
@@ -20661,6 +20730,17 @@ export type Database = {
           slot_number: number
         }[]
       }
+      claim_included_allowance: {
+        Args: {
+          _job_key: string
+          _kind: string
+          _limit: number
+          _period_end: string
+          _period_start: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       cleanup_expired_ai_cache: { Args: never; Returns: number }
       cleanup_expired_oauth_states: { Args: never; Returns: undefined }
       cleanup_expired_verification_tokens: { Args: never; Returns: undefined }
@@ -21466,6 +21546,10 @@ export type Database = {
       release_dialog_lock: {
         Args: { _holder: string; _pass_idx?: number; _scene_id: string }
         Returns: undefined
+      }
+      release_included_allowance: {
+        Args: { _job_key: string; _kind: string; _user_id: string }
+        Returns: boolean
       }
       render_queue_running_workers: { Args: never; Returns: number }
       render_queue_stats: {
