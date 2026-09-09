@@ -69,12 +69,9 @@ export function MotionStudioGate({ children }: { children: ReactNode }) {
         <div className="flex flex-col sm:flex-row gap-2 justify-center">
           <Button onClick={() => setOpen(true)}>
             <Sparkles className="h-4 w-4 mr-2" />
-            {tx({
-              de: 'Upgrade auf Beta Basic – 14,95 €/Monat',
-              en: 'Upgrade to Beta Basic – €14.95/month',
-              es: 'Mejora a Beta Basic – 14,95 €/mes',
-            })}
+            {upgradeCtaLabel()}
           </Button>
+
           <Button variant="outline" onClick={() => navigate('/library')}>
             {tx({
               de: 'Meine Bibliothek ansehen',
