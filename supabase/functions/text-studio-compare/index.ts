@@ -170,7 +170,35 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => null);
     if (!body?.prompt) return jsonResponse({ error: "prompt required" }, 400);
-    const { prompt, systemPrompt } = body;
+    const { prompt, systemPrompt: clientSystemPrompt, brandKitId } = body;
+
+    // Brand content is never trusted from the client — only the id is, and
+    // it is re-fetched here scoped to the verified user.
+    let systemPrompt: string | undefined = clientSystemPrompt;
+    if (brandKitId) {
+      const { data: kit } = await admin
+        .from("brand_kits")
+        .select("brand_name, brand_tone, brand_voice, brand_values, target_audience, industry, keywords, style_direction")
+        .eq("id", brandKitId)
+        .eq("user_id", userId)
+        .is("archived_at", null)
+        .maybeSingle();
+      if (kit) {
+        const lines: string[] = [];
+        if (kit.brand_name) lines.push(`Brand: ${kit.brand_name}`);
+        if (kit.brand_tone) lines.push(`Tone of voice: ${kit.brand_tone}`);
+        if (kit.brand_voice) lines.push(`Brand voice: ${JSON.stringify(kit.brand_voice)}`);
+        if (kit.brand_values) lines.push(`Values: ${JSON.stringify(kit.brand_values)}`);
+        if (kit.target_audience) lines.push(`Target audience: ${kit.target_audience}`);
+        if (kit.industry) lines.push(`Industry: ${kit.industry}`);
+        if (Array.isArray(kit.keywords) && kit.keywords.length) lines.push(`Keywords: ${kit.keywords.join(", ")}`);
+        if (kit.style_direction) lines.push(`Style direction: ${kit.style_direction}`);
+        if (lines.length) {
+          const brandBlock = `Follow this brand context when writing the response:\n${lines.join("\n")}`;
+          systemPrompt = systemPrompt ? `${systemPrompt}\n\n${brandBlock}` : brandBlock;
+        }
+      }
+    }
 
     const lovable = Deno.env.get("LOVABLE_API_KEY") || undefined;
     const anthropic = Deno.env.get("ANTHROPIC_API_KEY") || undefined;

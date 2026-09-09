@@ -45,27 +45,24 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
     }
 
-    // Extract and validate user ID from JWT token
-    let userId: string;
-    try {
-      const token = authHeader.replace('Bearer ', '');
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      userId = payload.sub;
-      
-      console.log('Extracted user ID from token:', userId);
-      
-      if (!userId) {
-        throw new Error('No user ID in token');
-      }
-    } catch (error) {
-      console.error('Token parsing error:', error);
+    // Validate the bearer token against Supabase auth (no manual JWT decoding)
+    const authClient = createClient(
+      supabaseUrl,
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+    if (authError || !user) {
+      console.error('Token validation error:', authError?.message);
       return new Response(
         JSON.stringify({ error: 'Unauthorized', details: 'Invalid authentication token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    const userId = user.id;
+    console.log('Verified user ID:', userId);
 
-    // Create Supabase client with service role key for database operations
+    // Create Supabase client with service role key for database operations (RLS bypass needed for insert)
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const requestBody = await req.json();
@@ -79,8 +76,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       brandName,
       brandValues,
       language,
-      stylePreference
+      stylePreference,
+      extractedDna
     } = requestBody;
+
+    // Real values extracted from the user's website (Brand DNA extractor).
+    // These are observed facts and must win over anything the model invents.
+    const dna = extractedDna && typeof extractedDna === 'object' ? extractedDna : null;
+    const dnaPalette: string[] = Array.isArray(dna?.palette) ? dna.palette.filter((c: unknown) => typeof c === 'string') : [];
+    const dnaKeywords: string[] = Array.isArray(dna?.keywords) ? dna.keywords.filter((k: unknown) => typeof k === 'string') : [];
+    const dnaValues: string[] = Array.isArray(dna?.values) ? dna.values.filter((v: unknown) => typeof v === 'string') : [];
+    const dnaFonts = dna?.fonts && typeof dna.fonts === 'object' ? dna.fonts : null;
 
     console.log('Request body received:', JSON.stringify(requestBody).substring(0, 300));
     console.log('Processing for user:', userId, '| Brand:', brandName, '| Color:', primaryColor);
@@ -99,6 +105,14 @@ ${secondaryColor ? `- Secondary Color: ${secondaryColor}` : ''}
 - Brand Description: ${brandDescription || 'No description provided'}
 ${tonePreference ? `- Tone Preference: ${tonePreference}` : ''}
 ${stylePreference ? `- Style Direction: ${stylePreference}` : ''}
+
+${dna ? `Observed data extracted from the brand's own website (treat as ground truth, do not contradict):
+${dnaPalette.length ? `- Website color palette: ${dnaPalette.join(', ')}` : ''}
+${dnaFonts?.headline || dnaFonts?.body ? `- Website fonts: headline "${dnaFonts?.headline || '?'}", body "${dnaFonts?.body || '?'}"` : ''}
+${dnaKeywords.length ? `- Website keywords: ${dnaKeywords.join(', ')}` : ''}
+${dnaValues.length ? `- Website brand values: ${dnaValues.join(', ')}` : ''}
+${dna.tone ? `- Website tone: ${dna.tone}` : ''}
+${dna.mood ? `- Website mood: ${dna.mood}` : ''}` : ''}
 
 ${logoUrl ? 'IMPORTANT: A logo image is provided. Carefully analyze its colors, shapes, typography style, and emotional impact. Use these insights to inform your recommendations.' : ''}
 

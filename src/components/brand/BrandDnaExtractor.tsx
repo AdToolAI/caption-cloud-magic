@@ -34,7 +34,7 @@ export function BrandDnaExtractor({ onApply }: Props) {
           setResult(d);
           toast({
             title: tx({ de: "Brand DNA extrahiert", en: "Brand DNA extracted", es: "ADN de marca extraído" }),
-            description: `${tx({ de: "Konfidenz", en: "Confidence", es: "Confianza" })}: ${Math.round((d.confidence ?? 0) * 100)}%`,
+            description: tx({ de: "Die Vorschläge wurden erstellt.", en: "Suggestions have been generated.", es: "Se generaron las sugerencias." }),
           });
         },
         onError: (e) => {
@@ -105,7 +105,7 @@ export function BrandDnaExtractor({ onApply }: Props) {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                    {result.source} · {tx({ de: "Konfidenz", en: "Confidence", es: "Confianza" })} {Math.round((result.confidence ?? 0) * 100)}%
+                    {result.source}
                   </div>
                   <div className="text-base font-semibold">
                     {result.brand_name ?? tx({ de: "Unbenannte Marke", en: "Unnamed brand", es: "Marca sin nombre" })}

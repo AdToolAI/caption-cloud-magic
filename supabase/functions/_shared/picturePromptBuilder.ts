@@ -92,6 +92,16 @@ export interface PicturePromptInput {
     secondaryColor?: string;
     accentColor?: string;
     mood?: string;
+    /** Free-form brand keywords — used as positive visual cues, English only. */
+    keywords?: string[];
+    /** Short brand style direction (e.g. "minimal, airy, high-contrast"). */
+    styleDirection?: string;
+    /** Who the visuals are made for — informs subject/setting choices. */
+    targetAudience?: string;
+    /** Overall brand tone (e.g. "playful", "premium") — used as a mood cue. */
+    brandTone?: string;
+    /** Logo URL — kept for context/consumers, never turned into prompt text. */
+    logoUrl?: string;
   } | null;
 }
 
@@ -395,7 +405,8 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
     });
   }
 
-  /* 5. brand kit */
+  /* 5. brand kit — English-only visual cues; fonts are never sent to image models. */
+  const brandNegativeTerms: string[] = [];
   if (input.brandKit) {
     const brandParts: string[] = [];
     const colors = [input.brandKit.primaryColor, input.brandKit.secondaryColor, input.brandKit.accentColor]
@@ -403,6 +414,11 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
       .join(', ');
     if (colors) brandParts.push(`Brand colors: ${colors}`);
     if (input.brandKit.mood) brandParts.push(`Brand mood: ${input.brandKit.mood}`);
+    if (input.brandKit.brandTone) brandParts.push(`Brand tone: ${input.brandKit.brandTone}`);
+    if (input.brandKit.styleDirection) brandParts.push(`Brand style direction: ${input.brandKit.styleDirection}`);
+    if (input.brandKit.targetAudience) brandParts.push(`Visuals should appeal to this target audience: ${input.brandKit.targetAudience}`);
+    const keywords = (input.brandKit.keywords ?? []).filter(Boolean);
+    if (keywords.length) brandParts.push(`Incorporate these brand keywords as visual cues: ${keywords.join(', ')}`);
     if (input.brandKit.name) brandParts.push(`Visual identity aligned with ${input.brandKit.name}`);
     if (brandParts.length) {
       segments.push({
@@ -411,6 +427,14 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
         label: { de: 'Brand-Kit', en: 'Brand kit', es: 'Brand Kit' },
       });
       appliedModifiers.push({ source: 'brand', id: 'brand:kit' });
+    }
+    // Brand-derived negative constraints keep off-brand visuals out, without
+    // ever touching the strength/reference logic below.
+    if (colors) {
+      brandNegativeTerms.push('colors that clash with the brand palette');
+    }
+    if (input.brandKit.styleDirection) {
+      brandNegativeTerms.push(`visual style contradicting "${input.brandKit.styleDirection}"`);
     }
   }
 
@@ -441,14 +465,18 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
     }
   }
 
-  /* 7. negative terms */
-  if (negativeTerms.length) {
+  /* 7. negative terms (user-provided + brand-derived) */
+  const combinedNegativeTerms = [...negativeTerms, ...brandNegativeTerms];
+  if (combinedNegativeTerms.length) {
     segments.push({
       source: 'negative',
-      text: `Avoid: ${negativeTerms.join(', ')}.`,
+      text: `Avoid: ${combinedNegativeTerms.join(', ')}.`,
       label: { de: 'Ausschlüsse', en: 'Exclusions', es: 'Exclusiones' },
     });
     appliedModifiers.push({ source: 'negative', id: 'negative:avoid' });
+    if (brandNegativeTerms.length) {
+      appliedModifiers.push({ source: 'brand', id: 'brand:negative' });
+    }
     notices.push({
       code: 'NEGATIVE_AS_LANGUAGE',
       level: 'warn',
@@ -524,14 +552,14 @@ export function buildPictureRequest(input: PicturePromptInput): BuiltPictureRequ
     subjectRefCount: input.mode === 'create' ? 0 : subjectRefs.length,
     styleRefCount: input.mode === 'create' ? 0 : styleRefs.length,
     transparentBackground,
-    negativeTerms,
+    negativeTerms: combinedNegativeTerms,
     appliedModifiers,
   };
 
   return {
     prompt: segments.map((s) => s.text).join('\n\n').trim(),
     segments,
-    negativeTerms,
+    negativeTerms: combinedNegativeTerms,
     strengthValue,
     strengthField,
     transparentBackground,

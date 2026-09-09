@@ -5,6 +5,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { safeFetchText, SafeFetchError } from "../_shared/safe-fetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,32 +36,23 @@ interface BrandDnaResult {
   emoji_suggestions?: string[];
   ai_comment?: string;
   source: "website" | "screenshot" | "logo";
-  confidence: number;
+  confidence?: number;
 }
 
-async function fetchPageText(url: string): Promise<string> {
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; AdToolBrandDNA/1.0; +https://useadtool.ai)",
-      },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return "";
-    const html = await res.text();
-    // strip scripts/styles, collapse whitespace, take first ~6000 chars
-    const stripped = html
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    return stripped.slice(0, 6000);
-  } catch (e) {
-    console.warn("fetchPageText failed", e);
-    return "";
-  }
+function stripHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function fetchFailedResponse(reason: string, corsHeaders: Record<string, string>) {
+  return new Response(
+    JSON.stringify({ error: "fetch_failed", reason }),
+    { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
 }
 
 function extractMetaName(html: string): string | undefined {
@@ -109,10 +101,20 @@ serve(async (req) => {
     if (body.websiteUrl) {
       source = "website";
       try {
-        const res = await fetch(body.websiteUrl, { signal: AbortSignal.timeout(8000) });
-        rawHtmlSnippet = (await res.text()).slice(0, 12000);
-      } catch (_) { /* ignore */ }
-      pageText = await fetchPageText(body.websiteUrl);
+        const fetched = await safeFetchText(body.websiteUrl);
+        rawHtmlSnippet = fetched.text.slice(0, 12000);
+        pageText = stripHtml(fetched.text).slice(0, 6000);
+      } catch (e) {
+        const reason = e instanceof SafeFetchError ? e.reason : "invalid_url";
+        console.warn("safeFetchText failed", reason, e);
+        // Only hard-fail if there is no other usable input (screenshot/logo)
+        if (!body.screenshotUrl && !body.logoUrl) {
+          return fetchFailedResponse(reason, corsHeaders);
+        }
+      }
+      if (!pageText && !body.screenshotUrl && !body.logoUrl) {
+        return fetchFailedResponse("empty_content", corsHeaders);
+      }
     }
     if (body.screenshotUrl) { source = "screenshot"; visionImages.push(body.screenshotUrl); }
     if (body.logoUrl) { if (!body.websiteUrl && !body.screenshotUrl) source = "logo"; visionImages.push(body.logoUrl); }
@@ -211,7 +213,7 @@ Return JSON with this exact shape:
         : [],
       ai_comment: parsed.ai_comment,
       source,
-      confidence: pageText.length > 500 || visionImages.length > 0 ? 0.85 : 0.55,
+      ...(typeof parsed.confidence === "number" ? { confidence: parsed.confidence } : {}),
     };
 
     return new Response(JSON.stringify(result), {

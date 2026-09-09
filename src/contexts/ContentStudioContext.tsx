@@ -289,14 +289,33 @@ export function ContentStudioProvider({
 
   useEffect(() => {
     if (!user) return;
+    // Prefer the explicitly active kit (excluding archived ones); only fall
+    // back to the most recently created non-archived kit when none is
+    // marked active, so this never silently uses a stale/archived kit.
     supabase
       .from("brand_kits")
       .select("*")
       .eq("user_id", user.id)
+      .eq("is_active", true)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
-      .then(({ data }) => setBrandKit((data as BrandKitLike) ?? null));
+      .then(({ data }) => {
+        if (data) {
+          setBrandKit(data as BrandKitLike);
+          return;
+        }
+        supabase
+          .from("brand_kits")
+          .select("*")
+          .eq("user_id", user.id)
+          .is("archived_at", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          .then(({ data: fallback }) => setBrandKit((fallback as BrandKitLike) ?? null));
+      });
   }, [user]);
 
   const activeCopy = useMemo(() => {

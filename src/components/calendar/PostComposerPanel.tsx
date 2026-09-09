@@ -130,6 +130,10 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
         platforms: channels.length ? channels : ["instagram"],
         languages: ["de"],
         stylePreset: tonality === "professional" ? "clean" : tonality,
+        // The event already carries the brand kit selected for it in the
+        // Calendar (falls back to none — the edge function simply skips
+        // brand injection when no id is present).
+        brandKitId: event?.brand_kit_id || null,
         options: {},
         ...overrides,
       },

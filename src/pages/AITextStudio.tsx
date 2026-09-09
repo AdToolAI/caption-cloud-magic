@@ -63,6 +63,7 @@ import {
 } from "@/lib/text-studio/models";
 
 import { estimateTokens } from "@/lib/text-studio/pricing";
+import { useActiveBrandKit } from "@/hooks/useActiveBrandKit";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -108,6 +109,10 @@ export default function AITextStudio() {
   const [premiumOpen, setPremiumOpen] = useState(false);
   const { pinned, pin, unpin } = usePinnedChat();
   const [tab, setTab] = useState("chat");
+  const { data: activeBrandKit } = useActiveBrandKit();
+  // Optional brand context for Compare — defaults ON once a kit exists, user
+  // can switch it off; brand content itself is always re-fetched server-side.
+  const [useBrandKitInCompare, setUseBrandKitInCompare] = useState(true);
 
   // Chat state
   const [model, setModel] = useState<TextModelId>(DEFAULT_TEXT_MODEL);
@@ -456,7 +461,12 @@ export default function AITextStudio() {
     setCompareResults(null);
     try {
       const { data, error } = await supabase.functions.invoke("text-studio-compare", {
-        body: { prompt: comparePrompt, systemPrompt: selectedPersona?.system_prompt, models: compareModels },
+        body: {
+          prompt: comparePrompt,
+          systemPrompt: selectedPersona?.system_prompt,
+          models: compareModels,
+          brandKitId: useBrandKitInCompare && activeBrandKit ? activeBrandKit.id : undefined,
+        },
       });
       if (error) throw error;
       setCompareResults(data?.results || null);
@@ -742,6 +752,14 @@ export default function AITextStudio() {
         {/* COMPARE TAB */}
         <TabsContent value="compare" className="space-y-4">
           <Card className="p-4 space-y-3">
+            {activeBrandKit && (
+              <div className="flex items-center gap-2">
+                <Switch id="compare-brand-kit" checked={useBrandKitInCompare} onCheckedChange={setUseBrandKitInCompare} />
+                <Label htmlFor="compare-brand-kit" className="text-xs">
+                  {tx({ de: `Brand Kit verwenden (${activeBrandKit.brand_name || "aktiv"})`, en: `Use Brand Kit (${activeBrandKit.brand_name || "active"})`, es: `Usar Brand Kit (${activeBrandKit.brand_name || "activo"})` })}
+                </Label>
+              </div>
+            )}
             <Label>Compare-Prompt</Label>
             <Textarea
               value={comparePrompt}

@@ -27,10 +27,16 @@ serve(async (req) => {
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { fn: "export-brand-guidelines-pdf", url: "https://example.com/mock.pdf" });
 
   try {
-    const supa = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const supa = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const authHeader = req.headers.get("authorization");
     if (!authHeader) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: corsHeaders });
-    const userId = JSON.parse(atob(authHeader.replace("Bearer ", "").split(".")[1])).sub;
+    const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user } } = await userClient.auth.getUser();
+    if (!user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: corsHeaders });
+    const userId = user.id;
 
     const { brandKitId } = await req.json();
     const { data: kit } = await supa.from("brand_kits").select("*").eq("id", brandKitId).eq("user_id", userId).single();

@@ -83,6 +83,11 @@ interface GenerateRequest {
     secondaryColor?: string;
     accentColor?: string;
     mood?: string;
+    keywords?: string[];
+    styleDirection?: string;
+    targetAudience?: string;
+    brandTone?: string;
+    logoUrl?: string;
   } | null;
 }
 
