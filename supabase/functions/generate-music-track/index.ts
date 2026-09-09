@@ -329,10 +329,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       });
     if (uploadError) {
       console.error('[generate-music-track] Storage upload error:', uploadError);
+      await releaseIncluded();
       return new Response(JSON.stringify({ error: `Storage error: ${uploadError.message}` }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
+
     const { data: publicUrlData } = supabaseAdmin.storage.from('audio-studio').getPublicUrl(storagePath);
     const publicUrl = publicUrlData.publicUrl;
 
