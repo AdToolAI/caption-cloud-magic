@@ -24,6 +24,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useUserRoles } from '@/hooks/useUserRoles';
 import { useAuth } from '@/hooks/useAuth';
 import { useTrialAccess } from '@/hooks/useTrialAccess';
+import { useAccountType } from '@/hooks/useAccountType';
 
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
@@ -301,6 +302,7 @@ export function EnhanceVideoPanel({
   const { isAdmin: isEnhanceTestUser } = useUserRoles();
   const { subscribed } = useAuth();
   const { isPaid } = useTrialAccess();
+  const { isCreator } = useAccountType();
   const [premiumOpen, setPremiumOpen] = useState(false);
   const [premiumCode, setPremiumCode] = useState<PremiumCode>('TOPAZ_PREMIUM_REQUIRED');
 
@@ -471,7 +473,7 @@ export function EnhanceVideoPanel({
   // Display-only premium gate. The server decides authoritatively with the same
   // rules; this only spares non-entitled customers a request that would be
   // refused anyway and keeps their video + settings while they upgrade.
-  const premiumEntitled = subscribed === true || isPaid === true || isEnhanceTestUser;
+  const premiumEntitled = subscribed === true || isPaid === true || isCreator === true || isEnhanceTestUser;
   const premiumBlock = premiumEntitled
     ? null
     : premiumCapabilityRequired({ provider: model?.provider ?? '', tier, fps });
