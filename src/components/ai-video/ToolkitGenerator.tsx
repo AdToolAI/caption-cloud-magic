@@ -1602,9 +1602,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
             {tx({
-              de: `${model.name} lehnt Fotos echter Personen als Bildvorlage ab. Nutze ein KI-erzeugtes Charakterbild aus deiner Library — sonst bricht der Anbieter den Auftrag ab (ohne Kosten).`,
-              en: `${model.name} rejects photos of real people as image input. Use an AI-generated character image from your library — otherwise the provider cancels the job (at no cost).`,
-              es: `${model.name} rechaza fotos de personas reales como imagen de referencia. Usa una imagen de personaje generada por IA de tu biblioteca; de lo contrario el proveedor cancela el trabajo (sin coste).`,
+              de: `${model.name} lehnt Fotos echter Personen sowie bekannte Film-, Zeichentrick- und Markenmotive als Bildvorlage ab. Nutze ein KI-erzeugtes Charakterbild aus deiner Library — sonst bricht der Anbieter den Auftrag ab (ohne Kosten). Für bekannte Figuren sind Kling 3 oder Wan 2.6 Pro toleranter.`,
+              en: `${model.name} rejects photos of real people as well as well-known movie, cartoon and brand motifs as image input. Use an AI-generated character image from your library — otherwise the provider cancels the job (at no cost). For well-known characters, Kling 3 or Wan 2.6 Pro are more tolerant.`,
+              es: `${model.name} rechaza fotos de personas reales y motivos conocidos de cine, dibujos animados o marcas como imagen de referencia. Usa una imagen de personaje generada por IA de tu biblioteca; de lo contrario el proveedor cancela el trabajo (sin coste). Para personajes conocidos, Kling 3 o Wan 2.6 Pro son más tolerantes.`,
+
             })}
           </span>
         </div>
