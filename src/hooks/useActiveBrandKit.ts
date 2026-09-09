@@ -14,6 +14,8 @@ export interface ActiveBrandKit {
   style_direction: string | null;
   target_audience: string | null;
   brand_tone: string | null;
+  brand_values: string[] | null;
+  color_palette: Record<string, unknown> | null;
 }
 
 /**
