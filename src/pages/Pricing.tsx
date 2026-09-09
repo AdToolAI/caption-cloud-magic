@@ -631,7 +631,7 @@ const Pricing = () => {
                 {t("pricingDetails.custom.description")}
               </p>
               <a
-                href="mailto:bestofproducts4u@gmail.com"
+                href="mailto:info@useadtool.ai"
                 className="inline-flex items-center gap-2 text-primary hover:text-gold-dark font-medium text-sm transition-colors"
               >
                 {t("pricingDetails.custom.contact")} <ArrowRight className="w-4 h-4" />

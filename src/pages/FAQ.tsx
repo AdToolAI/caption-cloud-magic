@@ -35,7 +35,7 @@ const FAQ = () => {
       },
       {
         question: "Can I get a refund?",
-        answer: "Refunds are available within 14 days of purchase if you're not satisfied with our service. Contact support@useadtool.ai for assistance."
+        answer: "Refunds are available within 14 days of purchase if you're not satisfied with our service. Contact info@useadtool.ai for assistance."
       },
       {
         question: "How is my data protected?",
@@ -69,7 +69,7 @@ const FAQ = () => {
       },
       {
         question: "Kann ich eine Rückerstattung erhalten?",
-        answer: "Rückerstattungen sind innerhalb von 14 Tagen nach dem Kauf möglich, wenn Sie mit unserem Service nicht zufrieden sind. Kontaktieren Sie support@useadtool.ai für Hilfe."
+        answer: "Rückerstattungen sind innerhalb von 14 Tagen nach dem Kauf möglich, wenn Sie mit unserem Service nicht zufrieden sind. Kontaktieren Sie info@useadtool.ai für Hilfe."
       },
       {
         question: "Wie werden meine Daten geschützt?",
@@ -103,7 +103,7 @@ const FAQ = () => {
       },
       {
         question: "¿Puedo obtener un reembolso?",
-        answer: "Los reembolsos están disponibles dentro de los 14 días posteriores a la compra si no estás satisfecho con nuestro servicio. Contacta a support@useadtool.ai para ayuda."
+        answer: "Los reembolsos están disponibles dentro de los 14 días posteriores a la compra si no estás satisfecho con nuestro servicio. Contacta a info@useadtool.ai para ayuda."
       },
       {
         question: "¿Cómo se protegen mis datos?",

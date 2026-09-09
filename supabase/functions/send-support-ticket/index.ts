@@ -251,7 +251,7 @@ serve(async (req) => {
       <p>Best regards,<br/><strong>The AdTool AI Team</strong></p>
     </div>
     <div class="footer">
-      <p>This is an automated confirmation. Please do not reply directly — we'll contact you from support@useadtool.ai.</p>
+      <p>This is an automated confirmation. Please do not reply directly — we'll contact you from info@useadtool.ai.</p>
       <p>© ${new Date().getFullYear()} AdTool AI. All rights reserved.</p>
     </div>
   </div>

@@ -1550,7 +1550,7 @@ export const translations: Record<Language, any> = {
       custom: {
         title: "Need a custom plan?",
         description: "We offer tailored solutions for enterprises and large teams.",
-        contact: "Contact us at bestofproducts4u@gmail.com",
+        contact: "Contact us at info@useadtool.ai",
       },
       errors: {
         checkoutFailed: "Checkout could not be started",
@@ -6480,7 +6480,7 @@ export const translations: Record<Language, any> = {
       custom: {
         title: "Brauchst du einen individuellen Plan?",
         description: "Wir bieten maßgeschneiderte Lösungen für Unternehmen und große Teams.",
-        contact: "Kontaktiere uns unter bestofproducts4u@gmail.com",
+        contact: "Kontaktiere uns unter info@useadtool.ai",
       },
       errors: {
         checkoutFailed: "Checkout konnte nicht gestartet werden",
@@ -11415,7 +11415,7 @@ export const translations: Record<Language, any> = {
       custom: {
         title: "¿Necesitas un plan personalizado?",
         description: "Ofrecemos soluciones a medida para empresas y equipos grandes.",
-        contact: "Contáctanos en bestofproducts4u@gmail.com",
+        contact: "Contáctanos en info@useadtool.ai",
       },
       errors: {
         checkoutFailed: "No se pudo iniciar el pago",
