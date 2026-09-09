@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Download, HelpCircle, Loader2, Sparkles, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, HelpCircle, Loader2, Lock, Sparkles, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -902,6 +902,30 @@ export function EnhanceVideoPanel({
           )}
         </div>
       )}
+
+      <Dialog open={premiumOpen} onOpenChange={setPremiumOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{tx('premiumTitle', lang)}</DialogTitle>
+            <DialogDescription>{tx('premiumBody', lang)}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPremiumOpen(false);
+                if (models.some((m) => m.id === 'bytedance-vcube')) setModelId('bytedance-vcube');
+              }}
+            >
+              {tx('premiumFallback', lang)}
+            </Button>
+            <Button asChild>
+              {/* New tab: the chosen video and settings stay untouched here. */}
+              <a href="/pricing" target="_blank" rel="noreferrer">{tx('premiumUpgrade', lang)}</a>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
