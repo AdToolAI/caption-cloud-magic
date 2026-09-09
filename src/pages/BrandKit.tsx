@@ -743,6 +743,97 @@ const BrandKit = () => {
                       </div>
                     </div>
 
+                    <div>
+                      <Label htmlFor="website-url">{tx({ de: "Website-Adresse", en: "Website address", es: "Dirección web" })}</Label>
+                      <Input
+                        id="website-url"
+                        value={formData.websiteUrl}
+                        onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
+                        placeholder="https://example.com"
+                        className="mt-2 bg-muted/20 border-white/10"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="tone">{tx({ de: "Tonalität", en: "Tone", es: "Tono" })}</Label>
+                        <Input
+                          id="tone"
+                          value={formData.tonePreference}
+                          onChange={(e) => setFormData({ ...formData, tonePreference: e.target.value })}
+                          placeholder={tx({ de: "z.B. inspirierend", en: "e.g. inspiring", es: "p. ej. inspirador" })}
+                          className="mt-2 bg-muted/20 border-white/10"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="mood">{tx({ de: "Stimmung", en: "Mood", es: "Ambiente" })}</Label>
+                        <Input
+                          id="mood"
+                          value={formData.moodPreference}
+                          onChange={(e) => setFormData({ ...formData, moodPreference: e.target.value })}
+                          placeholder={tx({ de: "z.B. elegant", en: "e.g. elegant", es: "p. ej. elegante" })}
+                          className="mt-2 bg-muted/20 border-white/10"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="style">{tx({ de: "Visuelle Ausrichtung", en: "Visual style direction", es: "Dirección visual" })}</Label>
+                      <Input
+                        id="style"
+                        value={formData.stylePreference}
+                        onChange={(e) => setFormData({ ...formData, stylePreference: e.target.value })}
+                        placeholder={tx({ de: "z.B. minimalistisch", en: "e.g. minimalistic", es: "p. ej. minimalista" })}
+                        className="mt-2 bg-muted/20 border-white/10"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="values">{tx({ de: "Markenwerte (mit Komma trennen)", en: "Brand values (comma separated)", es: "Valores de marca (separados por comas)" })}</Label>
+                      <Input
+                        id="values"
+                        value={formData.brandValues.join(", ")}
+                        onChange={(e) => setFormData({ ...formData, brandValues: e.target.value.split(",").map((v) => v.trim()).filter(Boolean) })}
+                        className="mt-2 bg-muted/20 border-white/10"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="keywords">{tx({ de: "Keywords (mit Komma trennen)", en: "Keywords (comma separated)", es: "Palabras clave (separadas por comas)" })}</Label>
+                      <Input
+                        id="keywords"
+                        value={formData.keywords.join(", ")}
+                        onChange={(e) => setFormData({ ...formData, keywords: e.target.value.split(",").map((v) => v.trim()).filter(Boolean) })}
+                        className="mt-2 bg-muted/20 border-white/10"
+                      />
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {tx({ de: "Was du hier löschst, bleibt gelöscht.", en: "Whatever you remove here stays removed.", es: "Lo que borres aquí permanece borrado." })}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="font-headline">{tx({ de: "Schrift Überschriften", en: "Headline font", es: "Fuente de titulares" })}</Label>
+                        <Input
+                          id="font-headline"
+                          value={formData.fontHeadline}
+                          onChange={(e) => setFormData({ ...formData, fontHeadline: e.target.value })}
+                          placeholder="Montserrat"
+                          className="mt-2 bg-muted/20 border-white/10"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="font-body">{tx({ de: "Schrift Fließtext", en: "Body font", es: "Fuente de texto" })}</Label>
+                        <Input
+                          id="font-body"
+                          value={formData.fontBody}
+                          onChange={(e) => setFormData({ ...formData, fontBody: e.target.value })}
+                          placeholder="Open Sans"
+                          className="mt-2 bg-muted/20 border-white/10"
+                        />
+                      </div>
+                    </div>
+
                     <div className="flex gap-3 pt-4">
                       {/* Premium Generate Button */}
                       <Button
