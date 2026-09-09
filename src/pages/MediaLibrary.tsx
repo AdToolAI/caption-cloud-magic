@@ -35,6 +35,11 @@ const MAX_VIDEOS = 500;
 const MAX_IMAGES = 2500;
 const MAX_STORAGE_GB = 10;
 
+// Admin archive account (bestofproducts4u@gmail.com) is exempt from the library cap.
+// Mirrors the server-side exemption in enforce_user_video_library_limits.
+const ARCHIVE_EXEMPT_USER_ID = '8948d3d9-2c5e-4405-9e9c-1624448e7189';
+
+
 // Normalized media item type
 interface NormalizedMediaItem {
   id: string;
@@ -585,13 +590,17 @@ export default function MediaLibrary() {
     const fileSizeMb = file.size / 1024 / 1024;
 
     // Auto-FIFO cleanup (or block if cloud connected)
-    const decision = enforceLimits<CleanupMediaItem>({
-      media: media as CleanupMediaItem[],
-      incoming: { type: isVideo ? 'video' : 'image', sizeMb: fileSizeMb },
-      hasCloud: !!cloudConnection,
-      limits: { maxVideos: MAX_VIDEOS, maxImages: MAX_IMAGES, maxStorageMb: MAX_STORAGE_GB * 1024 },
-      currentUsedMb: storageQuota.used_mb,
-    });
+    const isArchiveExempt = user.id === ARCHIVE_EXEMPT_USER_ID;
+    const decision = isArchiveExempt
+      ? { toDelete: [] as CleanupMediaItem[], blocked: false as const }
+      : enforceLimits<CleanupMediaItem>({
+          media: media as CleanupMediaItem[],
+          incoming: { type: isVideo ? 'video' : 'image', sizeMb: fileSizeMb },
+          hasCloud: !!cloudConnection,
+          limits: { maxVideos: MAX_VIDEOS, maxImages: MAX_IMAGES, maxStorageMb: MAX_STORAGE_GB * 1024 },
+          currentUsedMb: storageQuota.used_mb,
+        });
+
 
     if (decision.blocked) {
       if (decision.blockReason === 'cloud_offload_required') {
