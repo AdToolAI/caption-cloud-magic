@@ -134,6 +134,9 @@ export default function MotionStudioHub() {
   const libLoading = locsLoading || charsLoading;
   const { voices, loading: voicesLoading } = useCustomVoices();
   const { wallet, loading: walletLoading } = useAIVideoWallet();
+  const { canUseMotionStudio, isLoading: accessLoading } = useSubscriptionAccess();
+  const locked = !accessLoading && !canUseMotionStudio;
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [recent, setRecent] = useState<RecentProject[]>([]);
   const [recentLoading, setRecentLoading] = useState(true);
 
@@ -427,6 +430,7 @@ export default function MotionStudioHub() {
           </section>
         </div>
       </div>
+      <MotionStudioUpgradeDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
     </>
   );
 }
