@@ -2,7 +2,24 @@ import { Link } from "react-router-dom";
 import { Sparkles, Twitter, Linkedin, Instagram, Youtube } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 
+/** lucide-react has no TikTok glyph — slim inline SVG in the same 16px style. */
+const TikTokIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M21 8.5a6.5 6.5 0 0 1-5-2.3V15a6 6 0 1 1-6-6c.34 0 .67.03 1 .09v3.2A2.8 2.8 0 1 0 13 15V2h3a5 5 0 0 0 5 5z" />
+  </svg>
+);
+
 const socialLinks = [
+  { icon: TikTokIcon, href: "#", label: "TikTok" },
   { icon: Twitter, href: "#", label: "Twitter" },
   { icon: Linkedin, href: "#", label: "LinkedIn" },
   { icon: Instagram, href: "#", label: "Instagram" },
@@ -17,19 +34,10 @@ export const BlackTieFooter = () => {
       { label: "Features", href: "/#features" },
       { label: t("nav.pricing"), href: "/pricing" },
       { label: t("nav.faq"), href: "/faq" },
-      { label: "Roadmap", href: "/coming-soon" },
     ],
     resources: [
-      { label: "Blog", href: "/coming-soon" },
-      { label: "Tutorials", href: "/coming-soon" },
-      { label: "API Docs", href: "/coming-soon" },
       { label: "Status", href: "/status" },
-    ],
-    company: [
-      { label: t("landing.footer.aboutUs"), href: "/coming-soon" },
-      { label: t("landing.footer.careers"), href: "/coming-soon" },
-      { label: t("landing.footer.contactLink"), href: "/coming-soon" },
-      { label: t("landing.footer.press"), href: "/coming-soon" },
+      { label: t("landing.footer.contactLink"), href: "/support" },
     ],
     legal: [
       { label: t("landing.footer.privacy"), href: "/privacy" },
