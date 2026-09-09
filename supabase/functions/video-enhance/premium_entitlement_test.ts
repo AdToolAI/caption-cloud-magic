@@ -88,3 +88,93 @@ Deno.test('direct API request cannot bypass the UI gate', async () => {
   assertEquals(stale.entitled, false);
   assertEquals(stale.reason, 'stale_customer');
 });
+
+// --- ByteDance vCube premium capabilities -----------------------------------
+// Same gate, same entitlement helper: only the capability classifier decides
+// whether the subscription check runs at all.
+
+import { premiumCapabilityRequired } from '../_shared/video-enhance-premium.ts';
+
+async function startAllowed(
+  userId: string,
+  profile: Parameters<typeof resolveSubscriptionEntitlement>[0],
+  capability: { provider: string; tier?: string | null; fps?: number | null },
+  stripeActive = false,
+): Promise<{ allowed: boolean; code?: string }> {
+  const premium = premiumCapabilityRequired(capability);
+  if (!premium) return { allowed: true };
+  if (isTestAllowlisted(env, userId)) return { allowed: true };
+  const result = await resolveSubscriptionEntitlement(
+    profile,
+    stripeActive ? activeStripe : noStripe,
+  );
+  return result.entitled ? { allowed: true } : { allowed: false, code: premium.code };
+}
+
+const FREE = { plan: 'free' } as const;
+const VCUBE = 'replicate';
+
+Deno.test('free user may run vCube Standard at 24/30/60 fps', async () => {
+  for (const fps of [24, 30, 60, null]) {
+    const r = await startAllowed(PLAIN_USER, FREE, { provider: VCUBE, tier: 'standard', fps });
+    assertEquals(r.allowed, true);
+  }
+});
+
+Deno.test('free user is blocked on vCube Pro', async () => {
+  const r = await startAllowed(PLAIN_USER, FREE, { provider: VCUBE, tier: 'pro', fps: 30 });
+  assertEquals(r.allowed, false);
+  assertEquals(r.code, 'VCUBE_PRO_PREMIUM_REQUIRED');
+});
+
+Deno.test('free user is blocked on vCube 120 fps', async () => {
+  const r = await startAllowed(PLAIN_USER, FREE, { provider: VCUBE, tier: 'standard', fps: 120 });
+  assertEquals(r.allowed, false);
+  assertEquals(r.code, 'VCUBE_120FPS_PREMIUM_REQUIRED');
+});
+
+Deno.test('paid user may run vCube Pro and 120 fps', async () => {
+  const paid = { stripe_customer_id: 'cus_1' };
+  assertEquals(
+    (await startAllowed(PLAIN_USER, paid, { provider: VCUBE, tier: 'pro', fps: 30 }, true)).allowed,
+    true,
+  );
+  assertEquals(
+    (await startAllowed(PLAIN_USER, paid, { provider: VCUBE, tier: 'standard', fps: 120 }, true))
+      .allowed,
+    true,
+  );
+});
+
+Deno.test('creator and allowlisted test accounts keep Pro and 120 fps', async () => {
+  assertEquals(
+    (await startAllowed(PLAIN_USER, { account_type: 'creator' }, {
+      provider: VCUBE,
+      tier: 'pro',
+      fps: 120,
+    })).allowed,
+    true,
+  );
+  assertEquals(
+    (await startAllowed(TEST_USER, null, { provider: VCUBE, tier: 'pro', fps: 120 })).allowed,
+    true,
+  );
+});
+
+Deno.test('direct API request cannot bypass the vCube premium gate', async () => {
+  // No client-supplied field feeds the classifier: it reads only the resolved
+  // server-side config (provider, tier, fps).
+  const r = await startAllowed(PLAIN_USER, { plan: 'free' }, {
+    provider: VCUBE,
+    tier: 'pro',
+    fps: 24,
+  });
+  assertEquals(r.allowed, false);
+  assertEquals(r.code, 'VCUBE_PRO_PREMIUM_REQUIRED');
+});
+
+Deno.test('Topaz stays premium-gated regardless of tier and fps', async () => {
+  const r = await startAllowed(PLAIN_USER, FREE, { provider: 'topaz', tier: 'standard', fps: 30 });
+  assertEquals(r.allowed, false);
+  assertEquals(r.code, 'TOPAZ_PREMIUM_REQUIRED');
+});
