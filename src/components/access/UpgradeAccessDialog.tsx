@@ -1,4 +1,6 @@
 import { tx } from '@/lib/i18nText';
+import { upgradeCtaLabel } from '@/lib/pricingDisplay';
+
 import { useNavigate } from 'react-router-dom';
 import { Lock, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
