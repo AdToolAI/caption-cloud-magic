@@ -1269,6 +1269,13 @@ const BrandKit = () => {
         feature="brand_kit"
       />
 
+      <BrandDnaRefreshDialog
+        kit={refreshTarget}
+        open={!!refreshTarget}
+        onOpenChange={(open) => { if (!open) setRefreshTarget(null); }}
+      />
+
+
       <Dialog open={!!renameTarget} onOpenChange={(open) => { if (!open) { setRenameTarget(null); setRenameValue(""); } }}>
         <DialogContent>
           <DialogHeader>
