@@ -23,6 +23,8 @@ import {
 } from "../_shared/video-enhance-models.ts";
 import { resolveAccountDiscountFactor } from "../_shared/accountVideoPricing.ts";
 import { fetchSubscriptionEntitlement } from "../_shared/subscription-entitlement.ts";
+import { premiumCapabilityRequired } from "../_shared/video-enhance-premium.ts";
+
 
 
 
