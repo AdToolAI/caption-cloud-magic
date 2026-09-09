@@ -2,6 +2,8 @@ import { ReactNode, useState } from 'react';
 import { Lock, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { tx } from '@/lib/i18nText';
+import { upgradeCtaLabel } from '@/lib/pricingDisplay';
+
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { UpgradeAccessDialog } from '@/components/access/UpgradeAccessDialog';
