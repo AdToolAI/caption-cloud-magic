@@ -8,6 +8,15 @@ import { usePinnedChat } from "@/contexts/PinnedChatContext";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useTrialAccess } from "@/hooks/useTrialAccess";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -52,7 +61,7 @@ import {
   type CreativityLevel,
 } from "@/lib/text-studio/models";
 
-import { estimateTokens, estimateCost, formatEUR } from "@/lib/text-studio/pricing";
+import { estimateTokens } from "@/lib/text-studio/pricing";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -89,7 +98,11 @@ interface Conversation {
 }
 
 export default function AITextStudio() {
-  const { user } = useAuth();
+  const { user, subscribed } = useAuth();
+  const { isPaid } = useTrialAccess();
+  // Display/UX only — the edge functions enforce the same subscription rule.
+  const textStudioEntitled = !!(subscribed || isPaid);
+  const [premiumOpen, setPremiumOpen] = useState(false);
   const { pinned, pin, unpin } = usePinnedChat();
   const [tab, setTab] = useState("chat");
 
@@ -114,7 +127,7 @@ export default function AITextStudio() {
   const [compareResults, setCompareResults] = useState<Record<string, any> | null>(null);
   const [compareModels, setCompareModels] = useState<TextModelId[]>([
     "openai-gpt-5-6-terra",
-    "google-gemini-3-6-flash",
+    "google-gemini-3-8-flash",
     "google-gemini-3-1-pro",
   ]);
 
@@ -192,7 +205,6 @@ export default function AITextStudio() {
     () => estimateTokens(input + messages.map((m) => m.content).join("\n")),
     [input, messages],
   );
-  const estCostEur = useMemo(() => estimateCost(model, inputTokens, 800), [model, inputTokens]);
 
   // Intercept model change: if active chat has messages, fork into a branch
   function handleModelChange(next: TextModelId) {
@@ -286,6 +298,11 @@ export default function AITextStudio() {
 
   async function send() {
     if (!input.trim() || streaming || !user) return;
+    // Subscription-only studio: keep the typed prompt, show the upgrade dialog.
+    if (!textStudioEntitled) {
+      setPremiumOpen(true);
+      return;
+    }
     if (selectedModel.requiresExternalKey) {
       // Will be enforced server-side, but warn anyway
     }
@@ -325,7 +342,9 @@ export default function AITextStudio() {
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
-        if (resp.status === 402) toast.error(err.error || tx({ de: "Wallet leer – bitte Credits aufladen.", en: "Wallet empty – please top up credits.", es: "Monedero vacío – por favor recarga créditos." }));
+        if (resp.status === 403 && err.code === "TEXT_STUDIO_PREMIUM_REQUIRED") {
+          setPremiumOpen(true);
+        } else if (resp.status === 402) toast.error(err.error || tx({ de: "Wallet leer – bitte Credits aufladen.", en: "Wallet empty – please top up credits.", es: "Monedero vacío – por favor recarga créditos." }));
         else if (resp.status === 429) toast.error(tx({ de: "Rate limit – kurz warten und erneut probieren.", en: "Rate limit – please wait a moment and try again.", es: "Límite de velocidad – espera un momento e inténtalo de nuevo." }));
         else toast.error(err.error || tx({ de: "Fehler beim Senden", en: "Error sending message", es: "Error al enviar" }));
         setMessages(next);
@@ -426,6 +445,10 @@ export default function AITextStudio() {
 
   async function runCompare() {
     if (!comparePrompt.trim() || compareLoading) return;
+    if (!textStudioEntitled) {
+      setPremiumOpen(true);
+      return;
+    }
     setCompareLoading(true);
     setCompareResults(null);
     try {
@@ -504,7 +527,7 @@ export default function AITextStudio() {
             </div>
 
             {/* Qualitätsstufen des gewählten Anbieters */}
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {TIER_ORDER.map((tier) => {
                 const m = findModel(providerKey, tier);
                 if (!m) return null;
@@ -531,9 +554,13 @@ export default function AITextStudio() {
                       {TIER_DESCRIPTIONS[tier]}
                     </div>
                     <div className="text-[11px] text-muted-foreground mt-2">
-                      {formatEUR(m.inputPricePer1k)} / {formatEUR(m.outputPricePer1k)}{" "}
-                      {tx({ de: "pro 1k Tokens", en: "per 1k tokens", es: "por 1k tokens" })} ·{" "}
                       {(m.contextWindow / 1000).toFixed(0)}k {tx({ de: "Kontext", en: "context", es: "contexto" })}
+                      {!textStudioEntitled && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-primary">
+                          <Lock className="h-3 w-3" />
+                          {tx({ de: "Abo", en: "Plan", es: "Plan" })}
+                        </span>
+                      )}
                     </div>
                   </button>
                 );
@@ -575,7 +602,9 @@ export default function AITextStudio() {
                   <Select value={reasoning} onValueChange={(v) => setReasoning(v as ReasoningEffort)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {REASONING_EFFORT_OPTIONS.map((r) => (
+                      {REASONING_EFFORT_OPTIONS.filter(
+                        (r) => !(selectedModel.requiresReasoning && r === "none"),
+                      ).map((r) => (
                         <SelectItem key={r} value={r}>{REASONING_EFFORT_LABELS[r]}</SelectItem>
                       ))}
                     </SelectContent>
@@ -594,7 +623,11 @@ export default function AITextStudio() {
             {selectedModel.strengths.map((s) => (
               <Badge key={s} variant="secondary">{s}</Badge>
             ))}
-            <Badge variant="outline">~{formatEUR(estCostEur)} {tx({ de: 'geschätzt', en: 'estimated', es: 'estimado' })}</Badge>
+            <Badge variant="outline">
+              {textStudioEntitled
+                ? tx({ de: 'Im Abo enthalten', en: 'Included in your plan', es: 'Incluido en tu plan' })
+                : tx({ de: 'Nur mit Abo', en: 'Subscription only', es: 'Solo con suscripción' })}
+            </Badge>
             <Button
               size="sm"
               variant="ghost"
@@ -763,7 +796,7 @@ export default function AITextStudio() {
                     <div className="font-semibold">{m.label}</div>
                     {r?.ok && (
                       <Badge variant="outline" className="text-[10px]">
-                        {r.latencyMs}ms · {formatEUR(r.cost)}
+                        {r.latencyMs}ms
                       </Badge>
                     )}
                   </div>
@@ -819,6 +852,33 @@ export default function AITextStudio() {
           })}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={premiumOpen} onOpenChange={setPremiumOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {tx({ de: 'AI Text Studio ist im Abo enthalten', en: 'AI Text Studio is included with a plan', es: 'AI Text Studio está incluido en el plan' })}
+            </DialogTitle>
+            <DialogDescription>
+              {tx({
+                de: 'Alle Modelle sind für Abonnenten ohne Zusatzkosten nutzbar. Dein Text und deine Einstellungen bleiben erhalten.',
+                en: 'All models are free to use for subscribers. Your text and settings stay exactly as they are.',
+                es: 'Todos los modelos son gratuitos para los suscriptores. Tu texto y tus ajustes se mantienen.',
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setPremiumOpen(false)}>
+              {tx({ de: 'Später', en: 'Later', es: 'Más tarde' })}
+            </Button>
+            <Button asChild>
+              <a href="/pricing" target="_blank" rel="noreferrer">
+                {tx({ de: 'Abo ansehen', en: 'View plans', es: 'Ver planes' })}
+              </a>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!branchPrompt} onOpenChange={(o) => !o && setBranchPrompt(null)}>
         <AlertDialogContent>
