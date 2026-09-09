@@ -204,8 +204,7 @@ export const PrivacyContent = ({ lang }: PrivacyContentProps) => {
           <p>Bahnhofstraße 15a</p>
           <p>85221 Dachau, Germany</p>
           <div className="mt-4 pt-4 border-t border-white/10">
-            <p><strong className="text-foreground">Email:</strong> support@useadtool.ai</p>
-            <p><strong className="text-foreground">Privacy:</strong> privacy@useadtool.ai</p>
+            <p><strong className="text-foreground">Email:</strong> info@useadtool.ai</p>
           </div>
         </div>
       </LegalSection>
