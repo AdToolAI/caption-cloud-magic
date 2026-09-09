@@ -132,7 +132,7 @@ Q: Gibt es eine Testversion?
 A: Ja! Der Free Plan ist kostenlos und dauerhaft nutzbar!
 
 Q: Kann ich eine Rückerstattung bekommen?
-A: Innerhalb von 14 Tagen ab Kauf möglich. Email an support@useadtool.ai
+A: Innerhalb von 14 Tagen ab Kauf möglich. Email an info@useadtool.ai
 
 **💎 Credits & Preise:**
 Q: Wie funktionieren Credits?

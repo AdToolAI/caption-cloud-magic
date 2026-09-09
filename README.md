@@ -221,7 +221,7 @@ This project is licensed under the MIT License.
 
 ## 📞 Support
 
-- 📧 Email: support@useadtool.ai
+- 📧 Email: info@useadtool.ai
 - 💬 Discord: Join our community
 - 🐦 Twitter: @AdToolAI
 - 📖 Documentation: Complete guides available

@@ -18,7 +18,7 @@ export interface SendEmailOptions {
   category: EmailCategory;
   /** Optional override of the From address. */
   from?: string;
-  /** Optional Reply-To override. Defaults to support@useadtool.ai. */
+  /** Optional Reply-To override. Defaults to info@useadtool.ai. */
   replyTo?: string;
   /** Optional extra headers to merge in. */
   extraHeaders?: Record<string, string>;
@@ -140,7 +140,7 @@ async function logSend(row: {
 export async function sendEmail(opts: SendEmailOptions): Promise<SendEmailResult> {
   const to = opts.to.trim().toLowerCase();
   const from = opts.from || FROM_BY_CATEGORY[opts.category];
-  const replyTo = opts.replyTo || `support@${APP_DOMAIN}`;
+  const replyTo = opts.replyTo || `info@${APP_DOMAIN}`;
 
   // 1. Suppression check
   const sup = await isSuppressed(to);

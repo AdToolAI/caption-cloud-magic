@@ -10,14 +10,14 @@ export const ContactBox = ({ lang }: ContactBoxProps) => {
   const content = {
     de: {
       title: "Kontakt für Datenschutzanfragen",
-      email: "privacy@useadtool.ai",
+      email: "info@useadtool.ai",
       address: "Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau, Germany",
       authority: "Zuständige Aufsichtsbehörde",
       authorityName: "Bayerisches Landesamt für Datenschutzaufsicht (BayLDA)"
     },
     en: {
       title: "Contact for Privacy Inquiries",
-      email: "privacy@useadtool.ai",
+      email: "info@useadtool.ai",
       address: "Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau, Germany",
       authority: "Supervisory Authority",
       authorityName: "Bavarian State Office for Data Protection Supervision (BayLDA)"

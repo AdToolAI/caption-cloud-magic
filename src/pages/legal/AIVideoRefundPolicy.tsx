@@ -134,8 +134,8 @@ export default function AIVideoRefundPolicy() {
             </div>
             <p className="text-sm text-foreground/90">
               {tx({ de: "In Härtefällen kann unser Support pro Nutzer", en: "In hardship cases, our support can grant", es: "En casos excepcionales, nuestro soporte puede conceder" })} <strong>{tx({ de: "eine Kulanz-Rückerstattung alle 30 Tage", en: "one goodwill refund every 30 days", es: "un reembolso de cortesía cada 30 días" })}</strong> {tx({ de: "gewähren — z. B. wenn ein Rendering trotz bestätigtem Preview offensichtlich unbrauchbar geworden ist. Meldung bitte innerhalb von 14 Tagen nach dem Rendering an", en: "per user — e.g. if a rendering has clearly become unusable despite a confirmed preview. Please report within 14 days of rendering to", es: "por usuario — p. ej. si un renderizado se ha vuelto claramente inutilizable a pesar de una vista previa confirmada. Por favor, informa dentro de los 14 días posteriores al renderizado a" })}{' '}
-              <a href="mailto:support@useadtool.ai" className="text-primary underline">
-                support@useadtool.ai
+              <a href="mailto:info@useadtool.ai" className="text-primary underline">
+                info@useadtool.ai
               </a>{' '}
               {tx({ de: "mit Szenen-ID und kurzer Beschreibung.", en: "with the scene ID and a short description.", es: "con el ID de la escena y una breve descripción." })}
             </p>
