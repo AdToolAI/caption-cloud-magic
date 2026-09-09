@@ -126,6 +126,7 @@ export function BatchGeneratePanel() {
 
   const handleStart = async () => {
     if (!user) { toast.error(tx({ de: "Bitte zuerst einloggen", en: "Please log in first", es: "Por favor, inicia sesión primero" })); return; }
+    if (isSpecialistTier(tier) && !isEntitled) { setPremiumDialogOpen(true); return; }
     if (!prompts.length) { toast.error(tx({ de: "Mindestens 1 Prompt eingeben", en: "Enter at least 1 prompt", es: "Introduce al menos 1 mensaje" })); return; }
     if (prompts.length > 20) { toast.error(tx({ de: "Max. 20 Prompts pro Batch", en: "Max. 20 prompts per batch", es: "Máx. 20 indicaciones por lote" })); return; }
     if (insufficient) {
@@ -380,6 +381,12 @@ export function BatchGeneratePanel() {
           ))}
         </div>
       )}
+      <PicturePremiumDialog
+        open={premiumDialogOpen}
+        onOpenChange={setPremiumDialogOpen}
+        fallbackLabel="GPT Image"
+        onFallback={() => setTier('gptimage')}
+      />
     </div>
   );
 }
