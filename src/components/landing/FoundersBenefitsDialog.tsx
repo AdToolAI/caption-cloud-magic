@@ -1,6 +1,7 @@
 import { tx } from "@/lib/i18nText";
 import { Link } from "react-router-dom";
-import { Crown, ShieldCheck, Percent, Clock, AlertTriangle, Sparkles } from "lucide-react";
+import { Crown, ShieldCheck, Percent, Clock, AlertTriangle, Sparkles, Brain, Wrench } from "lucide-react";
+import { subscriptionPricePerMonth } from "@/lib/pricingDisplay";
 import {
   Dialog,
   DialogContent,
