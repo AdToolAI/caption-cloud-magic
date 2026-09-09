@@ -626,11 +626,18 @@ serve(async (req) => {
     }
 
     // ---- premium entitlement -------------------------------------------------
-    // Topaz is a subscription-gated premium engine. Wallet balance alone never
-    // grants access: BOTH an active subscription entitlement AND enough credits
-    // are required. Checked before reservation, before any wallet mutation and
-    // before a single provider request — a direct API call cannot bypass the UI.
-    if (spec.provider === "topaz" && !isTestAllowlisted(env, user.id)) {
+    // Subscription-gated capabilities: the whole Topaz engine, vCube Pro and
+    // vCube high frame rate (>60 fps). Wallet balance alone never grants
+    // access: BOTH an active subscription entitlement AND enough credits are
+    // required. Checked before reservation, before any wallet mutation and
+    // before a single provider request — a direct API call cannot bypass the
+    // UI. Exactly one entitlement truth source is consulted.
+    const premium = premiumCapabilityRequired({
+      provider: spec.provider,
+      tier: config.tier,
+      fps: config.fps,
+    });
+    if (premium && !isTestAllowlisted(env, user.id)) {
       const entitlement = await fetchSubscriptionEntitlement(
         admin,
         user.id,
@@ -639,15 +646,18 @@ serve(async (req) => {
       if (!entitlement.entitled) {
         return json(
           {
-            error: "Topaz Video AI is a Premium feature.",
-            code: "TOPAZ_PREMIUM_REQUIRED",
-            provider: "topaz",
-            fallbackModelId: "bytedance-vcube",
+            error: premium.error,
+            code: premium.code,
+            provider: spec.provider,
+            ...(premium.fallbackModelId ? { fallbackModelId: premium.fallbackModelId } : {}),
+            ...(premium.fallbackTier ? { fallbackTier: premium.fallbackTier } : {}),
+            ...(premium.fallbackFps !== undefined ? { fallbackFps: premium.fallbackFps } : {}),
           },
           403,
         );
       }
     }
+
 
 
     // Engine-wide outage on OUR provider account: refuse before reserving.
