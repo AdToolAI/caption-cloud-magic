@@ -175,8 +175,11 @@ describe('rollout gates', () => {
     expect(DISABLED_VIDEO_ENHANCE_MODELS).toEqual([]);
   });
 
-  it('marks unverified rate cards so they cannot be rolled out silently', () => {
-    for (const card of Object.values(SERVER_CARDS)) expect(card.costUnverified).toBe(true);
+  it('keeps unverified rate cards flagged, and only the verified vCube card clear', () => {
+    // vCube was verified on 2026-09-09 against real billed runs; Topaz stays
+    // flagged until its credit estimator is confirmed the same way.
+    expect(SERVER_CARDS['bytedance-vcube'].costUnverified).toBeFalsy();
+    expect(SERVER_CARDS['topaz-video-upscale'].costUnverified).toBe(true);
   });
 });
 
