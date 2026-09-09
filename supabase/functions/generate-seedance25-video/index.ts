@@ -302,8 +302,9 @@ Deno.serve(async (req) => {
       resolvePricingId(MODEL_ID, generationMode, gate.resolutionLabel ?? resolution) ?? MODEL_ID;
 
     const costPerSecond = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, pricingModelId, currency, 0.3983,
+      supabaseAdmin, user.id, pricingModelId, currency,
     );
+    if (costPerSecond === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = +(billedDuration * costPerSecond).toFixed(4);
 
     const { data: wallet, error: walletError } = await supabaseAdmin

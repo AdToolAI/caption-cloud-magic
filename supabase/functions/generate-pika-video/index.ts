@@ -216,8 +216,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
     // Canonical catalog price (identical to the UI preview, incl. account discount).
     const effectiveCps = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, model, (wallet.currency === 'USD' ? 'USD' : 'EUR'), costPerSecond,
+      supabaseAdmin, user.id, model, (wallet.currency === 'USD' ? 'USD' : 'EUR'),
     );
+    if (effectiveCps === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = duration * effectiveCps;
     const sym = wallet.currency === "USD" ? "$" : "€";
     if (wallet.balance_euros < totalCost) {

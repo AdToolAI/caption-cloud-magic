@@ -144,8 +144,8 @@ serve(async (req) => {
     // shared with the frontend via /functions/v1/pricing-catalog).
     const costPerSecond = await resolveAccountCostPerSecond(
       supabaseAdmin, user.id, model, currency,
-      resolveCostPerSecond('seedance-standard', currency) ?? 0.09,
     );
+    if (costPerSecond === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 

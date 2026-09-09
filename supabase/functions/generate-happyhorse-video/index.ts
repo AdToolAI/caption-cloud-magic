@@ -233,8 +233,9 @@ serve(async (req) => {
       .maybeSingle();
     const walletCurrency = walletCurrencyRow?.currency === 'USD' ? 'USD' : 'EUR';
     const effectiveCps = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, model, walletCurrency, costPerSecond,
+      supabaseAdmin, user.id, model, walletCurrency,
     );
+    if (effectiveCps === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = +(effectiveCps * duration).toFixed(2);
 
     // Wallet check

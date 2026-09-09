@@ -167,8 +167,9 @@ serve(async (req) => {
     // Canonical price from the shared catalog (same source as the UI preview,
     // including the account discount). MODEL_PRICING is only a legacy fallback.
     const costPerSecond = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, model, currency as "EUR" | "USD", 0.32,
+      supabaseAdmin, user.id, model, currency as "EUR" | "USD",
     );
+    if (costPerSecond === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 
