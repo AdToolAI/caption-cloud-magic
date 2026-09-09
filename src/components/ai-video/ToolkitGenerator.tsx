@@ -43,6 +43,7 @@ import {
   validateStudioSelection,
 } from '@/lib/videoCapabilities/studioCapabilities';
 import { resolvePricingId } from '@/config/videoModelSpecs';
+import { VIDEO_PRICING_CATALOG } from '@/lib/cost/videoPricingCatalog';
 
 import { GenerateSection } from './generate/GenerateSection';
 import { QuickSettingsBar } from './generate/QuickSettingsBar';
