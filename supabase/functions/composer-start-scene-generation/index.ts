@@ -26,6 +26,7 @@ import { transitionScene } from "../_shared/scene-state.ts";
 import { startSceneRun, type SceneRun } from "../_shared/scene-run.ts";
 import { getSyncApiKey } from "../_shared/syncso-preflight.ts";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { motionStudioGateForUser } from "../_shared/motion-studio-premium.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,6 +64,12 @@ serve(async (req) => {
     const { data: userData } = await userClient.auth.getUser();
     const userId = userData?.user?.id;
     if (!userId) return json({ error: "unauthorized" }, 401);
+    // Motion Studio premium gate — subscription or Creator account required
+    // before any generation, render or edit. Existing work stays untouched.
+    {
+      const denied = await motionStudioGateForUser(userId, corsHeaders);
+      if (denied) return denied;
+    }
 
     const body = await req.json().catch(() => ({} as Record<string, unknown>));
     const rawIds = Array.isArray((body as any)?.scene_ids)

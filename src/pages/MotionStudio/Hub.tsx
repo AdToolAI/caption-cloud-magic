@@ -30,6 +30,12 @@ import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { CostComparisonWidget } from '@/components/motion-studio/CostComparisonWidget';
+import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
+import { MotionStudioUpgradeDialog } from '@/components/access/MotionStudioGate';
+import { Lock } from 'lucide-react';
+
+/** Routes that require an active subscription or a Creator account. */
+const GATED_HREFS = ['/motion-studio/studio', '/video-composer'];
 
 interface RecentProject {
   id: string;
@@ -128,6 +134,9 @@ export default function MotionStudioHub() {
   const libLoading = locsLoading || charsLoading;
   const { voices, loading: voicesLoading } = useCustomVoices();
   const { wallet, loading: walletLoading } = useAIVideoWallet();
+  const { canUseMotionStudio, isLoading: accessLoading } = useSubscriptionAccess();
+  const locked = !accessLoading && !canUseMotionStudio;
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [recent, setRecent] = useState<RecentProject[]>([]);
   const [recentLoading, setRecentLoading] = useState(true);
 
@@ -214,18 +223,32 @@ export default function MotionStudioHub() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button asChild size="lg" className="gap-2 bg-gradient-to-r from-primary to-accent shadow-lg shadow-primary/20">
-                  <Link to="/motion-studio/studio">
-                    <Wand2 className="h-4 w-4" />
+                {locked ? (
+                  <Button size="lg" className="gap-2 bg-gradient-to-r from-primary to-accent shadow-lg shadow-primary/20" onClick={() => setUpgradeOpen(true)}>
+                    <Lock className="h-4 w-4" />
                     {tx({ de: "Studio Mode starten", en: "Start Studio Mode", es: "Iniciar Modo Estudio" })}
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" size="lg" className="gap-2">
-                  <Link to="/video-composer">
-                    <PlayCircle className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button asChild size="lg" className="gap-2 bg-gradient-to-r from-primary to-accent shadow-lg shadow-primary/20">
+                    <Link to="/motion-studio/studio">
+                      <Wand2 className="h-4 w-4" />
+                      {tx({ de: "Studio Mode starten", en: "Start Studio Mode", es: "Iniciar Modo Estudio" })}
+                    </Link>
+                  </Button>
+                )}
+                {locked ? (
+                  <Button variant="outline" size="lg" className="gap-2" onClick={() => setUpgradeOpen(true)}>
+                    <Lock className="h-4 w-4" />
                     Composer
-                  </Link>
-                </Button>
+                  </Button>
+                ) : (
+                  <Button asChild variant="outline" size="lg" className="gap-2">
+                    <Link to="/video-composer">
+                      <PlayCircle className="h-4 w-4" />
+                      Composer
+                    </Link>
+                  </Button>
+                )}
                 <Button asChild variant="outline" size="lg" className="gap-2">
                   <Link to="/motion-studio/library">
                     <Plus className="h-4 w-4" />
@@ -264,8 +287,24 @@ export default function MotionStudioHub() {
             <div className="lg:col-span-2 space-y-4">
               <h2 className="text-2xl font-semibold">{tx({ de: "Module", en: "Modules", es: "Módulos" })}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {QUICK_ACTIONS.map((a) => (
-                  <Link key={a.href} to={a.href} className="group">
+                {QUICK_ACTIONS.map((a) => {
+                  const cardLocked = locked && GATED_HREFS.includes(a.href);
+                  const Wrapper = ({ children }: { children: React.ReactNode }) =>
+                    cardLocked ? (
+                      <button
+                        type="button"
+                        onClick={() => setUpgradeOpen(true)}
+                        className="group text-left w-full"
+                      >
+                        {children}
+                      </button>
+                    ) : (
+                      <Link to={a.href} className="group">
+                        {children}
+                      </Link>
+                    );
+                  return (
+                  <Wrapper key={a.href}>
                     <Card
                       className={`relative p-6 h-full overflow-hidden transition-all hover:scale-[1.01] hover:shadow-2xl border-border/50 backdrop-blur-xl bg-card/60`}
                     >
@@ -277,24 +316,32 @@ export default function MotionStudioHub() {
                           <div className="h-12 w-12 rounded-xl bg-background/80 backdrop-blur flex items-center justify-center">
                             <a.icon className="h-6 w-6 text-primary" />
                           </div>
-                          {a.badge && (
+                          {cardLocked ? (
+                            <Badge className="bg-primary/20 text-primary border-primary/30 gap-1">
+                              <Lock className="h-3 w-3" />
+                              PRO
+                            </Badge>
+                          ) : a.badge ? (
                             <Badge className="bg-primary/20 text-primary border-primary/30">
                               {a.badge}
                             </Badge>
-                          )}
+                          ) : null}
                         </div>
                         <div>
                           <h3 className="text-lg font-semibold">{a.title}</h3>
                           <p className="text-sm text-muted-foreground mt-1">{a.desc}</p>
                         </div>
                         <div className="flex items-center text-sm text-primary group-hover:gap-2 transition-all">
-                          {tx({ de: "Öffnen", en: "Open", es: "Abrir" })}
+                          {cardLocked
+                            ? tx({ de: "Mit Abo freischalten", en: "Unlock with subscription", es: "Desbloquear con suscripción" })
+                            : tx({ de: "Öffnen", en: "Open", es: "Abrir" })}
                           <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
                         </div>
                       </div>
                     </Card>
-                  </Link>
-                ))}
+                  </Wrapper>
+                  );
+                })}
               </div>
             </div>
           </section>
@@ -383,6 +430,7 @@ export default function MotionStudioHub() {
           </section>
         </div>
       </div>
+      <MotionStudioUpgradeDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
     </>
   );
 }

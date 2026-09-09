@@ -5,6 +5,7 @@
 // removes the consumed entry from the stack.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { motionStudioGateForUser } from "../_shared/motion-studio-premium.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,6 +57,12 @@ Deno.serve(async (req) => {
       });
     }
     const userId = userRes.user.id;
+    // Motion Studio premium gate — subscription or Creator account required
+    // before any generation, render or edit. Existing work stays untouched.
+    {
+      const denied = await motionStudioGateForUser(userId, corsHeaders);
+      if (denied) return denied;
+    }
 
     const body = await req.json().catch(() => ({}));
     const { entryId, projectId } = body as { entryId?: string; projectId?: string };

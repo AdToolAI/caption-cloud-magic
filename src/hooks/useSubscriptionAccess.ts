@@ -22,6 +22,8 @@ export function useSubscriptionAccess() {
     isEntitled,
     canUseContentCommandCenter: isEntitled,
     canUseSocialConnections: isEntitled,
+    /** can_use_motion_studio = active_subscription || creator_account */
+    canUseMotionStudio: isEntitled,
     isLoading,
   };
 }

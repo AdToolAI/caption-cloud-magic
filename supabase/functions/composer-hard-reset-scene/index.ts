@@ -17,6 +17,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { hardResetScene } from "../_shared/scene-hard-reset.ts";
 import { getSyncApiKey } from "../_shared/syncso-preflight.ts";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { motionStudioGateForUser } from "../_shared/motion-studio-premium.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,6 +52,12 @@ serve(async (req) => {
     const { data: userData } = await userClient.auth.getUser();
     const userId = userData?.user?.id;
     if (!userId) return json({ error: "unauthorized" }, 401);
+    // Motion Studio premium gate — subscription or Creator account required
+    // before any generation, render or edit. Existing work stays untouched.
+    {
+      const denied = await motionStudioGateForUser(userId, corsHeaders);
+      if (denied) return denied;
+    }
 
     const body = await req.json().catch(() => ({}));
     const sceneId = String((body as any)?.scene_id ?? (body as any)?.sceneId ?? "").trim();

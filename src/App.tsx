@@ -128,6 +128,7 @@ const RenderQueue = lazy(() => import("./pages/RenderQueue"));
 const CreatorLibrary = lazy(() => import("./pages/CreatorLibrary"));
 const EmailDirector = lazy(() => import("./pages/EmailDirector"));
 const MotionStudioLibrary = lazy(() => import("./pages/MotionStudio/Library"));
+import { MotionStudioGate } from "@/components/access/MotionStudioGate";
 const MotionStudioHub = lazy(() => import("./pages/MotionStudio/Hub"));
 const MotionStudioStudioMode = lazy(() => import("./pages/MotionStudio/StudioMode"));
 const Marketplace = lazy(() => import("./pages/Marketplace"));
@@ -320,13 +321,13 @@ function AppLayout() {
           <Route path="/stock-videos" element={<ProtectedRoute><StockVideos /></ProtectedRoute>} />
           <Route path="/my-licenses" element={<ProtectedRoute><MyLicenses /></ProtectedRoute>} />
            <Route path="/sora-long-form" element={<Navigate to="/video-composer" replace />} />
-           <Route path="/video-composer" element={<VideoComposer />} />
+           <Route path="/video-composer" element={<MotionStudioGate><VideoComposer /></MotionStudioGate>} />
            <Route path="/queue" element={<ProtectedRoute><RenderQueue /></ProtectedRoute>} />
             <Route path="/render-queue" element={<Navigate to="/queue" replace />} />
             <Route path="/creator-library" element={<ProtectedRoute><CreatorLibrary /></ProtectedRoute>} />
            <Route path="/email-director" element={<ProtectedRoute><EmailDirector /></ProtectedRoute>} />
            <Route path="/motion-studio" element={<MotionStudioHub />} />
-           <Route path="/motion-studio/studio" element={<MotionStudioStudioMode />} />
+           <Route path="/motion-studio/studio" element={<MotionStudioGate><MotionStudioStudioMode /></MotionStudioGate>} />
            <Route path="/motion-studio/library" element={<Navigate to="/library" replace />} />
            <Route path="/marketplace" element={<Marketplace />} />
            <Route path="/autopilot" element={<ProtectedRoute><Autopilot /></ProtectedRoute>} />
