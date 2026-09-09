@@ -31,7 +31,9 @@ export function BrandDnaExtractor({ onApply }: Props) {
       { websiteUrl: safeUrl, language: "de" },
       {
         onSuccess: (d) => {
-          setResult(d);
+          // Keep the exact analyzed URL with the result so Apply can prefill
+          // the Brand Kit website field.
+          setResult({ ...d, source_url: d.source_url ?? safeUrl });
           toast({
             title: tx({ de: "Brand DNA extrahiert", en: "Brand DNA extracted", es: "ADN de marca extraído" }),
             description: tx({ de: "Die Vorschläge wurden erstellt.", en: "Suggestions have been generated.", es: "Se generaron las sugerencias." }),

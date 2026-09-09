@@ -25,6 +25,8 @@ export interface BrandDnaResult {
   emoji_suggestions?: string[];
   ai_comment?: string;
   source: "website" | "screenshot" | "logo";
+  /** The exact URL that was analyzed (website source only). */
+  source_url?: string;
   confidence?: number;
 }
 
