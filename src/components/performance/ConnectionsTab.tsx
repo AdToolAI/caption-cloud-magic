@@ -62,6 +62,8 @@ export const ConnectionsTab = () => {
       ? t('socialIntegrations.sessionBusyRetry')
       : (error?.message || fallback);
 
+  const { canUseSocialConnections } = useSubscriptionAccess();
+  const [connectUpgradeOpen, setConnectUpgradeOpen] = useState(false);
   const [connections, setConnections] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCSVUpload, setShowCSVUpload] = useState(false);
@@ -1401,6 +1403,15 @@ export const ConnectionsTab = () => {
         }}
       />
 
+      <UpgradeAccessDialog
+        open={connectUpgradeOpen}
+        onOpenChange={setConnectUpgradeOpen}
+        title={txt({
+          de: 'Social-Verbindungen freischalten',
+          en: 'Unlock social connections',
+          es: 'Desbloquea las conexiones sociales',
+        })}
+      />
     </div>
   );
 };
