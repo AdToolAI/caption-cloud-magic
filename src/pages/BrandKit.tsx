@@ -420,6 +420,9 @@ const BrandKit = () => {
   };
 
   const handleApplyDna = (dna: BrandDnaResult) => {
+    // Keep the full extraction (palette, fonts, keywords, metadata) so nothing
+    // is lost between "Apply" and the actual save.
+    setExtractedDna(dna);
     setFormData((prev) => ({
       ...prev,
       brandName: dna.brand_name ?? prev.brandName,
