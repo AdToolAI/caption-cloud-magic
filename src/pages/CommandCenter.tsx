@@ -13,6 +13,7 @@ import type { CommandCenterView } from "@/components/routing/CommandCenterRedire
 import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
 import { UpgradeAccessDialog } from "@/components/access/UpgradeAccessDialog";
 import { tx } from "@/lib/i18nText";
+import { upgradeCtaLabel } from '@/lib/pricingDisplay';
 
 const CalendarPage = lazy(() => import("./Calendar"));
 const PlannerV2Lazy = lazy(() =>
@@ -219,11 +220,7 @@ export default function CommandCenter() {
               })}
             </p>
             <Button className="mt-6" onClick={() => setUpgradeOpen(true)}>
-              {tx({
-                de: "Upgrade auf Beta Basic – 14,95 €/Monat",
-                en: "Upgrade to Beta Basic – €14.95/month",
-                es: "Mejora a Beta Basic – 14,95 €/mes",
-              })}
+              {upgradeCtaLabel()}
             </Button>
           </section>
         ) : (
