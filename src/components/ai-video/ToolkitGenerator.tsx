@@ -43,6 +43,7 @@ import {
   validateStudioSelection,
 } from '@/lib/videoCapabilities/studioCapabilities';
 import { resolvePricingId } from '@/config/videoModelSpecs';
+import { VIDEO_PRICING_CATALOG } from '@/lib/cost/videoPricingCatalog';
 
 import { GenerateSection } from './generate/GenerateSection';
 import { QuickSettingsBar } from './generate/QuickSettingsBar';
@@ -701,10 +702,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   const blockingIssue = capabilityViolation?.message ?? placementViolation ?? inputViolation ?? audioViolation;
 
-  /* ── Model switch: URL sync ONLY ──
-   * No silent resets. Duration / aspect ratio / resolution / audio / uploads
-   * and the chosen placement are the user's state; an unsupported combination
-   * is surfaced above and blocks the start until the user resolves it. */
+  /* ── Model switch: URL sync ──
+   * Duration / aspect ratio / resolution / audio stay the user's state; an
+   * unsupported combination is surfaced above and blocks the start. */
   useEffect(() => {
     if (searchParams.get('model') !== model.id) {
       const next = new URLSearchParams(searchParams);
@@ -713,6 +713,48 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model.id]);
+
+  /* ── Model switch: release inputs the NEW route cannot accept ──
+   * Reference images, a reference video or an end/anchor placement carried
+   * over from the previous model kept resolving the generation mode to
+   * something the new route has no mode for (Kling 3 landed in `reference`
+   * although its uploader is not even rendered any more — an unresolvable
+   * block). Nothing is silently converted: every released input is named. */
+  const prevModelIdRef = useRef(model.id);
+  useEffect(() => {
+    if (prevModelIdRef.current === model.id) return;
+    prevModelIdRef.current = model.id;
+
+    const released: string[] = [];
+    if (viduReferences.length > 0 && !model.capabilities.multiRef) {
+      setViduReferences([]);
+      released.push(tx({ de: 'Referenzbilder', en: 'reference images', es: 'imágenes de referencia' }));
+    }
+    if (referenceVideoUrl && !model.capabilities.v2v) {
+      setReferenceVideoUrl(null);
+      released.push(tx({ de: 'Referenzvideo', en: 'reference video', es: 'vídeo de referencia' }));
+    }
+    if (startImageUrl && !model.capabilities.i2v && !model.capabilities.anchorOnly) {
+      setStartImageUrl(null);
+      released.push(tx({ de: 'Startbild', en: 'start image', es: 'imagen inicial' }));
+    }
+    if (
+      (referencePlacement === 'end' && !supportsEndOnlyPlacement(model.id)) ||
+      (referencePlacement === 'anchor' && !model.capabilities.anchorOnly)
+    ) {
+      setReferencePlacement('start');
+      released.push(tx({ de: 'Bild-Platzierung', en: 'image placement', es: 'ubicación de la imagen' }));
+    }
+    if (released.length) {
+      toast.info(tx({
+        de: `${model.name} kann Folgendes nicht verarbeiten – entfernt: ${released.join(', ')}.`,
+        en: `${model.name} cannot use the following – removed: ${released.join(', ')}.`,
+        es: `${model.name} no admite lo siguiente – eliminado: ${released.join(', ')}.`,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model.id]);
+
 
 
   // Canonical per-second price from server catalog (falls back to local config).
@@ -732,13 +774,26 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     () => resolvePricingId(model.id, studioMode, resolution) ?? model.id,
     [model.id, studioMode, resolution],
   );
-  // Catalog prices are already personalized; the local fallback is a list price.
   const catalogPricePerSecond = getPricePerSecond(billingPricingId, billingCurrency);
   // Never show a binding price we could not verify against the server catalog —
   // that was the source of preview/charge mismatches.
   const priceUnverified = !catalogReady || catalogPricePerSecond == null;
+  /**
+   * Offline mirror of the SAME canonical catalog the backend charges from.
+   * The old fallback read `model.costPerSecond` from the display registry,
+   * which could quote a materially different (per-clip legacy) rate. When the
+   * mirror has no row either, there is no price at all — `priceUnverified`
+   * already blocks the start, so 0 is only a placeholder for the dash.
+   */
+  const mirrorPricePerSecond = useMemo(() => {
+    const entry = VIDEO_PRICING_CATALOG[billingPricingId];
+    if (!entry) return null;
+    const list = billingCurrency === 'USD' ? entry.sellUSD : entry.sellEUR;
+    return Math.round(list * 100) / 100;
+  }, [billingPricingId, billingCurrency]);
   const pricePerSecond =
-    catalogPricePerSecond ?? model.costPerSecond[billingCurrency] * discountFactor;
+    catalogPricePerSecond ?? (mirrorPricePerSecond != null ? mirrorPricePerSecond * discountFactor : 0);
+
   // Smart duration (-1) is reserved at the model's maximum length; the unused
   // seconds are refunded once the provider reports the real clip length.
   const billedSeconds = duration === -1

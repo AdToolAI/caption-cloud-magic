@@ -3,7 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -224,10 +224,11 @@ serve(async (req) => {
       );
     }
 
-    // Margin policy: exactly 3.00× cost (normalized 14.07.2026). Runway Gen-4 Aleph V2V ~$0.08/s → user €0.24/s.
+    // Canonical catalog price only — no local margin table (policy: net margin floor, see videoPricingCatalog.ts).
     const costPerSecond = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, 'runway-gen4-aleph', (wallet.currency === 'USD' ? 'USD' : 'EUR'), 0.18,
+      supabaseAdmin, user.id, 'runway-gen4-aleph', (wallet.currency === 'USD' ? 'USD' : 'EUR'),
     );
+    if (costPerSecond === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = duration * costPerSecond;
     const sym = wallet.currency === "USD" ? "$" : "€";
 

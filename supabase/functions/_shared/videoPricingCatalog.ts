@@ -83,7 +83,7 @@ const CATALOG_SOURCE: Record<string, CatalogSource> = {
   'luma-standard':        { id: 'luma-standard',        label: 'Luma Ray 2 Std',       unit: 'per-second', sellEUR: 0.155, costEUR: 0.07,  minDuration: 5,  maxDuration: 9  },
   'luma-pro':             { id: 'luma-pro',             label: 'Luma Ray 2 Pro',       unit: 'per-second', sellEUR: 0.255, costEUR: 0.12,  minDuration: 5,  maxDuration: 9  },
   // Luma Ray 3.2 — Replicate bepreist pro Clip ($0.30 / 5s, $0.90 / 10s @720p).
-  // Deshalb je Clip-Länge ein eigener Tarif, damit 3.00× exakt aufgeht.
+  // Deshalb je Clip-Länge ein eigener Tarif (Marge nach Netto-Policy).
   'luma-ray32-5s':        { id: 'luma-ray32-5s',        label: 'Luma Ray 3.2 (5s)',    unit: 'per-second', sellEUR: 0.135, costEUR: 0.06,  minDuration: 5,  maxDuration: 5  },
   'luma-ray32-10s':       { id: 'luma-ray32-10s',       label: 'Luma Ray 3.2 (10s)',   unit: 'per-second', sellEUR: 0.2, costEUR: 0.09,  minDuration: 10, maxDuration: 10 },
 

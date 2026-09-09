@@ -5,7 +5,7 @@ import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,15 +13,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Normalized 14.07.2026 — exactly 3.00× Replicate cost margin
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'luma-standard': { EUR: 0.21, USD: 0.21 },
-  'luma-pro':      { EUR: 0.36, USD: 0.36 },
-  // Ray 3.2 wird von Replicate pro Clip bepreist ($0.30/5s, $0.90/10s @720p);
-  // die Sekundenpreise unten ergeben exakt 3.00× bei fixer Cliplänge.
-  'luma-ray32-5s':  { EUR: 0.18, USD: 0.18 },
-  'luma-ray32-10s': { EUR: 0.27, USD: 0.27 },
-};
 
 /** Replicate slug per model tier. */
 const LUMA_SLUG: Record<string, string> = {
@@ -116,10 +107,11 @@ serve(async (req) => {
 
     // Calculate cost
     // Canonical price from the shared catalog (same source as the UI preview,
-    // including the account discount). MODEL_PRICING is only a legacy fallback.
+ *// including the account discount). There is no local fallback table any more.
     const costPerSecond = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, model, currency as "EUR" | "USD", 0.21,
+      supabaseAdmin, user.id, model, currency as "EUR" | "USD",
     );
+    if (costPerSecond === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 

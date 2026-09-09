@@ -4,7 +4,7 @@ import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.t
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
 import { resolvePricingId } from "../_shared/videoModelSpecs.ts";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 import {
   createSeedance25Task,
   getModelArkTask,
@@ -302,8 +302,9 @@ Deno.serve(async (req) => {
       resolvePricingId(MODEL_ID, generationMode, gate.resolutionLabel ?? resolution) ?? MODEL_ID;
 
     const costPerSecond = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, pricingModelId, currency, 0.3983,
+      supabaseAdmin, user.id, pricingModelId, currency,
     );
+    if (costPerSecond === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = +(billedDuration * costPerSecond).toFixed(4);
 
     const { data: wallet, error: walletError } = await supabaseAdmin

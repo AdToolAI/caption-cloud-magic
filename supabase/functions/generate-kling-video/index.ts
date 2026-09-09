@@ -6,7 +6,7 @@ import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-m
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond, VIDEO_PRICING_CATALOG } from "../_shared/videoPricingCatalog.ts";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -163,8 +163,9 @@ serve(async (req) => {
 
     // Canonical price from shared pricing catalog — single source of truth.
     const costPerSecond = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, model, currency as 'EUR' | 'USD', 0.18,
+      supabaseAdmin, user.id, model, currency as 'EUR' | 'USD',
     );
+    if (costPerSecond === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = +(duration * costPerSecond).toFixed(4);
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 

@@ -8,7 +8,7 @@ import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-m
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { sanitizeForHappyHorse, isGreenNetRejection } from "../_shared/happyhorse-green-net.ts";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,12 +20,6 @@ type HappyHorseModel = "happyhorse-standard" | "happyhorse-pro";
 
 const REPLICATE_MODEL = "alibaba/happyhorse-1.0";
 
-// Per-second prices (EUR). Replicate billing is per second of output.
-// 720p ≈ $0.14/s, 1080p ≈ $0.28/s — normalized 14.07.2026 to exactly 3.00× cost margin.
-const COST_PER_SECOND_EUR: Record<HappyHorseModel, number> = {
-  "happyhorse-standard": 0.42,
-  "happyhorse-pro":      0.84,
-};
 
 const RESOLUTIONS: Record<HappyHorseModel, "720p" | "1080p"> = {
   "happyhorse-standard": "720p",
@@ -194,9 +188,8 @@ serve(async (req) => {
     );
     if (gate.response) return gate.response;
 
-    const costPerSecond = COST_PER_SECOND_EUR[model];
     const resolution = gate.resolutionLabel ?? RESOLUTIONS[model];
-    if (!costPerSecond || !resolution) {
+    if (!resolution) {
       return new Response(
         JSON.stringify({ error: `Unknown HappyHorse model: ${model}` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -233,8 +226,9 @@ serve(async (req) => {
       .maybeSingle();
     const walletCurrency = walletCurrencyRow?.currency === 'USD' ? 'USD' : 'EUR';
     const effectiveCps = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, model, walletCurrency, costPerSecond,
+      supabaseAdmin, user.id, model, walletCurrency,
     );
+    if (effectiveCps === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = +(effectiveCps * duration).toFixed(2);
 
     // Wallet check
@@ -298,7 +292,7 @@ serve(async (req) => {
         duration_seconds: duration,
         aspect_ratio: aspectRatio,
         resolution,
-        cost_per_second: costPerSecond,
+        cost_per_second: effectiveCps,
         total_cost_euros: totalCost,
         status: "pending",
         source_image_url: hasImage ? image : null,

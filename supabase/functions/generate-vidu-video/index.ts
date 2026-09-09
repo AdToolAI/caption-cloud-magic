@@ -8,6 +8,7 @@ import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-m
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
+import { pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,14 +18,6 @@ const corsHeaders = {
 
 type ViduModel = "vidu-q2-reference" | "vidu-q2-i2v" | "vidu-q2-t2v";
 
-// Vidu Q3 bills per second of output. Provider rates (platform.vidu.com/docs/pricing,
-// worst case 1080p): q3-pro ≈ $0.125/s, q3-turbo ≈ $0.065/s.
-// Margin policy: exactly 3.00× provider cost — mirrors VIDEO_PRICING_CATALOG.
-const PRICE_PER_SECOND_EUR: Record<ViduModel, number> = {
-  "vidu-q2-reference": 0.375,
-  "vidu-q2-i2v":       0.375,
-  "vidu-q2-t2v":       0.195,
-};
 
 // NOTE: no hand-written provider-slug map here. The concrete Replicate
 // contract per (model x mode) is canonical truth
@@ -45,7 +38,11 @@ const MAX_DURATION = 16;
 const DEFAULT_DURATION = 5;
 const ALLOWED_ASPECTS = new Set(["16:9", "9:16", "1:1", "4:3", "3:4"]);
 const ALLOWED_RESOLUTIONS = new Set(["540p", "720p", "1080p"]);
-const MAX_REFERENCES = 7;
+// Route truth (Replicate `vidu/q3-*`, 11.08.2026): exactly ONE image input
+// (`start_image`, optionally paired with `end_image`). There is no reference
+// array, so more than one uploaded reference is REJECTED instead of being
+// folded into the prompt and billed as if it had been sent.
+const MAX_REFERENCES = 1;
 const VALID_ROLES = new Set(["character", "product", "location", "style", "prop"]);
 
 interface GenerateRequest {
@@ -226,7 +223,6 @@ serve(async (req) => {
       seed,
     } = body;
 
-    const perSecond = PRICE_PER_SECOND_EUR[model];
     const duration = Number(rawDuration ?? DEFAULT_DURATION);
     const requestedResolution = String(rawResolution ?? "1080p");
 
@@ -260,9 +256,11 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
     const viduWalletCurrency = viduWalletCurrencyRow?.currency === 'USD' ? 'USD' : 'EUR';
-    const effectivePerSecond = resolveCostPerSecond(model, viduWalletCurrency) ?? perSecond;
+    // Canonical catalog is the ONLY price source — no local fallback table.
+    const effectivePerSecond = resolveCostPerSecond(model, viduWalletCurrency);
+    if (effectivePerSecond == null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = Number((effectivePerSecond * duration).toFixed(2));
-    if (!replicateModel || perSecond === undefined) {
+    if (!replicateModel) {
       return new Response(JSON.stringify({ error: `Unknown Vidu model: ${model}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -288,7 +286,9 @@ serve(async (req) => {
       }
       if (referenceImages.length > MAX_REFERENCES) {
         return new Response(JSON.stringify({
-          error: `Maximum ${MAX_REFERENCES} reference images allowed.`,
+          error:
+            "Vidu Q3 accepts exactly one image (start frame, optionally with an end frame). " +
+            "Additional reference images are NOT sent to the provider — please remove them.",
           code: "TOO_MANY_REFERENCES",
         }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -356,7 +356,7 @@ serve(async (req) => {
         duration_seconds: duration,
         aspect_ratio: aspectRatio,
         resolution,
-        cost_per_second: perSecond,
+        cost_per_second: effectivePerSecond,
         total_cost_euros: totalCost,
         status: "pending",
         source_image_url: startImageUrl ?? referenceImages[0] ?? null,
@@ -393,14 +393,9 @@ serve(async (req) => {
     };
 
     if (model === "vidu-q2-reference") {
-      // q3-pro does not accept a multi-image array — send the first reference
-      // as `start_image`; remaining refs were already folded into the prompt
-      // via buildReferenceSuffix() above.
+      // q3-pro accepts exactly one image; more than one is rejected above.
       const img = referenceImages[0];
       if (img) viduInput.start_image = img;
-      if (referenceImages.length > 1) {
-        console.log(`[generate-vidu-video] Note: q3-pro accepts 1 start_image; ${referenceImages.length - 1} extra refs folded into prompt.`);
-      }
     } else if (model === "vidu-q2-i2v") {
       const img = startImageUrl ?? referenceImages[0];
       if (img) viduInput.start_image = img;

@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 
@@ -12,7 +12,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Pricing in EUR/USD per second — normalized 14.07.2026 to 3.00× Replicate cost margin
+// Customer pricing comes exclusively from the canonical catalog (_shared/videoPricingCatalog.ts).
 /** Provider-side capacity errors (Google Veo "code: 8" / RESOURCE_EXHAUSTED,
  *  Replicate 503 / "high load"). Transient and unrelated to our own load. */
 function isProviderOverload(err: any): boolean {
@@ -26,12 +26,6 @@ function isProviderOverload(err: any): boolean {
     || /"?code"?\s*:\s*8\b/.test(msg);
 }
 
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'veo-3.1-lite-720p':  { EUR: 0.45, USD: 0.45 },
-  'veo-3.1-lite-1080p': { EUR: 0.66, USD: 0.66 },
-  'veo-3.1-fast':       { EUR: 1.20, USD: 1.20 },
-  'veo-3.1-pro':        { EUR: 3.30, USD: 3.30 },
-};
 
 const REPLICATE_MODELS: Record<string, string> = {
   'veo-3.1-lite-720p': 'google/veo-3.1-fast',
@@ -122,7 +116,7 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    if (!MODEL_PRICING[model]) {
+    if (!REPLICATE_MODELS[model]) {
       return new Response(
         JSON.stringify({ error: "Invalid model" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -165,10 +159,11 @@ serve(async (req) => {
 
     // Cost
     // Canonical price from the shared catalog (same source as the UI preview,
-    // including the account discount). MODEL_PRICING is only a legacy fallback.
+ *// including the account discount). There is no local fallback table any more.
     const costPerSecond = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, model, currency as "EUR" | "USD", 0.32,
+      supabaseAdmin, user.id, model, currency as "EUR" | "USD",
     );
+    if (costPerSecond === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 

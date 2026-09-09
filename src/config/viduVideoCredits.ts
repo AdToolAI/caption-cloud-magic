@@ -1,44 +1,38 @@
 import { tx } from "@/lib/i18nText";
 /**
- * Vidu Pricing Reference (IDs heißen weiterhin q2-*, laufen real auf Vidu Q3)
+ * Vidu display reference (IDs heißen weiterhin q2-*, laufen real auf Vidu Q3)
  * --------------------------------------------------------------
- * Vidu Q3 from Shengshu AI — distinguishing feature: Reference2V mode
- * accepts up to 7 reference images (character + product + location +
- * style + props) and blends them into one consistent 5-second clip.
+ * PREISE STEHEN HIER NICHT. Der einzige Preis-Ursprung ist der kanonische
+ * Katalog (`src/lib/cost/videoPricingCatalog.ts` bzw. sein Deno-Spiegel).
+ * Die früheren `flatCost*`-Felder (0,39–0,43 € pro Clip) stammten aus einer
+ * alten Pauschal-Logik und lagen materiell unter dem echten Sekundentarif —
+ * sie sind entfernt, damit sie nirgends mehr als Fallback auftauchen können.
  *
- * Pricing is FLAT per generation (5s fixed), not per-second.
- * The cost-per-second numbers below exist only for UI parity with
- * other providers (= flat / 5).
+ * Vidu Q3 auf Replicate akzeptiert genau EIN Bild (`start_image`, optional mit
+ * `end_image`). Es gibt keinen nativen Multi-Reference-Input.
  */
 
-// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 export const VIDU_VIDEO_MODELS = {
   'vidu-q2-reference': {
     name: 'Vidu Q3 Reference',
     provider: 'Shengshu AI (Replicate)',
-    flatCostEUR: 0.43,
-    flatCostUSD: 0.43,
     fixedDuration: 5,
-    maxReferences: 7,
-    description: tx({ de: 'Bis zu 7 Referenzbilder (Character + Produkt + Location) in einer 5s-Szene', en: 'Up to 7 reference images (character + product + location) in a 5s scene', es: 'Hasta 7 imágenes de referencia (personaje + producto + ubicación) en una escena de 5 segundos' }),
-    badge: 'Multi-Ref',
+    maxReferences: 1,
+    description: tx({ de: 'Ein Referenzbild als Startframe, optional mit Endframe', en: 'One reference image as the start frame, optionally with an end frame', es: 'Una imagen de referencia como fotograma inicial, opcionalmente con fotograma final' }),
+    badge: 'Start+End',
   },
   'vidu-q2-i2v': {
     name: 'Vidu Q3 Image-to-Video',
     provider: 'Shengshu AI (Replicate)',
-    flatCostEUR: 0.39,
-    flatCostUSD: 0.39,
     fixedDuration: 5,
-    description: tx({ de: 'Animiert ein Standbild zu einem 5s-Clip', en: 'Animates a still image into a 5s clip', es: 'Anima una imagen fija en un clip de 5 segundos.' }),
+    description: tx({ de: 'Animiert ein Standbild zu einem Clip', en: 'Animates a still image into a clip', es: 'Anima una imagen fija en un clip' }),
     badge: 'I2V',
   },
   'vidu-q2-t2v': {
     name: 'Vidu Q3 Text-to-Video',
     provider: 'Shengshu AI (Replicate)',
-    flatCostEUR: 0.39,
-    flatCostUSD: 0.39,
     fixedDuration: 5,
-    description: tx({ de: '5s Clip aus reinem Prompt', en: '5s clip from pure prompt', es: 'Clip de 5 segundos de Pure Prompt' }),
+    description: tx({ de: 'Clip aus reinem Prompt', en: 'Clip from a pure prompt', es: 'Clip a partir de un prompt' }),
     badge: 'T2V',
   },
 } as const;

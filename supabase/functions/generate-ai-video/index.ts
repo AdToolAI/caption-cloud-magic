@@ -6,7 +6,7 @@ import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { withTimeout, isTimeoutError } from "../_shared/timeout.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,13 +14,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Sora 2 customer pricing per second — mirrors VIDEO_PRICING_CATALOG.
-// Provider (OpenAI via Replicate): sora-2 $0.10/s, sora-2-pro up to $0.50/s (1080p).
-// Margin policy: exactly 3.00× provider cost.
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'sora-2-standard': { EUR: 0.30, USD: 0.30 },
-  'sora-2-pro':      { EUR: 1.50, USD: 1.50 },
-};
 
 interface GenerateRequest {
   prompt: string;
@@ -102,10 +95,11 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
     // Calculate cost based on model and currency
     // Canonical price from the shared catalog (same source as the UI preview,
-    // including the account discount). MODEL_PRICING is only a legacy fallback.
+ *// including the account discount). There is no local fallback table any more.
     const costPerSecond = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, model, currency as "EUR" | "USD", 0.22,
+      supabaseAdmin, user.id, model, currency as "EUR" | "USD",
     );
+    if (costPerSecond === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 

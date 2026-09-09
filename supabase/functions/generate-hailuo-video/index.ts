@@ -6,7 +6,7 @@ import { getVisualStyleHint, type ComposerVisualStyle } from "../_shared/compose
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,11 +14,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Normalized 14.07.2026 — exactly 3.00× Replicate cost margin
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'hailuo-standard': { EUR: 0.14, USD: 0.14 },
-  'hailuo-pro':      { EUR: 0.23, USD: 0.23 },
-};
 
 interface GenerateRequest {
   prompt: string;
@@ -102,10 +97,11 @@ serve(async (req) => {
 
     // Calculate cost
     // Canonical price from the shared catalog (same source as the UI preview,
-    // including the account discount). MODEL_PRICING is only a legacy fallback.
+ *// including the account discount). There is no local fallback table any more.
     const costPerSecond = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, model, currency as "EUR" | "USD", 0.14,
+      supabaseAdmin, user.id, model, currency as "EUR" | "USD",
     );
+    if (costPerSecond === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 

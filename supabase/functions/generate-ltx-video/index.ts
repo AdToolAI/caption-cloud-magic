@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { allowanceJobKey, claimIncludedAllowance, releaseIncludedAllowance } from "../_shared/included-allowance.ts";
@@ -14,11 +14,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// LTX 2.3 — provider cost fast $0.06/s, pro $0.08/s (3× margin)
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'ltx-standard': { EUR: 0.18, USD: 0.18 },
-  'ltx-pro':      { EUR: 0.24, USD: 0.24 },
-};
 
 // Lightricks LTX 2.3 — text-to-video and image-to-video with native audio
 const REPLICATE_MODELS: Record<string, string> = {
@@ -105,10 +100,11 @@ serve(async (req) => {
     const currency = walletPreview?.currency || 'EUR';
 
     // Canonical price from the shared catalog (same source as the UI preview,
-    // including the account discount). MODEL_PRICING is only a legacy fallback.
+ *// including the account discount). There is no local fallback table any more.
     const costPerSecond = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, model, currency as "EUR" | "USD", 0.135,
+      supabaseAdmin, user.id, model, currency as "EUR" | "USD",
     );
+    if (costPerSecond === null) return pricingUnavailableResponse(corsHeaders);
     const listCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 

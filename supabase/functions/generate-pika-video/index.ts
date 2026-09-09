@@ -5,7 +5,7 @@ import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-m
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,12 +13,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
-// Std: $0.04/s → €0.12/s | Pro: $0.09/s → €0.27/s
-const MODEL_PRICING: Record<string, number> = {
-  'pika-2-2-standard': 0.12,
-  'pika-2-2-pro': 0.27,
-};
 
 // Pika 2.2 on Replicate
 const REPLICATE_MODELS: Record<string, string> = {
@@ -175,8 +169,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const { prompt, model, duration, aspectRatio, startImageUrl, endImageUrl, negativePrompt } = body;
 
     const replicateModel = REPLICATE_MODELS[model];
-    const costPerSecond = MODEL_PRICING[model];
-    if (!replicateModel || !costPerSecond) {
+    if (!replicateModel) {
       return new Response(JSON.stringify({ error: `Unknown Pika model: ${model}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -216,8 +209,9 @@ serve((req: Request) => withLang(req, () => (async (req) => {
 
     // Canonical catalog price (identical to the UI preview, incl. account discount).
     const effectiveCps = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, model, (wallet.currency === 'USD' ? 'USD' : 'EUR'), costPerSecond,
+      supabaseAdmin, user.id, model, (wallet.currency === 'USD' ? 'USD' : 'EUR'),
     );
+    if (effectiveCps === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = duration * effectiveCps;
     const sym = wallet.currency === "USD" ? "$" : "€";
     if (wallet.balance_euros < totalCost) {
@@ -247,7 +241,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         duration_seconds: duration,
         aspect_ratio: aspectRatio,
         resolution: model === 'pika-2-2-pro' ? '1080p' : '720p',
-        cost_per_second: costPerSecond,
+        cost_per_second: effectiveCps,
         total_cost_euros: totalCost,
         status: "pending",
         source_image_url: startImageUrl ?? null,

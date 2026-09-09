@@ -5,7 +5,7 @@ import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,15 +13,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Normalized 14.07.2026 — exactly 3.00× Replicate cost margin
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'wan-standard':      { EUR: 0.12, USD: 0.12 },
-  'wan-pro':           { EUR: 0.21, USD: 0.21 },
-  'wan-2-6-standard':  { EUR: 0.12, USD: 0.12 },
-  'wan-2-6-pro':       { EUR: 0.21, USD: 0.21 },
-  'wan-2-7-standard':  { EUR: 0.30, USD: 0.30 },
-  'wan-2-7-pro':       { EUR: 0.45, USD: 0.45 },
-};
 
 // NOTE: there is deliberately NO second provider-slug map here. The concrete
 // Replicate contract per (model x mode) lives in the canonical registry
@@ -122,10 +113,11 @@ serve(async (req) => {
 
     // Calculate cost
     // Canonical price from the shared catalog (same source as the UI preview,
-    // including the account discount). MODEL_PRICING is only a legacy fallback.
+ *// including the account discount). There is no local fallback table any more.
     const costPerSecond = await resolveAccountCostPerSecond(
-      supabaseAdmin, user.id, model, currency as "EUR" | "USD", 0.12,
+      supabaseAdmin, user.id, model, currency as "EUR" | "USD",
     );
+    if (costPerSecond === null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 
