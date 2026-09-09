@@ -18,17 +18,23 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { parseBatchPrompts } from "@/lib/pictureModels/batchPrompts";
 import { useOptionalActiveAsset } from "./ActiveAssetContext";
+import { usePicturePremium } from "@/hooks/usePicturePremium";
+import { PicturePremiumDialog } from "./PicturePremiumDialog";
+import { isSpecialistTier } from "@/lib/pictureStudio/premium";
+import { Lock } from "lucide-react";
 
 
-type QualityTier = 'fast' | 'pro' | 'ultra';
+type QualityTier = 'gptimage' | 'fast' | 'pro' | 'ultra';
 
 const TIER_COSTS: Record<QualityTier, number> = {
+  gptimage: 0.08,
   fast: 0.04,
   pro: 0.08,
   ultra: 0.20,
 };
 
 const TIER_META: Record<QualityTier, { label: string; model: string; icon: any }> = {
+  gptimage: { label: 'GPT Image', model: 'GPT-Image-2', icon: Sparkles },
   fast: { label: 'Fast', model: 'Seedream 4', icon: Zap },
   pro: { label: 'Pro', model: 'Imagen 4 Ultra', icon: Crown },
   ultra: { label: 'Ultra', model: 'Nano Banana 2', icon: Gem },
@@ -46,9 +52,11 @@ export function BatchGeneratePanel() {
   const navigate = useNavigate();
   const { wallet } = useAIVideoWallet();
   const { data: activeBrandKit } = useActiveBrandKit();
+  const { isEntitled } = usePicturePremium();
+  const [premiumDialogOpen, setPremiumDialogOpen] = useState(false);
 
   const [rawPrompts, setRawPrompts] = useState("");
-  const [tier, setTier] = useState<QualityTier>('fast');
+  const [tier, setTier] = useState<QualityTier>('gptimage');
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [style, setStyle] = useState("realistic");
   const [useBrandKit, setUseBrandKit] = useState(false);
@@ -118,6 +126,7 @@ export function BatchGeneratePanel() {
 
   const handleStart = async () => {
     if (!user) { toast.error(tx({ de: "Bitte zuerst einloggen", en: "Please log in first", es: "Por favor, inicia sesión primero" })); return; }
+    if (isSpecialistTier(tier) && !isEntitled) { setPremiumDialogOpen(true); return; }
     if (!prompts.length) { toast.error(tx({ de: "Mindestens 1 Prompt eingeben", en: "Enter at least 1 prompt", es: "Introduce al menos 1 mensaje" })); return; }
     if (prompts.length > 20) { toast.error(tx({ de: "Max. 20 Prompts pro Batch", en: "Max. 20 prompts per batch", es: "Máx. 20 indicaciones por lote" })); return; }
     if (insufficient) {
@@ -214,7 +223,7 @@ export function BatchGeneratePanel() {
           {/* Tier */}
           <div className="space-y-2">
             <Label>{tx({ de: "Qualität & Modell", en: "Quality & Model", es: "Calidad y modelo" })}</Label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {(Object.keys(TIER_META) as QualityTier[]).map((t) => {
                 const meta = TIER_META[t];
                 const Icon = meta.icon;
@@ -234,6 +243,7 @@ export function BatchGeneratePanel() {
                     <div className="flex items-center gap-2 mb-1">
                       <Icon className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
                       <span className="font-semibold text-sm">{meta.label}</span>
+                      {!isEntitled && isSpecialistTier(t) && <Lock className="h-3 w-3 text-primary ml-auto" />}
                     </div>
                     <p className="text-[10px] text-muted-foreground mb-1.5">{meta.model}</p>
                     <Badge variant="outline" className="text-[10px] h-5">
@@ -371,6 +381,12 @@ export function BatchGeneratePanel() {
           ))}
         </div>
       )}
+      <PicturePremiumDialog
+        open={premiumDialogOpen}
+        onOpenChange={setPremiumDialogOpen}
+        fallbackLabel="GPT Image"
+        onFallback={() => setTier('gptimage')}
+      />
     </div>
   );
 }

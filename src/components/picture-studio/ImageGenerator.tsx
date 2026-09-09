@@ -48,6 +48,10 @@ import {
   type SourceDimensions,
 } from "@/config/pictureFormatResolution";
 import { detectTransparencyWish, detectEditIntent } from "@/config/pictureIntentHints";
+import { usePicturePremium } from "@/hooks/usePicturePremium";
+import { PicturePremiumDialog } from "./PicturePremiumDialog";
+import { isSpecialistTier, PICTURE_FALLBACK_TIER } from "@/lib/pictureStudio/premium";
+import { Lock } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Eye, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -87,12 +91,16 @@ const TIER_META: Record<QualityTier, { label: string; model: string; icon: any; 
   qwen: { label: 'Qwen', model: 'Qwen Image', icon: ImageIcon, gradient: 'from-cyan-500/20 to-sky-500/20' },
 };
 
-const MAIN_TIERS: QualityTier[] = ['standard', 'fast', 'pro', 'ultra'];
-const SPECIALIST_TIERS: QualityTier[] = ['gptimage', 'flux', 'ideogram', 'recraft', 'qwen'];
+/** Core models — usable by everyone (still billed with AI credits). */
+const MAIN_TIERS: QualityTier[] = ['standard', 'gptimage', 'ideogram', 'recraft', 'qwen'];
+/** Specialist models — subscription required (see picture-studio-premium.ts). */
+const SPECIALIST_TIERS: QualityTier[] = ['fast', 'pro', 'ultra', 'flux'];
 
 
 export function ImageGenerator() {
   const { user } = useAuth();
+  const { isEntitled } = usePicturePremium();
+  const [premiumDialogOpen, setPremiumDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { wallet } = useAIVideoWallet();
   const { data: activeBrandKit } = useActiveBrandKit();
@@ -664,6 +672,7 @@ export function ImageGenerator() {
   const handleGenerate = () => {
     if (!prompt.trim()) { toast.error(t('picStudio.promptRequired')); return; }
     if (!user) { toast.error(t('picStudio.loginRequired')); return; }
+    if (isSpecialistTier(tier) && !isEntitled) { setPremiumDialogOpen(true); return; }
     // Free tier (Gemini/Standard "Gratis im Abo") skips confirm.
     if (cost <= 0) { void runGenerate(); return; }
     if (hasInsufficientCredits) {
@@ -912,7 +921,7 @@ export function ImageGenerator() {
               <summary className="cursor-pointer select-none px-3 py-2 text-xs text-muted-foreground">
                 {tx({ de: 'Spezialmodelle', en: 'Specialist models', es: 'Modelos especializados' })}
               </summary>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 p-2 pt-0">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-2 pt-0">
                 {SPECIALIST_TIERS.map((t) => {
                   const meta = TIER_META[t];
                   const Icon = meta.icon;
@@ -932,11 +941,17 @@ export function ImageGenerator() {
                       <div className="flex items-center gap-2 mb-1">
                         <Icon className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
                         <span className="font-semibold text-xs">{meta.label}</span>
+                        {!isEntitled && <Lock className="h-3 w-3 text-primary ml-auto" />}
                       </div>
                       <p className="text-[10px] text-muted-foreground mb-1">{PICTURE_MODELS[t].bestFor[0]}</p>
-                      <Badge variant="outline" className="text-[10px] h-5">
-                        {currencySymbol}{tierCost.toFixed(2)}
-                      </Badge>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <Badge variant="outline" className="text-[10px] h-5">
+                          {currencySymbol}{tierCost.toFixed(2)}
+                        </Badge>
+                        {!isEntitled && (
+                          <Badge variant="secondary" className="text-[10px] h-5">PRO</Badge>
+                        )}
+                      </div>
                     </button>
                   );
                 })}
@@ -1509,6 +1524,13 @@ export function ImageGenerator() {
         referenceImageUrl={mode === 'transform' ? referenceImage : mode === 'restyle' ? styleReference : null}
         autoEnhance={helperAutoEnhance}
         onApply={handleHelperApply}
+      />
+
+      <PicturePremiumDialog
+        open={premiumDialogOpen}
+        onOpenChange={setPremiumDialogOpen}
+        fallbackLabel="GPT Image"
+        onFallback={() => setTier(PICTURE_FALLBACK_TIER as QualityTier)}
       />
 
       <AIVideoCostConfirmDialog

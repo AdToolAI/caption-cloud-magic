@@ -35,6 +35,10 @@ import { useActiveAsset } from "./ActiveAssetContext";
 import { BeforeAfterCanvas } from "./BeforeAfterCanvas";
 import { AssetLineageStrip } from "./AssetLineageStrip";
 import { ModelControls } from "./ModelControls";
+import { usePicturePremium } from "@/hooks/usePicturePremium";
+import { PicturePremiumDialog } from "./PicturePremiumDialog";
+import { isPremiumEnhanceModel, PICTURE_FALLBACK_ENHANCE_MODEL } from "@/lib/pictureStudio/premium";
+import { Lock } from "lucide-react";
 
 type EnhanceTask = "upscale" | "restore" | "colorize";
 
@@ -67,6 +71,8 @@ export function EnhancePanel() {
 
   const [task, setTask] = useState<EnhanceTask>("upscale");
   const [modelId, setModelId] = useState<string>("clarity-pro");
+  const { isEntitled } = usePicturePremium();
+  const [premiumDialogOpen, setPremiumDialogOpen] = useState(false);
   const [scale, setScale] = useState<number>(2);
   const [presetId, setPresetId] = useState<string | null>("balanced");
   const [valuesByModel, setValuesByModel] = useState<Record<string, Record<string, unknown>>>({});
@@ -256,6 +262,10 @@ export function EnhancePanel() {
       return;
     }
     if (!model) return;
+    if (isPremiumEnhanceModel(model.id) && !isEntitled) {
+      setPremiumDialogOpen(true);
+      return;
+    }
     if (!isUnlocked(model)) {
       toast.info(
         tx({
@@ -281,7 +291,9 @@ export function EnhancePanel() {
     }
   };
 
-  const compareModels = models.filter(isUnlocked).slice(0, 2);
+  const compareModels = models
+    .filter((m) => isUnlocked(m) && (isEntitled || !isPremiumEnhanceModel(m.id)))
+    .slice(0, 2);
   const canCompare = task === "upscale" && compareModels.length >= 2 && !!sourceUrl;
 
   const handleCompare = async () => {
@@ -374,6 +386,11 @@ export function EnhancePanel() {
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   {m.bestFor.map((b) => pickLocalized(b, language)).join(" · ")}
                 </p>
+                {isPremiumEnhanceModel(m.id) && !isEntitled && (
+                  <Badge variant="secondary" className="mt-2 mr-2 text-[10px]">
+                    <Lock className="mr-1 h-3 w-3" />PRO
+                  </Badge>
+                )}
                 {!isUnlocked(m) && (
                   <Badge variant="secondary" className="mt-2 text-[10px]">
                     {tx({ de: "Bald verfügbar", en: "Coming soon", es: "Próximamente" })}
@@ -622,6 +639,13 @@ export function EnhancePanel() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PicturePremiumDialog
+        open={premiumDialogOpen}
+        onOpenChange={setPremiumDialogOpen}
+        fallbackLabel="Clarity Pro"
+        onFallback={() => setModelId(PICTURE_FALLBACK_ENHANCE_MODEL)}
+      />
     </div>
   );
 }

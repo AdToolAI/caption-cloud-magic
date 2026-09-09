@@ -8,6 +8,12 @@ import {
   resolveSize,
 } from "../_shared/pictureModelCapabilities.ts";
 import { readImageDimensions } from "../_shared/imageDimensions.ts";
+import {
+  PICTURE_FALLBACK_TIER,
+  PICTURE_SPECIALIST_PREMIUM_REQUIRED,
+  isPictureStudioPremiumEntitled,
+  isSpecialistTier,
+} from "../_shared/picture-studio-premium.ts";
 import { SOURCE_FORMAT } from "../_shared/pictureFormatResolution.ts";
 import { persistStudioImage } from "../_shared/studio-image-persist.ts";
 import {
@@ -148,6 +154,25 @@ serve(async (req) => {
         JSON.stringify({ error: "Invalid tier. Use fast, pro, or ultra." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Subscription gate BEFORE pricing, wallet mutation, provider call and job creation.
+    if (isSpecialistTier(tier)) {
+      const entitled = await isPictureStudioPremiumEntitled(
+        supabaseAdmin,
+        user.id,
+        (key) => Deno.env.get(key) ?? undefined,
+      );
+      if (!entitled) {
+        return new Response(
+          JSON.stringify({
+            error: "Specialist models require an active subscription.",
+            code: PICTURE_SPECIALIST_PREMIUM_REQUIRED,
+            fallbackTier: PICTURE_FALLBACK_TIER,
+          }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Wallet currency + balance
