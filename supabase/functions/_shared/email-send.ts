@@ -18,7 +18,7 @@ export interface SendEmailOptions {
   category: EmailCategory;
   /** Optional override of the From address. */
   from?: string;
-  /** Optional Reply-To override. Defaults to support@useadtool.ai. */
+  /** Optional Reply-To override. Defaults to info@useadtool.ai. */
   replyTo?: string;
   /** Optional extra headers to merge in. */
   extraHeaders?: Record<string, string>;
