@@ -172,6 +172,7 @@ serve(async (req) => {
       castList.length ? `AVAILABLE CAST: ${castList.join(", ")}` : "AVAILABLE CAST: (none)",
       locList.length ? `AVAILABLE LOCATIONS: ${locList.join(", ")}` : "AVAILABLE LOCATIONS: (none)",
       body.mood ? `GLOBAL MOOD: ${body.mood}` : "",
+      ...brandLines(body.brand),
       "Return ONLY the JSON storyboard.",
     ]
       .filter(Boolean)
