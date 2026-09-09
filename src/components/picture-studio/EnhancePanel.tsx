@@ -648,12 +648,6 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-3">
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">{value}</span>
-      <PicturePremiumDialog
-        open={premiumDialogOpen}
-        onOpenChange={setPremiumDialogOpen}
-        fallbackLabel="Clarity Pro"
-        onFallback={() => setModelId(PICTURE_FALLBACK_ENHANCE_MODEL)}
-      />
     </div>
   );
 }
