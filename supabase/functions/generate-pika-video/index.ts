@@ -13,12 +13,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Margin policy: exactly 3.00× Replicate cost (normalized 14.07.2026)
-// Std: $0.04/s → €0.12/s | Pro: $0.09/s → €0.27/s
-const MODEL_PRICING: Record<string, number> = {
-  'pika-2-2-standard': 0.12,
-  'pika-2-2-pro': 0.27,
-};
 
 // Pika 2.2 on Replicate
 const REPLICATE_MODELS: Record<string, string> = {

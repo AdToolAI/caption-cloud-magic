@@ -13,9 +13,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'grok-imagine': { EUR: 0.15, USD: 0.15 }, // $0.05/s provider cost — 3.00× margin
-};
 
 // xAI Grok Imagine — text-to-video and image-to-video with native audio
 const REPLICATE_MODEL_SLUG = 'xai/grok-imagine-video';

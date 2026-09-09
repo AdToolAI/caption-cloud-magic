@@ -26,12 +26,6 @@ function isProviderOverload(err: any): boolean {
     || /"?code"?\s*:\s*8\b/.test(msg);
 }
 
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'veo-3.1-lite-720p':  { EUR: 0.45, USD: 0.45 },
-  'veo-3.1-lite-1080p': { EUR: 0.66, USD: 0.66 },
-  'veo-3.1-fast':       { EUR: 1.20, USD: 1.20 },
-  'veo-3.1-pro':        { EUR: 3.30, USD: 3.30 },
-};
 
 const REPLICATE_MODELS: Record<string, string> = {
   'veo-3.1-lite-720p': 'google/veo-3.1-fast',

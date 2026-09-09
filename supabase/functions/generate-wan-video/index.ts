@@ -13,15 +13,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Normalized 14.07.2026 — exactly 3.00× Replicate cost margin
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'wan-standard':      { EUR: 0.12, USD: 0.12 },
-  'wan-pro':           { EUR: 0.21, USD: 0.21 },
-  'wan-2-6-standard':  { EUR: 0.12, USD: 0.12 },
-  'wan-2-6-pro':       { EUR: 0.21, USD: 0.21 },
-  'wan-2-7-standard':  { EUR: 0.30, USD: 0.30 },
-  'wan-2-7-pro':       { EUR: 0.45, USD: 0.45 },
-};
 
 // NOTE: there is deliberately NO second provider-slug map here. The concrete
 // Replicate contract per (model x mode) lives in the canonical registry

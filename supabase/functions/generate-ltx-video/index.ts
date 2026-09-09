@@ -14,11 +14,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// LTX 2.3 — provider cost fast $0.06/s, pro $0.08/s (3× margin)
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'ltx-standard': { EUR: 0.18, USD: 0.18 },
-  'ltx-pro':      { EUR: 0.24, USD: 0.24 },
-};
 
 // Lightricks LTX 2.3 — text-to-video and image-to-video with native audio
 const REPLICATE_MODELS: Record<string, string> = {

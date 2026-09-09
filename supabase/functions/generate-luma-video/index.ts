@@ -13,15 +13,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Normalized 14.07.2026 — exactly 3.00× Replicate cost margin
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'luma-standard': { EUR: 0.21, USD: 0.21 },
-  'luma-pro':      { EUR: 0.36, USD: 0.36 },
-  // Ray 3.2 wird von Replicate pro Clip bepreist ($0.30/5s, $0.90/10s @720p);
-  // die Sekundenpreise unten ergeben exakt 3.00× bei fixer Cliplänge.
-  'luma-ray32-5s':  { EUR: 0.18, USD: 0.18 },
-  'luma-ray32-10s': { EUR: 0.27, USD: 0.27 },
-};
 
 /** Replicate slug per model tier. */
 const LUMA_SLUG: Record<string, string> = {

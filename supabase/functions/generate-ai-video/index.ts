@@ -14,13 +14,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// Sora 2 customer pricing per second — mirrors VIDEO_PRICING_CATALOG.
-// Provider (OpenAI via Replicate): sora-2 $0.10/s, sora-2-pro up to $0.50/s (1080p).
-// Margin policy: exactly 3.00× provider cost.
-const MODEL_PRICING: Record<string, Record<string, number>> = {
-  'sora-2-standard': { EUR: 0.30, USD: 0.30 },
-  'sora-2-pro':      { EUR: 1.50, USD: 1.50 },
-};
 
 interface GenerateRequest {
   prompt: string;

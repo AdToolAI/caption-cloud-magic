@@ -17,14 +17,6 @@ const corsHeaders = {
 
 type ViduModel = "vidu-q2-reference" | "vidu-q2-i2v" | "vidu-q2-t2v";
 
-// Vidu Q3 bills per second of output. Provider rates (platform.vidu.com/docs/pricing,
-// worst case 1080p): q3-pro ≈ $0.125/s, q3-turbo ≈ $0.065/s.
-// Margin policy: exactly 3.00× provider cost — mirrors VIDEO_PRICING_CATALOG.
-const PRICE_PER_SECOND_EUR: Record<ViduModel, number> = {
-  "vidu-q2-reference": 0.375,
-  "vidu-q2-i2v":       0.375,
-  "vidu-q2-t2v":       0.195,
-};
 
 // NOTE: no hand-written provider-slug map here. The concrete Replicate
 // contract per (model x mode) is canonical truth
