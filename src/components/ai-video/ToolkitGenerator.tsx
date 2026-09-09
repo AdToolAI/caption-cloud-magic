@@ -52,7 +52,7 @@ import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor'
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
 import { extractEdgeErrorMessage, extractEdgeErrorPayload } from '@/lib/edgeFunctionError';
 import { findDuplicateReferences, isReferenceRole } from '@/lib/ai-video/referenceBinding';
-import { friendlyVideoErrorMessage } from '@/lib/videoErrorMessages';
+import { friendlyVideoErrorMessage, classifyVideoError } from '@/lib/videoErrorMessages';
 
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters } from '@/hooks/useBrandCharacters';
@@ -1240,7 +1240,21 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       refetchWallet();
       onAfterGenerate?.();
     } catch (err: any) {
-      toast.error(friendlyVideoErrorMessage(err?.message));
+      const kind = classifyVideoError(err?.message);
+      const tolerantId = getToolkitModelById('kling-3') ? 'kling-3' : (getToolkitModelById('wan-2-6-pro') ? 'wan-2-6-pro' : null);
+      const offerSwitch = (kind === 'copyright_output' || kind === 'real_person_image') && tolerantId && model.id !== tolerantId;
+      toast.error(friendlyVideoErrorMessage(err?.message), offerSwitch ? {
+        duration: 12000,
+        action: {
+          label: tx({
+            de: `Mit ${getToolkitModelById(tolerantId!)?.name ?? 'Kling 3'} versuchen`,
+            en: `Try with ${getToolkitModelById(tolerantId!)?.name ?? 'Kling 3'}`,
+            es: `Probar con ${getToolkitModelById(tolerantId!)?.name ?? 'Kling 3'}`,
+          }),
+          onClick: () => setModelId(tolerantId!),
+        },
+      } : undefined);
+
       if (rejectedSlotRef.current !== null) {
         // Set after the state reset effect so the highlight survives.
         const idx = rejectedSlotRef.current;
@@ -1602,9 +1616,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
             {tx({
-              de: `${model.name} lehnt Fotos echter Personen als Bildvorlage ab. Nutze ein KI-erzeugtes Charakterbild aus deiner Library — sonst bricht der Anbieter den Auftrag ab (ohne Kosten).`,
-              en: `${model.name} rejects photos of real people as image input. Use an AI-generated character image from your library — otherwise the provider cancels the job (at no cost).`,
-              es: `${model.name} rechaza fotos de personas reales como imagen de referencia. Usa una imagen de personaje generada por IA de tu biblioteca; de lo contrario el proveedor cancela el trabajo (sin coste).`,
+              de: `${model.name} lehnt Fotos echter Personen sowie bekannte Film-, Zeichentrick- und Markenmotive als Bildvorlage ab. Nutze ein KI-erzeugtes Charakterbild aus deiner Library — sonst bricht der Anbieter den Auftrag ab (ohne Kosten). Für bekannte Figuren sind Kling 3 oder Wan 2.6 Pro toleranter.`,
+              en: `${model.name} rejects photos of real people as well as well-known movie, cartoon and brand motifs as image input. Use an AI-generated character image from your library — otherwise the provider cancels the job (at no cost). For well-known characters, Kling 3 or Wan 2.6 Pro are more tolerant.`,
+              es: `${model.name} rechaza fotos de personas reales y motivos conocidos de cine, dibujos animados o marcas como imagen de referencia. Usa una imagen de personaje generada por IA de tu biblioteca; de lo contrario el proveedor cancela el trabajo (sin coste). Para personajes conocidos, Kling 3 o Wan 2.6 Pro son más tolerantes.`,
+
             })}
           </span>
         </div>
