@@ -773,13 +773,26 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     () => resolvePricingId(model.id, studioMode, resolution) ?? model.id,
     [model.id, studioMode, resolution],
   );
-  // Catalog prices are already personalized; the local fallback is a list price.
   const catalogPricePerSecond = getPricePerSecond(billingPricingId, billingCurrency);
   // Never show a binding price we could not verify against the server catalog —
   // that was the source of preview/charge mismatches.
   const priceUnverified = !catalogReady || catalogPricePerSecond == null;
+  /**
+   * Offline mirror of the SAME canonical catalog the backend charges from.
+   * The old fallback read `model.costPerSecond` from the display registry,
+   * which could quote a materially different (per-clip legacy) rate. When the
+   * mirror has no row either, there is no price at all — `priceUnverified`
+   * already blocks the start, so 0 is only a placeholder for the dash.
+   */
+  const mirrorPricePerSecond = useMemo(() => {
+    const entry = VIDEO_PRICING_CATALOG[billingPricingId];
+    if (!entry) return null;
+    const list = billingCurrency === 'USD' ? entry.sellUSD : entry.sellEUR;
+    return Math.round(list * 100) / 100;
+  }, [billingPricingId, billingCurrency]);
   const pricePerSecond =
-    catalogPricePerSecond ?? model.costPerSecond[billingCurrency] * discountFactor;
+    catalogPricePerSecond ?? (mirrorPricePerSecond != null ? mirrorPricePerSecond * discountFactor : 0);
+
   // Smart duration (-1) is reserved at the model's maximum length; the unused
   // seconds are refunded once the provider reports the real clip length.
   const billedSeconds = duration === -1
