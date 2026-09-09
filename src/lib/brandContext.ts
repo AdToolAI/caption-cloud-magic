@@ -18,7 +18,7 @@ export interface MotionStudioBrandContext {
   colors?: string[];
 }
 
-type AnyKit = Record<string, unknown> | null | undefined;
+type AnyKit = Record<string, unknown> | Record<string, any> | null | undefined;
 
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v.trim() ? v.trim() : undefined;
