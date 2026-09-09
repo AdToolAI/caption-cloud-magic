@@ -56,6 +56,7 @@ const BrandKit = () => {
   const [renameTarget, setRenameTarget] = useState<any>(null);
   const [renameValue, setRenameValue] = useState("");
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [extractedDna, setExtractedDna] = useState<BrandDnaResult | null>(null);
 
   const [formData, setFormData] = useState({
     brandName: "",
@@ -342,6 +343,7 @@ const BrandKit = () => {
           secondaryColor: data.secondaryColor || null,
           brandDescription: data.brandDescription,
           tonePreference: data.tonePreference || null,
+          extractedDna: extractedDna || null,
           language: 'de'
         }
       });
