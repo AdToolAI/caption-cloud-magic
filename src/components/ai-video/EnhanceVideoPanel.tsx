@@ -269,6 +269,9 @@ export function EnhanceVideoPanel({
   const [modeTouched, setModeTouched] = useState(false);
   const [resolution, setResolution] = useState<VideoResolution>('1080p');
   const [fps, setFps] = useState<number | null>(null);
+  // Processing quality (ByteDance Standard vs Pro). Pro is only offered when
+  // the provider entitlement is verified — `availableTiers` decides that.
+  const [tier, setTier] = useState<QualityTier>('standard');
   const [outputQuality, setOutputQuality] = useState<TopazOutputQuality>(
     TOPAZ_DEFAULT_OUTPUT_QUALITY,
   );
@@ -344,6 +347,10 @@ export function EnhanceVideoPanel({
 
 
   const fpsChoices = model ? availableFps(model, mode, resolution) : [];
+  const tierChoicesForModel = useMemo(() => (model ? availableTiers(model) : []), [model]);
+  useEffect(() => {
+    if (!tierChoicesForModel.includes(tier)) setTier(tierChoicesForModel[0] ?? 'standard');
+  }, [tierChoicesForModel, tier]);
   useEffect(() => {
     if (fps !== null && !fpsChoices.includes(fps)) setFps(null);
   }, [fps, fpsChoices]);
@@ -398,7 +405,7 @@ export function EnhanceVideoPanel({
         modeExplicit: modeTouched,
         resolution,
         fps,
-        tier: availableTiers(model)[0] ?? 'standard',
+        tier: tierChoicesForModel.includes(tier) ? tier : (tierChoicesForModel[0] ?? 'standard'),
         // Topaz-only settings; an engine without an encoder or interpolation
         // choice must not receive them at all.
         ...(topazEngine ? { outputQuality } : {}),
@@ -413,7 +420,7 @@ export function EnhanceVideoPanel({
     if (!config || !hasSource) return;
     void previewPrice(source, config);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, modelId, mode, modeTouched, resolution, fps, outputQuality, interpolationModel, hasSource]);
+  }, [source, modelId, mode, modeTouched, resolution, fps, tier, outputQuality, interpolationModel, hasSource]);
 
   // Display-only premium gate. The server decides authoritatively; this only
   // spares non-entitled customers a request that would be refused anyway and
@@ -687,6 +694,25 @@ export function EnhanceVideoPanel({
             )}
 
 
+            {tierChoicesForModel.length > 1 && (
+              <div className="space-y-2">
+                <Label>{tx('qualityTier', lang)}</Label>
+                <Select value={tier} onValueChange={(v) => setTier(v as QualityTier)}>
+                  <SelectTrigger data-testid="enhance-quality-tier"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {tierChoicesForModel.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t === 'pro' ? tx('tierPro', lang) : tx('tierStandard', lang)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {tier === 'pro' && (
+                  <p className="text-xs text-amber-400">{tx('tierProHint', lang)}</p>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>{tx('resolution', lang)}</Label>
               <Select value={resolution} onValueChange={(v) => setResolution(v as VideoResolution)}>
@@ -730,10 +756,15 @@ export function EnhanceVideoPanel({
                 <SelectContent>
                   <SelectItem value="source">{tx('keepFps', lang)}</SelectItem>
                   {fpsChoices.map((f) => (
-                    <SelectItem key={f} value={String(f)}>{f} FPS</SelectItem>
+                    <SelectItem key={f} value={String(f)}>
+                      {f} FPS{f > 60 ? ` · ${tx('fpsAdvanced', lang)}` : ''}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {fps !== null && fps > 30 && (
+                <p className="text-xs text-muted-foreground">{tx('fpsHighHint', lang)}</p>
+              )}
             </div>
           </div>
 
