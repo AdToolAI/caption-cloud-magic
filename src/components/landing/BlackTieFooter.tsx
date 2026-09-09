@@ -2,7 +2,24 @@ import { Link } from "react-router-dom";
 import { Sparkles, Twitter, Linkedin, Instagram, Youtube } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 
+/** lucide-react has no TikTok glyph — slim inline SVG in the same 16px style. */
+const TikTokIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M21 8.5a6.5 6.5 0 0 1-5-2.3V15a6 6 0 1 1-6-6c.34 0 .67.03 1 .09v3.2A2.8 2.8 0 1 0 13 15V2h3a5 5 0 0 0 5 5z" />
+  </svg>
+);
+
 const socialLinks = [
+  { icon: TikTokIcon, href: "#", label: "TikTok" },
   { icon: Twitter, href: "#", label: "Twitter" },
   { icon: Linkedin, href: "#", label: "LinkedIn" },
   { icon: Instagram, href: "#", label: "Instagram" },
@@ -17,19 +34,10 @@ export const BlackTieFooter = () => {
       { label: "Features", href: "/#features" },
       { label: t("nav.pricing"), href: "/pricing" },
       { label: t("nav.faq"), href: "/faq" },
-      { label: "Roadmap", href: "/coming-soon" },
     ],
     resources: [
-      { label: "Blog", href: "/coming-soon" },
-      { label: "Tutorials", href: "/coming-soon" },
-      { label: "API Docs", href: "/coming-soon" },
       { label: "Status", href: "/status" },
-    ],
-    company: [
-      { label: t("landing.footer.aboutUs"), href: "/coming-soon" },
-      { label: t("landing.footer.careers"), href: "/coming-soon" },
-      { label: t("landing.footer.contactLink"), href: "/coming-soon" },
-      { label: t("landing.footer.press"), href: "/coming-soon" },
+      { label: t("landing.footer.contactLink"), href: "/support" },
     ],
     legal: [
       { label: t("landing.footer.privacy"), href: "/privacy" },
@@ -46,7 +54,7 @@ export const BlackTieFooter = () => {
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
       
       <div className="container max-w-7xl mx-auto px-4 py-16">
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-8 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
           <div className="col-span-2">
             <Link to="/" className="flex items-center gap-2 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-gold-dark flex items-center justify-center">
@@ -98,19 +106,6 @@ export const BlackTieFooter = () => {
           </div>
 
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-4">{t("landing.footer.company")}</h4>
-            <ul className="space-y-3">
-              {footerLinks.company.map((link) => (
-                <li key={link.label}>
-                  <Link to={link.href} className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
             <h4 className="text-sm font-semibold text-foreground mb-4">{t("landing.footer.legal")}</h4>
             <ul className="space-y-3">
               {footerLinks.legal.map((link) => (
@@ -133,15 +128,10 @@ export const BlackTieFooter = () => {
           </div>
         </div>
 
-        <div className="pt-8 border-t border-border/50 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="pt-8 border-t border-border/50 flex justify-center md:justify-start">
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} AdTool AI. {t("landing.footer.allRightsReserved")}
           </p>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>{t("landing.footer.madeWith")}</span>
-            <span className="text-primary">♥</span>
-            <span>{t("landing.footer.inGermany")}</span>
-          </div>
         </div>
       </div>
     </footer>

@@ -98,15 +98,13 @@ export function QuickHelpPanel() {
       </div>
 
       <a
-        href="https://wa.me/491735802069?text=Hi%20-%20I%20need%20urgent%20help%20with%20AdTool%20AI"
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center gap-3 p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition-all"
+        href="mailto:info@useadtool.ai"
+        className="flex items-center gap-3 p-4 rounded-lg border border-white/10 bg-white/[0.02] hover:border-primary/40 hover:bg-primary/5 transition-all"
       >
-        <MessageCircle className="h-5 w-5 text-emerald-400" />
+        <MessageCircle className="h-5 w-5 text-primary" />
         <div>
-          <div className="text-sm font-medium text-foreground">{t.whatsapp}</div>
-          <div className="text-xs text-muted-foreground">+49 173 5802069</div>
+          <div className="text-sm font-medium text-foreground">E-Mail</div>
+          <div className="text-xs text-muted-foreground">info@useadtool.ai</div>
         </div>
       </a>
     </div>
