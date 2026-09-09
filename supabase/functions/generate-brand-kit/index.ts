@@ -261,27 +261,43 @@ Language: ${language || 'de'}`;
       logo_url: logoUrl || null,
       primary_color: primaryColor || '#6366F1',
       secondary_color: secondaryColor || null,
-      color_palette: brandKit.color_palette || { 
-        primary: primaryColor, 
-        secondary: secondaryColor || '#000000', 
-        accent: '#6366F1', 
-        neutrals: ['#F3F4F6', '#1F2937'] 
+      color_palette: {
+        ...(brandKit.color_palette || {
+          primary: primaryColor,
+          secondary: secondaryColor || '#000000',
+          accent: '#6366F1',
+          neutrals: ['#F3F4F6', '#1F2937'],
+        }),
+        // Keep the real colors found on the website alongside the generated set
+        ...(dnaPalette.length ? { extracted: dnaPalette } : {}),
+        ...(dna?.accent_color ? { accent: dna.accent_color } : {}),
       },
-      font_pairing: brandKit.font_pairing || { 
-        headline: 'Montserrat', 
-        body: 'Open Sans' 
-      },
-      mood: brandKit.mood || 'professionell',
+      font_pairing: (dnaFonts?.headline || dnaFonts?.body)
+        ? {
+            headline: dnaFonts?.headline || brandKit.font_pairing?.headline || 'Montserrat',
+            body: dnaFonts?.body || brandKit.font_pairing?.body || 'Open Sans',
+            source: 'website',
+          }
+        : (brandKit.font_pairing || { headline: 'Montserrat', body: 'Open Sans' }),
+      mood: dna?.mood || brandKit.mood || 'professionell',
       style_direction: brandKit.style_direction || stylePreference || 'modern',
-      brand_tone: brandKit.brand_tone || tonePreference || 'professionell',
-      brand_values: Array.isArray(brandKit.brand_emotions) ? brandKit.brand_emotions : [],
+      brand_tone: dna?.tone || brandKit.brand_tone || tonePreference || 'professionell',
+      brand_values: dnaValues.length
+        ? dnaValues
+        : (Array.isArray(brandKit.brand_emotions) ? brandKit.brand_emotions : []),
       brand_emotions: Array.isArray(brandKit.brand_emotions) ? brandKit.brand_emotions : [],
-      keywords: Array.isArray(brandKit.keywords) ? brandKit.keywords : [],
+      keywords: Array.from(new Set([
+        ...dnaKeywords,
+        ...(Array.isArray(brandKit.keywords) ? brandKit.keywords : []),
+      ])),
       recommended_hashtags: Array.isArray(brandKit.recommended_hashtags) ? brandKit.recommended_hashtags : [],
-      emoji_suggestions: Array.isArray(brandKit.emoji_suggestions) ? brandKit.emoji_suggestions : [],
+      emoji_suggestions: Array.from(new Set([
+        ...(Array.isArray(dna?.emoji_suggestions) ? dna.emoji_suggestions : []),
+        ...(Array.isArray(brandKit.emoji_suggestions) ? brandKit.emoji_suggestions : []),
+      ])),
       example_caption: brandKit.example_caption || '',
       usage_examples: Array.isArray(brandKit.usage_examples) ? brandKit.usage_examples : [],
-      ai_comment: brandKit.ai_comment || '',
+      ai_comment: [brandKit.ai_comment || '', dna?.ai_comment ? `\n\n[Website-Extraktion] ${dna.ai_comment}` : ''].join('').trim(),
       consistency_score: 100,
       is_active: true
     };
