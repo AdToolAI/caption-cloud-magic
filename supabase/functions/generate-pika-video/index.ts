@@ -169,8 +169,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const { prompt, model, duration, aspectRatio, startImageUrl, endImageUrl, negativePrompt } = body;
 
     const replicateModel = REPLICATE_MODELS[model];
-    const costPerSecond = MODEL_PRICING[model];
-    if (!replicateModel || !costPerSecond) {
+    if (!replicateModel) {
       return new Response(JSON.stringify({ error: `Unknown Pika model: ${model}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

@@ -218,7 +218,6 @@ serve(async (req) => {
       seed,
     } = body;
 
-    const perSecond = PRICE_PER_SECOND_EUR[model];
     const duration = Number(rawDuration ?? DEFAULT_DURATION);
     const requestedResolution = String(rawResolution ?? "1080p");
 
@@ -252,9 +251,11 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
     const viduWalletCurrency = viduWalletCurrencyRow?.currency === 'USD' ? 'USD' : 'EUR';
-    const effectivePerSecond = resolveCostPerSecond(model, viduWalletCurrency) ?? perSecond;
+    // Canonical catalog is the ONLY price source — no local fallback table.
+    const effectivePerSecond = resolveCostPerSecond(model, viduWalletCurrency);
+    if (effectivePerSecond == null) return pricingUnavailableResponse(corsHeaders);
     const totalCost = Number((effectivePerSecond * duration).toFixed(2));
-    if (!replicateModel || perSecond === undefined) {
+    if (!replicateModel) {
       return new Response(JSON.stringify({ error: `Unknown Vidu model: ${model}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

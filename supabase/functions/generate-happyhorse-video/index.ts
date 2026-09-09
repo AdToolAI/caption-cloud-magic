@@ -188,9 +188,8 @@ serve(async (req) => {
     );
     if (gate.response) return gate.response;
 
-    const costPerSecond = COST_PER_SECOND_EUR[model];
     const resolution = gate.resolutionLabel ?? RESOLUTIONS[model];
-    if (!costPerSecond || !resolution) {
+    if (!resolution) {
       return new Response(
         JSON.stringify({ error: `Unknown HappyHorse model: ${model}` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },

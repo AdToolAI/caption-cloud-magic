@@ -116,7 +116,7 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    if (!MODEL_PRICING[model]) {
+    if (!REPLICATE_MODELS[model]) {
       return new Response(
         JSON.stringify({ error: "Invalid model" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
