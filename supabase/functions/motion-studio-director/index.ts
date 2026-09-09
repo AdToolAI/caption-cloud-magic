@@ -32,6 +32,17 @@ interface DirectorPlan {
   totalDurationSeconds: number;
 }
 
+interface BrandContext {
+  brandName?: string;
+  styleDirection?: string;
+  tone?: string;
+  mood?: string;
+  targetAudience?: string;
+  keywords?: string[];
+  values?: string[];
+  colors?: string[];
+}
+
 interface RequestBody {
   brief: string;
   targetDurationSeconds?: number; // default 30
@@ -39,7 +50,36 @@ interface RequestBody {
   castNames?: string[];           // names of available characters
   locationNames?: string[];       // names of available locations
   mood?: string;                  // optional global mood/style override
+  /** Generative brand guidance (never fonts/logo — those stay deterministic). */
+  brand?: BrandContext | null;
 }
+
+function brandLines(brand: BrandContext | null | undefined): string[] {
+  if (!brand) return [];
+  const clean = (v?: string) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 200) : "");
+  const list = (v?: string[]) =>
+    Array.isArray(v)
+      ? v.filter((x) => typeof x === "string" && x.trim()).slice(0, 8).map((x) => x.trim()).join(", ")
+      : "";
+
+  const rows = [
+    clean(brand.brandName) && `- Brand: ${clean(brand.brandName)}`,
+    clean(brand.styleDirection) && `- Visual style direction: ${clean(brand.styleDirection)}`,
+    clean(brand.tone) && `- Brand tone: ${clean(brand.tone)}`,
+    clean(brand.mood) && `- Brand mood: ${clean(brand.mood)}`,
+    clean(brand.targetAudience) && `- Target audience: ${clean(brand.targetAudience)}`,
+    list(brand.keywords) && `- Brand keywords: ${list(brand.keywords)}`,
+    list(brand.values) && `- Brand values: ${list(brand.values)}`,
+    list(brand.colors) && `- Preferred brand colors: ${list(brand.colors)} (use where naturally appropriate — do not force every color into every shot)`,
+  ].filter(Boolean) as string[];
+
+  if (!rows.length) return [];
+  return [
+    "BRAND CONTEXT (steer story, styling and casting; never render text/logos):",
+    ...rows,
+  ];
+}
+
 
 const SYSTEM_PROMPT = `You are an award-winning film director who turns rough briefs
 into shot-by-shot storyboards for AI-generated short videos.

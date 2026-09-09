@@ -38,3 +38,11 @@
 - Validiert an 12 echten Abrechnungen inkl. neuer Läufe 720p->2K (13), 540p->4K (29), 720p->4K/24 (11), 720p->4K/60 (51): Abweichung 0 %.
 - Ausreißer 608x1080->4K (halbe Abrechnung) bewusst nicht gefittet; wird überschätzt, nie unterschätzt.
 - Offen: globaler Topaz-Rollout freigeben (aktuell weiterhin Test-Gate).
+
+## Brand Kit v2 (Sep 9)
+- [x] Website URL + updated_at on brand kits
+- [ ] Server-side form-first precedence in generate-brand-kit (presence-aware, no merge-back)
+- [ ] Editable tone/style/keywords/values/fonts in create form
+- [ ] "Re-analyze website" refresh dialog with per-field Keep current / Use new (single UPDATE)
+- [ ] Motion Studio generative brand context (separate from deterministic branding)
+- [ ] Free tests A-I; paid E2E only after approval
