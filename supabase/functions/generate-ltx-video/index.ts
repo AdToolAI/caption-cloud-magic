@@ -100,7 +100,7 @@ serve(async (req) => {
     const currency = walletPreview?.currency || 'EUR';
 
     // Canonical price from the shared catalog (same source as the UI preview,
- *// including the account discount). There is no local fallback table any more.
+    // including the account discount). There is no local fallback table any more.
     const costPerSecond = await resolveAccountCostPerSecond(
       supabaseAdmin, user.id, model, currency as "EUR" | "USD",
     );
