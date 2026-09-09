@@ -2,9 +2,10 @@ import { tx } from '@/lib/i18nText';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
 import { upgradeCtaLabel } from '@/lib/pricingDisplay';
+import {
   Dialog,
+
   DialogContent,
   DialogDescription,
   DialogFooter,
