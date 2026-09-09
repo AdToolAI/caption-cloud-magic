@@ -83,6 +83,7 @@ export default function AIDirectorBriefDialog({
             language,
             castNames,
             locationNames,
+            brand: useBrand ? buildMotionStudioBrandContext(activeKit ?? null) : null,
           },
         }
       );
