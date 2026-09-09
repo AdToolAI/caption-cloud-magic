@@ -29,6 +29,8 @@ Nur an der Verständlichkeit arbeiten, nichts an Abrechnung oder Erstattung anfa
 1. Klartext-Fehlermeldung statt technischem Toast: wenn der Anbieter wegen Urheberrecht ablehnt, wird eine eigene Meldung in EN/DE/ES angezeigt ("Der Anbieter hat das Video wegen möglicher Urheberrechte an der Vorlage abgelehnt — dir wurde nichts berechnet").
 2. Immer sichtbar dazuschreiben, dass das Guthaben vollständig zurückgebucht wurde.
 3. Den Hinweistext im Bildbereich ergänzen: nicht nur Fotos echter Personen, sondern auch bekannte Film-/Zeichentrickfiguren und Marken werden abgelehnt.
+4. Bei einer Urheberrechts-Ablehnung direkt einen toleranteren Anbieter vorschlagen (Kling 3 oder Wan 2.6 Pro), mit erhaltenem Prompt und Bild.
+
 4. Antwortvorschlag an den Nutzer: Doppel-Gutschrift war ein Fehler vom 7.9. und ist seit 8.9. behoben; die Ablehnung kam vom Urheberrechtsfilter, nicht von der Personenerkennung.
 
 ## Technische Details
