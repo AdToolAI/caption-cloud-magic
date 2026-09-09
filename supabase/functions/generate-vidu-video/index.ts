@@ -393,14 +393,9 @@ serve(async (req) => {
     };
 
     if (model === "vidu-q2-reference") {
-      // q3-pro does not accept a multi-image array — send the first reference
-      // as `start_image`; remaining refs were already folded into the prompt
-      // via buildReferenceSuffix() above.
+      // q3-pro accepts exactly one image; more than one is rejected above.
       const img = referenceImages[0];
       if (img) viduInput.start_image = img;
-      if (referenceImages.length > 1) {
-        console.log(`[generate-vidu-video] Note: q3-pro accepts 1 start_image; ${referenceImages.length - 1} extra refs folded into prompt.`);
-      }
     } else if (model === "vidu-q2-i2v") {
       const img = startImageUrl ?? referenceImages[0];
       if (img) viduInput.start_image = img;
