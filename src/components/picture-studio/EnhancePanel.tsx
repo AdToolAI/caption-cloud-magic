@@ -71,6 +71,8 @@ export function EnhancePanel() {
 
   const [task, setTask] = useState<EnhanceTask>("upscale");
   const [modelId, setModelId] = useState<string>("clarity-pro");
+  const { isEntitled } = usePicturePremium();
+  const [premiumDialogOpen, setPremiumDialogOpen] = useState(false);
   const [scale, setScale] = useState<number>(2);
   const [presetId, setPresetId] = useState<string | null>("balanced");
   const [valuesByModel, setValuesByModel] = useState<Record<string, Record<string, unknown>>>({});
@@ -289,7 +291,9 @@ export function EnhancePanel() {
     }
   };
 
-  const compareModels = models.filter(isUnlocked).slice(0, 2);
+  const compareModels = models
+    .filter((m) => isUnlocked(m) && (isEntitled || !isPremiumEnhanceModel(m.id)))
+    .slice(0, 2);
   const canCompare = task === "upscale" && compareModels.length >= 2 && !!sourceUrl;
 
   const handleCompare = async () => {
@@ -644,6 +648,12 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-3">
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">{value}</span>
+      <PicturePremiumDialog
+        open={premiumDialogOpen}
+        onOpenChange={setPremiumDialogOpen}
+        fallbackLabel="Clarity Pro"
+        onFallback={() => setModelId(PICTURE_FALLBACK_ENHANCE_MODEL)}
+      />
     </div>
   );
 }
