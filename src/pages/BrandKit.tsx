@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { 
   Loader2, Upload, Trash2, Paintbrush, Download, 
-  Sparkles, Copy, Check, Star, BarChart3, Settings, Pencil, Archive, ArchiveRestore
+  Sparkles, Copy, Check, Star, BarChart3, Settings, Pencil, Archive, ArchiveRestore, RefreshCw
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
@@ -30,6 +30,7 @@ import { ActiveBrandSelector } from "@/components/brand/ActiveBrandSelector";
 import { BrandKitHeroHeader } from "@/components/brand/BrandKitHeroHeader";
 import { BrandVault } from "@/components/brand/BrandVault";
 import { BrandDnaExtractor } from "@/components/brand/BrandDnaExtractor";
+import { BrandDnaRefreshDialog } from "@/components/brand/BrandDnaRefreshDialog";
 import { BrandVoiceLibrary } from "@/components/brand/BrandVoiceLibrary";
 import { BrandAssetFactory } from "@/components/brand/BrandAssetFactory";
 import { BrandDriftDossier } from "@/components/brand/BrandDriftDossier";
@@ -57,14 +58,21 @@ const BrandKit = () => {
   const [renameValue, setRenameValue] = useState("");
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [extractedDna, setExtractedDna] = useState<BrandDnaResult | null>(null);
+  const [refreshTarget, setRefreshTarget] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     brandName: "",
     targetAudience: "",
     brandDescription: "",
     brandValues: [] as string[],
+    keywords: [] as string[],
+    palette: [] as string[],
     tonePreference: "",
     stylePreference: "",
+    moodPreference: "",
+    fontHeadline: "",
+    fontBody: "",
+    websiteUrl: "",
     primaryColor: "#6366F1",
     secondaryColor: ""
   });
@@ -332,17 +340,25 @@ const BrandKit = () => {
       }
 
       // Call edge function
+      // Every editable field is submitted explicitly — a field that is present
+      // but empty means "the user cleared it" and must not be resurrected from
+      // the extraction on the server.
       const { data: response, error } = await supabase.functions.invoke('generate-brand-kit', {
         body: {
           logoUrl,
-          brandName: data.brandName,
-          targetAudience: data.targetAudience,
-          brandValues: Array.isArray(data.brandValues) ? data.brandValues.join(", ") : data.brandValues,
-          stylePreference: data.stylePreference || null,
+          brandName: data.brandName ?? '',
+          targetAudience: data.targetAudience ?? '',
+          brandValues: Array.isArray(data.brandValues) ? data.brandValues : String(data.brandValues || '').split(',').map((v: string) => v.trim()).filter(Boolean),
+          keywords: Array.isArray(data.keywords) ? data.keywords : [],
+          palette: Array.isArray(data.palette) ? data.palette : [],
+          fonts: { headline: data.fontHeadline ?? '', body: data.fontBody ?? '' },
+          stylePreference: data.stylePreference ?? '',
+          moodPreference: data.moodPreference ?? '',
           primaryColor: data.primaryColor,
           secondaryColor: data.secondaryColor || null,
           brandDescription: data.brandDescription,
-          tonePreference: data.tonePreference || null,
+          tonePreference: data.tonePreference ?? '',
+          websiteUrl: data.websiteUrl ?? '',
           extractedDna: extractedDna || null,
           language: 'de'
         }
@@ -422,8 +438,8 @@ const BrandKit = () => {
   };
 
   const handleApplyDna = (dna: BrandDnaResult) => {
-    // Keep the full extraction (palette, fonts, keywords, metadata) so nothing
-    // is lost between "Apply" and the actual save.
+    // Extraction only PREFILLS the form. From here on the form is the single
+    // source of truth — anything the user edits afterwards wins at save time.
     setExtractedDna(dna);
     setFormData((prev) => ({
       ...prev,
@@ -433,13 +449,20 @@ const BrandKit = () => {
       secondaryColor: dna.secondary_color ?? prev.secondaryColor,
       tonePreference: dna.tone ?? prev.tonePreference,
       stylePreference: dna.mood ?? prev.stylePreference,
+      moodPreference: dna.mood ?? prev.moodPreference,
       brandValues: dna.values?.length ? dna.values : prev.brandValues,
+      keywords: dna.keywords?.length ? dna.keywords : prev.keywords,
+      fontHeadline: dna.fonts?.headline ?? prev.fontHeadline,
+      fontBody: dna.fonts?.body ?? prev.fontBody,
+      palette: dna.palette?.length ? dna.palette : prev.palette,
+      websiteUrl: dna.source === 'website' ? (prev.websiteUrl || '') : prev.websiteUrl,
     }));
     toast({
       title: tx({ de: 'Brand DNA übernommen', en: 'Brand DNA applied', es: 'Brand DNA aplicado' }),
-      description: tx({ de: "Das Formular wurde mit den extrahierten Werten vorausgefüllt.", en: "The form was pre-filled with the extracted values.", es: "El formulario se rellenó con los valores extraídos." }),
+      description: tx({ de: "Das Formular wurde vorausgefüllt — deine Änderungen daran gewinnen beim Speichern.", en: "The form was pre-filled — your edits to it win when saving.", es: "El formulario se rellenó — tus ediciones ganan al guardar." }),
     });
   };
+
 
   const handleDuplicate = async (kit: any) => {
     try {
@@ -1097,6 +1120,15 @@ const BrandKit = () => {
                             }}
                           >
                             <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-white/10"
+                            title={tx({ de: "Website neu analysieren", en: "Re-analyze website", es: "Volver a analizar el sitio web" })}
+                            onClick={() => setRefreshTarget(kit)}
+                          >
+                            <RefreshCw className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
