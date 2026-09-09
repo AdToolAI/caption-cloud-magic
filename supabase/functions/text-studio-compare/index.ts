@@ -112,7 +112,9 @@ async function callModel(
             ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
             { role: "user", content: prompt },
           ],
-          ...(route.apiModel.startsWith("openai/") ? { reasoning_effort: "none" } : {}),
+          ...(route.apiModel.startsWith("openai/")
+            ? { reasoning_effort: route.apiModel === "openai/gpt-6-astra" ? "low" : "none" }
+            : {}),
         }),
 
       });
@@ -157,6 +159,14 @@ Deno.serve(async (req) => {
     const { data: ud, error: ue } = await sb.auth.getUser();
     if (ue || !ud?.user) return jsonResponse({ error: "Unauthorized" }, 401);
     const userId = ud.user.id;
+
+    // Premium gate — same single entitlement truth source, before any provider call.
+    if (!(await isTextStudioEntitled(admin, userId, (k) => Deno.env.get(k)))) {
+      return jsonResponse(
+        { error: TEXT_STUDIO_PREMIUM_MESSAGE, code: TEXT_STUDIO_PREMIUM_REQUIRED },
+        403,
+      );
+    }
 
     const body = await req.json().catch(() => null);
     if (!body?.prompt) return jsonResponse({ error: "prompt required" }, 400);
