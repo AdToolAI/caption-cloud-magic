@@ -455,7 +455,7 @@ const BrandKit = () => {
       fontHeadline: dna.fonts?.headline ?? prev.fontHeadline,
       fontBody: dna.fonts?.body ?? prev.fontBody,
       palette: dna.palette?.length ? dna.palette : prev.palette,
-      websiteUrl: dna.source === 'website' ? (prev.websiteUrl || '') : prev.websiteUrl,
+      websiteUrl: dna.source === 'website' && dna.source_url ? dna.source_url : prev.websiteUrl,
     }));
     toast({
       title: tx({ de: 'Brand DNA übernommen', en: 'Brand DNA applied', es: 'Brand DNA aplicado' }),
