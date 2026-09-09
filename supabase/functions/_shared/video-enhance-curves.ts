@@ -76,10 +76,21 @@ export function ceilCent(value: number): number {
 }
 
 export interface CurvePricing {
+  /**
+   * TARGET multiplier read off the degressive curve — the customer-facing
+   * pricing intent, before the price is rounded to whole cents.
+   */
   multiplier: number;
+  /** Alias of `multiplier`, named for telemetry readers. */
+  targetMultiplier: number;
   listPriceEur: number;
-  /** listPrice / estimated provider cost, after cent rounding. */
+  /**
+   * EFFECTIVE multiplier: listPrice / estimated provider cost, i.e. the target
+   * multiplier AFTER cent rounding. On tiny jobs this sits above the target.
+   */
   effectiveMultiplier: number | null;
+  /** effective - target, i.e. the pure cent-rounding uplift. */
+  roundingUplift: number | null;
   band: { min: number; max: number };
   gate: 'ok' | 'review_required';
   gateReason: string | null;
@@ -107,7 +118,16 @@ export function evaluateCurvePricing(costEur: number, curve: CurvePoint[]): Curv
     gateReason = 'floor_conflict';
   }
 
-  return { multiplier, listPriceEur, effectiveMultiplier, band, gate, gateReason };
+  return {
+    multiplier,
+    targetMultiplier: multiplier,
+    listPriceEur,
+    effectiveMultiplier,
+    roundingUplift: effectiveMultiplier === null ? null : effectiveMultiplier - multiplier,
+    band,
+    gate,
+    gateReason,
+  };
 }
 
 // ---------------------------------------------------------------------------
