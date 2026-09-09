@@ -58,8 +58,13 @@ export function BrandDriftDossier({ brandKitId }: Props) {
                     <span className="text-xs font-mono opacity-80">CASE FILE #{d.id.slice(0, 6).toUpperCase()}</span>
                     <Badge variant="outline" className="text-[10px] uppercase">{d.severity}</Badge>
                   </div>
-                  <p className="text-sm font-medium">
+                  <p className="text-sm font-medium flex items-center gap-2 flex-wrap">
                     {d.source_table === "posts" ? "Voice-Drift" : "Color-Drift"} · {tx({ de: 'Score', en: 'Score', es: 'Puntuación' })} {Math.round(d.score)}
+                    {d.suggested_fix?.method === "heuristic" && (
+                      <Badge variant="outline" className="text-[9px] uppercase opacity-70">
+                        {tx({ de: 'Basis-Heuristik, keine KI-Analyse', en: 'Basic heuristic, not AI analysis', es: 'Heurística básica, no análisis de IA' })}
+                      </Badge>
+                    )}
                   </p>
                   <p className="text-xs opacity-70 mt-1 truncate">
                     {tx({ de: 'Vorschlag', en: 'Suggested', es: 'Sugerido' })}: {d.suggested_fix?.kind ?? "review"} {d.suggested_fix?.hex ? `→ ${d.suggested_fix.hex}` : ""}

@@ -3173,6 +3173,7 @@ export type Database = {
         Row: {
           accent_color: string | null
           ai_comment: string | null
+          archived_at: string | null
           brand_emotions: Json | null
           brand_name: string | null
           brand_tone: string | null
@@ -3208,6 +3209,7 @@ export type Database = {
         Insert: {
           accent_color?: string | null
           ai_comment?: string | null
+          archived_at?: string | null
           brand_emotions?: Json | null
           brand_name?: string | null
           brand_tone?: string | null
@@ -3243,6 +3245,7 @@ export type Database = {
         Update: {
           accent_color?: string | null
           ai_comment?: string | null
+          archived_at?: string | null
           brand_emotions?: Json | null
           brand_name?: string | null
           brand_tone?: string | null
@@ -4664,6 +4667,7 @@ export type Database = {
         Row: {
           ai_json: Json
           audience: string | null
+          brand_kit_id: string | null
           created_at: string
           duration_weeks: number
           ends_at: string | null
@@ -4683,6 +4687,7 @@ export type Database = {
         Insert: {
           ai_json?: Json
           audience?: string | null
+          brand_kit_id?: string | null
           created_at?: string
           duration_weeks: number
           ends_at?: string | null
@@ -4702,6 +4707,7 @@ export type Database = {
         Update: {
           ai_json?: Json
           audience?: string | null
+          brand_kit_id?: string | null
           created_at?: string
           duration_weeks?: number
           ends_at?: string | null
@@ -4718,7 +4724,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       captions: {
         Row: {
@@ -7664,6 +7678,7 @@ export type Database = {
       content_projects: {
         Row: {
           audio_config: Json | null
+          brand_kit_id: string | null
           brief: string | null
           completed_at: string | null
           content_type: string
@@ -7690,6 +7705,7 @@ export type Database = {
         }
         Insert: {
           audio_config?: Json | null
+          brand_kit_id?: string | null
           brief?: string | null
           completed_at?: string | null
           content_type: string
@@ -7716,6 +7732,7 @@ export type Database = {
         }
         Update: {
           audio_config?: Json | null
+          brand_kit_id?: string | null
           brief?: string | null
           completed_at?: string | null
           content_type?: string
@@ -7741,6 +7758,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "content_projects_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "content_projects_template_id_fkey"
             columns: ["template_id"]
@@ -10104,6 +10128,7 @@ export type Database = {
       media_library: {
         Row: {
           alt_text: string | null
+          brand_kit_id: string | null
           category: string | null
           created_at: string
           description: string | null
@@ -10124,6 +10149,7 @@ export type Database = {
         }
         Insert: {
           alt_text?: string | null
+          brand_kit_id?: string | null
           category?: string | null
           created_at?: string
           description?: string | null
@@ -10144,6 +10170,7 @@ export type Database = {
         }
         Update: {
           alt_text?: string | null
+          brand_kit_id?: string | null
           category?: string | null
           created_at?: string
           description?: string | null
@@ -10162,7 +10189,15 @@ export type Database = {
           user_id?: string
           width?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "media_library_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       media_profiles: {
         Row: {
@@ -12001,6 +12036,7 @@ export type Database = {
       }
       posts: {
         Row: {
+          brand_kit_id: string | null
           caption: string | null
           created_at: string | null
           error_message: string | null
@@ -12018,6 +12054,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          brand_kit_id?: string | null
           caption?: string | null
           created_at?: string | null
           error_message?: string | null
@@ -12035,6 +12072,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          brand_kit_id?: string | null
           caption?: string | null
           created_at?: string | null
           error_message?: string | null
@@ -12051,7 +12089,15 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "posts_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       posts_history: {
         Row: {

@@ -32,9 +32,19 @@ serve(async (req) => {
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const userId = payload.sub;
+    const authClient = createClient(
+      supabaseUrl,
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const userId = user.id;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { brandKitId, contentId, contentType, content } = await req.json();
@@ -163,7 +173,8 @@ Gib NUR valides JSON zurück.`;
           consistency_score: avgScore,
           last_consistency_check: new Date().toISOString()
         })
-        .eq('id', brandKitId);
+        .eq('id', brandKitId)
+        .eq('user_id', userId);
     }
 
     console.log('Consistency analysis completed:', analysis.score);

@@ -45,27 +45,24 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       );
     }
 
-    // Extract and validate user ID from JWT token
-    let userId: string;
-    try {
-      const token = authHeader.replace('Bearer ', '');
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      userId = payload.sub;
-      
-      console.log('Extracted user ID from token:', userId);
-      
-      if (!userId) {
-        throw new Error('No user ID in token');
-      }
-    } catch (error) {
-      console.error('Token parsing error:', error);
+    // Validate the bearer token against Supabase auth (no manual JWT decoding)
+    const authClient = createClient(
+      supabaseUrl,
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+    if (authError || !user) {
+      console.error('Token validation error:', authError?.message);
       return new Response(
         JSON.stringify({ error: 'Unauthorized', details: 'Invalid authentication token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    const userId = user.id;
+    console.log('Verified user ID:', userId);
 
-    // Create Supabase client with service role key for database operations
+    // Create Supabase client with service role key for database operations (RLS bypass needed for insert)
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const requestBody = await req.json();
@@ -79,8 +76,17 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       brandName,
       brandValues,
       language,
-      stylePreference
+      stylePreference,
+      extractedDna
     } = requestBody;
+
+    // Real values extracted from the user's website (Brand DNA extractor).
+    // These are observed facts and must win over anything the model invents.
+    const dna = extractedDna && typeof extractedDna === 'object' ? extractedDna : null;
+    const dnaPalette: string[] = Array.isArray(dna?.palette) ? dna.palette.filter((c: unknown) => typeof c === 'string') : [];
+    const dnaKeywords: string[] = Array.isArray(dna?.keywords) ? dna.keywords.filter((k: unknown) => typeof k === 'string') : [];
+    const dnaValues: string[] = Array.isArray(dna?.values) ? dna.values.filter((v: unknown) => typeof v === 'string') : [];
+    const dnaFonts = dna?.fonts && typeof dna.fonts === 'object' ? dna.fonts : null;
 
     console.log('Request body received:', JSON.stringify(requestBody).substring(0, 300));
     console.log('Processing for user:', userId, '| Brand:', brandName, '| Color:', primaryColor);
@@ -99,6 +105,14 @@ ${secondaryColor ? `- Secondary Color: ${secondaryColor}` : ''}
 - Brand Description: ${brandDescription || 'No description provided'}
 ${tonePreference ? `- Tone Preference: ${tonePreference}` : ''}
 ${stylePreference ? `- Style Direction: ${stylePreference}` : ''}
+
+${dna ? `Observed data extracted from the brand's own website (treat as ground truth, do not contradict):
+${dnaPalette.length ? `- Website color palette: ${dnaPalette.join(', ')}` : ''}
+${dnaFonts?.headline || dnaFonts?.body ? `- Website fonts: headline "${dnaFonts?.headline || '?'}", body "${dnaFonts?.body || '?'}"` : ''}
+${dnaKeywords.length ? `- Website keywords: ${dnaKeywords.join(', ')}` : ''}
+${dnaValues.length ? `- Website brand values: ${dnaValues.join(', ')}` : ''}
+${dna.tone ? `- Website tone: ${dna.tone}` : ''}
+${dna.mood ? `- Website mood: ${dna.mood}` : ''}` : ''}
 
 ${logoUrl ? 'IMPORTANT: A logo image is provided. Carefully analyze its colors, shapes, typography style, and emotional impact. Use these insights to inform your recommendations.' : ''}
 
@@ -247,27 +261,43 @@ Language: ${language || 'de'}`;
       logo_url: logoUrl || null,
       primary_color: primaryColor || '#6366F1',
       secondary_color: secondaryColor || null,
-      color_palette: brandKit.color_palette || { 
-        primary: primaryColor, 
-        secondary: secondaryColor || '#000000', 
-        accent: '#6366F1', 
-        neutrals: ['#F3F4F6', '#1F2937'] 
+      color_palette: {
+        ...(brandKit.color_palette || {
+          primary: primaryColor,
+          secondary: secondaryColor || '#000000',
+          accent: '#6366F1',
+          neutrals: ['#F3F4F6', '#1F2937'],
+        }),
+        // Keep the real colors found on the website alongside the generated set
+        ...(dnaPalette.length ? { extracted: dnaPalette } : {}),
+        ...(dna?.accent_color ? { accent: dna.accent_color } : {}),
       },
-      font_pairing: brandKit.font_pairing || { 
-        headline: 'Montserrat', 
-        body: 'Open Sans' 
-      },
-      mood: brandKit.mood || 'professionell',
+      font_pairing: (dnaFonts?.headline || dnaFonts?.body)
+        ? {
+            headline: dnaFonts?.headline || brandKit.font_pairing?.headline || 'Montserrat',
+            body: dnaFonts?.body || brandKit.font_pairing?.body || 'Open Sans',
+            source: 'website',
+          }
+        : (brandKit.font_pairing || { headline: 'Montserrat', body: 'Open Sans' }),
+      mood: dna?.mood || brandKit.mood || 'professionell',
       style_direction: brandKit.style_direction || stylePreference || 'modern',
-      brand_tone: brandKit.brand_tone || tonePreference || 'professionell',
-      brand_values: Array.isArray(brandKit.brand_emotions) ? brandKit.brand_emotions : [],
+      brand_tone: dna?.tone || brandKit.brand_tone || tonePreference || 'professionell',
+      brand_values: dnaValues.length
+        ? dnaValues
+        : (Array.isArray(brandKit.brand_emotions) ? brandKit.brand_emotions : []),
       brand_emotions: Array.isArray(brandKit.brand_emotions) ? brandKit.brand_emotions : [],
-      keywords: Array.isArray(brandKit.keywords) ? brandKit.keywords : [],
+      keywords: Array.from(new Set([
+        ...dnaKeywords,
+        ...(Array.isArray(brandKit.keywords) ? brandKit.keywords : []),
+      ])),
       recommended_hashtags: Array.isArray(brandKit.recommended_hashtags) ? brandKit.recommended_hashtags : [],
-      emoji_suggestions: Array.isArray(brandKit.emoji_suggestions) ? brandKit.emoji_suggestions : [],
+      emoji_suggestions: Array.from(new Set([
+        ...(Array.isArray(dna?.emoji_suggestions) ? dna.emoji_suggestions : []),
+        ...(Array.isArray(brandKit.emoji_suggestions) ? brandKit.emoji_suggestions : []),
+      ])),
       example_caption: brandKit.example_caption || '',
       usage_examples: Array.isArray(brandKit.usage_examples) ? brandKit.usage_examples : [],
-      ai_comment: brandKit.ai_comment || '',
+      ai_comment: [brandKit.ai_comment || '', dna?.ai_comment ? `\n\n[Website-Extraktion] ${dna.ai_comment}` : ''].join('').trim(),
       consistency_score: 100,
       is_active: true
     };

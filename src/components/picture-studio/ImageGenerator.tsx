@@ -436,6 +436,11 @@ export function ImageGenerator() {
     secondaryColor: activeBrandKit.secondary_color || undefined,
     accentColor: activeBrandKit.accent_color || undefined,
     mood: activeBrandKit.mood || undefined,
+    keywords: activeBrandKit.keywords?.length ? activeBrandKit.keywords : undefined,
+    styleDirection: activeBrandKit.style_direction || undefined,
+    targetAudience: activeBrandKit.target_audience || undefined,
+    brandTone: activeBrandKit.brand_tone || undefined,
+    logoUrl: activeBrandKit.logo_url || undefined,
   } : null;
 
   // Single source of truth for "what do we actually send": the very module the

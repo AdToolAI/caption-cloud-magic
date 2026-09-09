@@ -10,8 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { 
   Loader2, Upload, Trash2, Paintbrush, Download, 
-  Sparkles, Copy, Check, Star, BarChart3, Settings
+  Sparkles, Copy, Check, Star, BarChart3, Settings, Pencil, Archive, ArchiveRestore
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { isSubscribed } from "@/config/pricing";
@@ -48,6 +52,11 @@ const BrandKit = () => {
   const [showPlanLimit, setShowPlanLimit] = useState(false);
   const [activeTab, setActiveTab] = useState("create");
   const [copiedText, setCopiedText] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<any>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [extractedDna, setExtractedDna] = useState<BrandDnaResult | null>(null);
 
   const [formData, setFormData] = useState({
     brandName: "",
@@ -80,7 +89,9 @@ const BrandKit = () => {
     }
   });
 
-  const activeBrandKit = brandKits.find((kit: any) => kit.is_active) || brandKits[0];
+  const visibleBrandKits = showArchived ? brandKits : brandKits.filter((kit: any) => !kit.archived_at);
+  const nonArchivedKits = brandKits.filter((kit: any) => !kit.archived_at);
+  const activeBrandKit = nonArchivedKits.find((kit: any) => kit.is_active) || nonArchivedKits[0];
 
   // Show wizard for first-time users
   useEffect(() => {
@@ -107,8 +118,56 @@ const BrandKit = () => {
     }
   });
 
+  const REFERENCING_TABLES: { table: string; label: { de: string; en: string; es: string } }[] = [
+    { table: 'carousel_projects', label: { de: 'Carousel-Projekte', en: 'carousel projects', es: 'proyectos de carrusel' } },
+    { table: 'composer_projects', label: { de: 'Composer-Projekte', en: 'composer projects', es: 'proyectos de composer' } },
+    { table: 'post_drafts', label: { de: 'Post-Entwürfe', en: 'post drafts', es: 'borradores de publicaciones' } },
+    { table: 'calendar_events', label: { de: 'Kalender-Einträge', en: 'calendar events', es: 'eventos de calendario' } },
+    { table: 'video_creations', label: { de: 'Video-Erstellungen', en: 'video creations', es: 'creaciones de video' } },
+    { table: 'brand_characters', label: { de: 'Marken-Charaktere', en: 'brand characters', es: 'personajes de marca' } },
+    { table: 'brand_locations', label: { de: 'Marken-Orte', en: 'brand locations', es: 'ubicaciones de marca' } },
+  ];
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const counts = await Promise.all(
+        REFERENCING_TABLES.map(async ({ table }) => {
+          const { count, error } = await supabase
+            .from(table as any)
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('brand_kit_id', id);
+          if (error) {
+            // If a table doesn't have brand_kit_id or errors, don't block the delete on that table
+            console.warn(`Reference check failed for ${table}:`, error);
+            return { table, count: 0 };
+          }
+          return { table, count: count || 0 };
+        })
+      );
+
+      const blocking = counts.filter((c) => c.count > 0);
+      if (blocking.length > 0) {
+        const names = blocking
+          .map((b) => REFERENCING_TABLES.find((r) => r.table === b.table)?.label)
+          .filter(Boolean) as { de: string; en: string; es: string }[];
+        const namesEn = names.map((n) => n.en).join(', ');
+        const namesDe = names.map((n) => n.de).join(', ');
+        const namesEs = names.map((n) => n.es).join(', ');
+        const err: any = new Error(
+          tx({
+            de: `Dieses Marken-Set wird noch verwendet von: ${namesDe}. Bitte archiviere es stattdessen.`,
+            en: `This brand kit is still referenced by: ${namesEn}. Archive it instead.`,
+            es: `Este kit de marca todavía es utilizado por: ${namesEs}. Archívalo en su lugar.`,
+          })
+        );
+        err.isBlocked = true;
+        throw err;
+      }
+
       const { error } = await supabase
         .from('brand_kits')
         .delete()
@@ -121,6 +180,74 @@ const BrandKit = () => {
       toast({
         title: tx({ de: "Gelöscht", en: "Deleted", es: "Eliminado" }),
         description: tx({ de: "Brand Kit wurde erfolgreich gelöscht", en: "Brand kit deleted successfully", es: "Brand kit eliminado correctamente" })
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: error?.isBlocked
+          ? tx({ de: "Löschen nicht möglich", en: "Cannot delete", es: "No se puede eliminar" })
+          : tx({ de: "Fehler", en: "Mistake", es: "Error" }),
+        description: error?.message || tx({ de: "Brand Kit konnte nicht gelöscht werden", en: "Brand kit could not be deleted", es: "No se pudo eliminar el brand kit" }),
+        variant: "destructive",
+        duration: 8000,
+      });
+    }
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: async ({ id, archive }: { id: string; archive: boolean }) => {
+      const updates: Record<string, any> = { archived_at: archive ? new Date().toISOString() : null };
+      if (archive) updates.is_active = false;
+      const { error } = await supabase
+        .from('brand_kits')
+        .update(updates)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['brand-kits'] });
+      queryClient.invalidateQueries({ queryKey: ['active-brand-kit'] });
+      toast({
+        title: variables.archive
+          ? tx({ de: "Archiviert", en: "Archived", es: "Archivado" })
+          : tx({ de: "Wiederhergestellt", en: "Restored", es: "Restaurado" }),
+        description: variables.archive
+          ? tx({ de: "Brand Kit wurde archiviert", en: "Brand kit has been archived", es: "El kit de marca ha sido archivado" })
+          : tx({ de: "Brand Kit wurde wiederhergestellt", en: "Brand kit has been restored", es: "El kit de marca ha sido restaurado" })
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
+        description: error?.message || tx({ de: "Aktion fehlgeschlagen", en: "Action failed", es: "La acción falló" }),
+        variant: "destructive"
+      });
+    }
+  });
+
+  const renameMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase
+        .from('brand_kits')
+        .update({ brand_name: name })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['brand-kits'] });
+      queryClient.invalidateQueries({ queryKey: ['active-brand-kit'] });
+      setRenameTarget(null);
+      setRenameValue("");
+      toast({
+        title: tx({ de: "Umbenannt", en: "Renamed", es: "Renombrado" }),
+        description: tx({ de: "Brand Kit wurde umbenannt", en: "Brand kit has been renamed", es: "El kit de marca ha sido renombrado" })
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
+        description: error?.message || tx({ de: "Umbenennen fehlgeschlagen", en: "Rename failed", es: "El cambio de nombre falló" }),
+        variant: "destructive"
       });
     }
   });
@@ -216,6 +343,7 @@ const BrandKit = () => {
           secondaryColor: data.secondaryColor || null,
           brandDescription: data.brandDescription,
           tonePreference: data.tonePreference || null,
+          extractedDna: extractedDna || null,
           language: 'de'
         }
       });
@@ -268,14 +396,35 @@ const BrandKit = () => {
     }
   };
 
-  const handleExportPDF = () => {
-    toast({
-      title: tx({ de: "Export wird vorbereitet", en: "Export is being prepared", es: "Se está preparando la exportación." }),
-      description: tx({ de: 'PDF-Export kommt in Kürze', en: 'PDF export coming soon', es: 'La exportación a PDF estará disponible pronto' })
-    });
+  const handleExportPDF = async () => {
+    if (!activeBrandKit) return;
+    setIsExportingPdf(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('export-brand-guidelines-pdf', {
+        body: { brandKitId: activeBrandKit.id }
+      });
+      if (error) throw error;
+      if (!data?.url) throw new Error('missing_url');
+      window.open(data.url, '_blank', 'noopener,noreferrer');
+      toast({
+        title: tx({ de: "Export bereit", en: "Export ready", es: "Exportación lista" }),
+        description: tx({ de: "Deine Brand Guidelines wurden als PDF exportiert", en: "Your brand guidelines were exported as a PDF", es: "Tus guías de marca se exportaron como PDF" })
+      });
+    } catch (error: any) {
+      toast({
+        title: tx({ de: "Fehler", en: "Mistake", es: "Error" }),
+        description: error?.message || tx({ de: "PDF-Export fehlgeschlagen", en: "PDF export failed", es: "La exportación a PDF falló" }),
+        variant: "destructive"
+      });
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   const handleApplyDna = (dna: BrandDnaResult) => {
+    // Keep the full extraction (palette, fonts, keywords, metadata) so nothing
+    // is lost between "Apply" and the actual save.
+    setExtractedDna(dna);
     setFormData((prev) => ({
       ...prev,
       brandName: dna.brand_name ?? prev.brandName,
@@ -377,10 +526,10 @@ const BrandKit = () => {
         <BrandVault brandKit={activeBrandKit} />
 
         {/* Active Brand Selector */}
-        {brandKits.length > 0 && (
+        {nonArchivedKits.length > 0 && (
           <div className="mb-6">
             <ActiveBrandSelector
-              brandKits={brandKits}
+              brandKits={nonArchivedKits}
               activeKitId={activeBrandKit?.id}
               onSelect={(id) => setActiveMutation.mutate(id)}
             />
@@ -685,10 +834,17 @@ const BrandKit = () => {
                       <Button 
                         onClick={handleExportPDF} 
                         variant="outline"
+                        disabled={isExportingPdf}
                         className="border-white/10 hover:bg-primary/10 hover:border-primary/30 group"
                       >
-                        <Download className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />
-                        {tx({ de: "Als PDF exportieren", en: "Export as PDF", es: "Exportar como PDF" })}
+                        {isExportingPdf ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />
+                        )}
+                        {isExportingPdf
+                          ? tx({ de: "Exportiere...", en: "Exporting...", es: "Exportando..." })
+                          : tx({ de: "Als PDF exportieren", en: "Export as PDF", es: "Exportar como PDF" })}
                       </Button>
                     </div>
 
@@ -751,7 +907,7 @@ const BrandKit = () => {
                 {activeBrandKit ? (
                   <div className="grid md:grid-cols-2 gap-6">
                     <ConsistencyScore 
-                      score={activeBrandKit.consistency_score || 85} 
+                      score={typeof activeBrandKit.consistency_score === 'number' ? activeBrandKit.consistency_score : null} 
                       brandKit={activeBrandKit}
                     />
                     <BrandDriftDossier brandKitId={activeBrandKit.id} />
@@ -833,14 +989,20 @@ const BrandKit = () => {
                 transition={{ duration: 0.3 }}
                 className="space-y-6"
               >
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center flex-wrap gap-3">
                   <h2 className="text-2xl font-bold">{tx({ de: 'Meine Marken-Sets', en: 'My brand sets', es: 'Mis kits de marca' })}</h2>
-                  <Badge 
-                    variant="secondary"
-                    className="backdrop-blur-xl bg-primary/10 border border-primary/20 text-primary font-medium"
-                  >
-                    {brandKits.length} {brandKits.length === 1 ? "Set" : "Sets"}
-                  </Badge>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+                      <Checkbox checked={showArchived} onCheckedChange={(v) => setShowArchived(!!v)} />
+                      {tx({ de: 'Archivierte anzeigen', en: 'Show archived', es: 'Mostrar archivados' })}
+                    </label>
+                    <Badge 
+                      variant="secondary"
+                      className="backdrop-blur-xl bg-primary/10 border border-primary/20 text-primary font-medium"
+                    >
+                      {visibleBrandKits.length} {visibleBrandKits.length === 1 ? "Set" : "Sets"}
+                    </Badge>
+                  </div>
                 </div>
 
                 <motion.div 
@@ -849,7 +1011,7 @@ const BrandKit = () => {
                   initial="hidden"
                   animate="visible"
                 >
-                  {brandKits.map((kit: any) => (
+                  {visibleBrandKits.map((kit: any) => (
                     <motion.div
                       key={kit.id}
                       variants={staggerItem}
@@ -860,9 +1022,14 @@ const BrandKit = () => {
                           : "border-white/10 hover:border-white/20 hover:shadow-[0_0_20px_rgba(0,0,0,0.2)]"
                       }`}
                     >
-                      {kit.is_active && (
+                      {kit.is_active && !kit.archived_at && (
                         <Badge className="absolute -top-2 -right-2 z-10 bg-primary text-primary-foreground shadow-[0_0_15px_hsla(43,90%,68%,0.4)]">
                           {tx({ de: "Aktiv", en: "Active", es: "Activo" })}
+                        </Badge>
+                      )}
+                      {kit.archived_at && (
+                        <Badge variant="outline" className="absolute -top-2 -right-2 z-10 bg-muted text-muted-foreground border-white/20">
+                          {tx({ de: "Archiviert", en: "Archived", es: "Archivado" })}
                         </Badge>
                       )}
                       
@@ -908,8 +1075,8 @@ const BrandKit = () => {
                           {kit.mood}
                         </Badge>
 
-                        <div className="flex gap-2 pt-2">
-                          {!kit.is_active && (
+                        <div className="flex flex-wrap gap-2 pt-2">
+                          {!kit.is_active && !kit.archived_at && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -923,9 +1090,32 @@ const BrandKit = () => {
                             variant="ghost"
                             size="sm"
                             className="hover:bg-white/10"
+                            title={tx({ de: "Umbenennen", en: "Rename", es: "Renombrar" })}
+                            onClick={() => {
+                              setRenameTarget(kit);
+                              setRenameValue(kit.brand_name || "");
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-white/10"
                             onClick={() => handleDuplicate(kit)}
                           >
                             <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-white/10"
+                            title={kit.archived_at
+                              ? tx({ de: "Wiederherstellen", en: "Unarchive", es: "Desarchivar" })
+                              : tx({ de: "Archivieren", en: "Archive", es: "Archivar" })}
+                            onClick={() => archiveMutation.mutate({ id: kit.id, archive: !kit.archived_at })}
+                          >
+                            {kit.archived_at ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
                           </Button>
                           <Button
                             variant="ghost"
@@ -955,6 +1145,35 @@ const BrandKit = () => {
         onOpenChange={setShowPlanLimit}
         feature="brand_kit"
       />
+
+      <Dialog open={!!renameTarget} onOpenChange={(open) => { if (!open) { setRenameTarget(null); setRenameValue(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{tx({ de: "Marken-Set umbenennen", en: "Rename brand kit", es: "Renombrar kit de marca" })}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="rename-input">{tx({ de: "Name", en: "Name", es: "Nombre" })}</Label>
+            <Input
+              id="rename-input"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRenameTarget(null); setRenameValue(""); }}>
+              {tx({ de: "Abbrechen", en: "Cancel", es: "Cancelar" })}
+            </Button>
+            <Button
+              disabled={!renameValue.trim() || renameMutation.isPending}
+              onClick={() => renameTarget && renameMutation.mutate({ id: renameTarget.id, name: renameValue.trim() })}
+            >
+              {renameMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {tx({ de: "Speichern", en: "Save", es: "Guardar" })}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

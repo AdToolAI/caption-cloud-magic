@@ -84,13 +84,26 @@ serve((req: Request) => withLang(req, () => (withTelemetry('generate-post-v2', a
       const brandVoice = brandData.brand_voice || {};
       const alwaysWords = brandData.keywords || [];
       const neverWords = brandData.brand_emotions?.filter((e: any) => e.avoid) || [];
-      
+      const brandName = brandData.brand_name;
+      const targetAudience = brandData.target_audience;
+      const industry = brandData.industry;
+      const styleDirection = brandData.style_direction;
+      const brandValues = Array.isArray(brandData.brand_values)
+        ? brandData.brand_values.join(", ")
+        : brandData.brand_values;
+
       systemPrompt += `\n\nBRAND-REGELN:
-- Tonfall: ${toneOverride || brandTone}
+${brandName ? `- Marke: ${brandName}
+` : ""}- Tonfall: ${toneOverride || brandTone}
 - Emojis: ${brandVoice.emojiUse || "moderat verwenden"}
-- Immer verwenden: ${alwaysWords.join(", ")}
+${brandVoice.style ? `- Stil der Markenstimme: ${brandVoice.style}
+` : ""}- Immer verwenden: ${alwaysWords.join(", ")}
 - Niemals verwenden: ${neverWords.join(", ")}
-- Brand-Treue: ${options.brandFidelity || 80}%`;
+${targetAudience ? `- Zielgruppe: ${targetAudience}
+` : ""}${industry ? `- Branche: ${industry}
+` : ""}${styleDirection ? `- Stilrichtung: ${styleDirection}
+` : ""}${brandValues ? `- Markenwerte: ${brandValues}
+` : ""}- Brand-Treue: ${options.brandFidelity || 80}%`;
     }
 
     systemPrompt += `\n\nPLATTFORM-LIMITS:

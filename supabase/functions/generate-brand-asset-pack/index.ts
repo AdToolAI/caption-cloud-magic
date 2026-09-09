@@ -112,18 +112,21 @@ Deno.serve(async (req) => {
       });
       if (up.error) throw up.error;
 
-      const { data: pub } = admin.storage.from("brand-assets").getPublicUrl(path);
+      const { data: signed, error: signErr } = await admin.storage
+        .from("brand-assets")
+        .createSignedUrl(path, 60 * 60 * 24 * 7);
+      if (signErr || !signed?.signedUrl) throw signErr ?? new Error("sign_failed");
 
       const ins = await admin.from("brand_assets").insert({
         brand_kit_id: brandKitId,
         user_id: user.id,
         kind: spec.kind,
-        url: pub.publicUrl,
-        meta: { width: spec.width, height: spec.height, prompt: spec.prompt },
+        url: signed.signedUrl,
+        meta: { width: spec.width, height: spec.height, prompt: spec.prompt, path },
       }).select("id").single();
       if (ins.error) throw ins.error;
 
-      return { kind: spec.kind, url: pub.publicUrl };
+      return { kind: spec.kind, url: signed.signedUrl };
     }));
 
     const ok = results.filter((r) => r.status === "fulfilled").map((r: any) => r.value);

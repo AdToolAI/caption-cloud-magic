@@ -3,13 +3,13 @@ import { tx } from "@/lib/i18nText";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, AlertCircle, CheckCircle, Trophy, Target } from "lucide-react";
+import { TrendingUp, AlertCircle, CheckCircle, Trophy, Target, ScanSearch } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
 interface ConsistencyScoreProps {
-  score: number;
+  score: number | null;
   brandKit: any;
 }
 
@@ -43,28 +43,40 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
     return tx({ de: "Verbesserung nötig", en: "Improvement needed", es: "Mejora necesaria" });
   };
 
-  const suggestions = [
+  // Real feedback extracted from analyzed content, when available.
+  const realFeedbackItems: string[] = recentChecks
+    .flatMap((check: any) => {
+      const fb = check?.feedback;
+      if (!fb) return [];
+      if (Array.isArray(fb?.suggestions)) return fb.suggestions;
+      if (Array.isArray(fb)) return fb;
+      if (typeof fb?.text === "string") return [fb.text];
+      return [];
+    })
+    .filter((t: any) => typeof t === "string" && t.trim().length > 0)
+    .slice(0, 4);
+
+  const hasRealFeedback = realFeedbackItems.length > 0;
+
+  const genericSuggestions = [
     {
-      type: score >= 80 ? "success" : "tip",
-      icon: score >= 80 ? CheckCircle : AlertCircle,
-      text: score >= 80 
-        ? tx({ de: tx({ de: "Deine Marke ist konsistent! Weiter so!", en: "Your brand is consistent! Keep it up!", es: "¡Tu marca es consistente! ¡Sigue así!" }), en: "Your brand is consistent! Keep it up!", es: "¡Tu marca es consistente! ¡Sigue así!" }) 
+      icon: score !== null && score >= 80 ? CheckCircle : AlertCircle,
+      text: score !== null && score >= 80
+        ? tx({ de: "Deine Marke ist konsistent! Weiter so!", en: "Your brand is consistent! Keep it up!", es: "¡Tu marca es consistente! ¡Sigue así!" })
         : tx({ de: "Nutze deine Primärfarbe häufiger in Posts", en: "Use your primary color more often in posts", es: "Usa tu color primario con más frecuencia en las publicaciones" })
     },
     {
-      type: "tip",
       icon: TrendingUp,
       text: tx({ de: `Tonalität "${brandKit.brand_tone}" beibehalten`, en: `Maintain tonality "${brandKit.brand_tone}"`, es: `Mantener la tonalidad "${brandKit.brand_tone}"` })
     },
     {
-      type: "tip",
       icon: TrendingUp,
       text: tx({ de: "Empfohlene Hashtags in jedem Post verwenden", en: "Use recommended hashtags in every post", es: "Usar hashtags recomendados en cada publicación" })
     }
   ];
 
-  const hasMasterBadge = score >= 90;
-  const hasProBadge = score >= 80;
+  const hasMasterBadge = score !== null && score >= 90;
+  const hasProBadge = score !== null && score >= 80;
 
   return (
     <Card>
@@ -76,12 +88,28 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="text-center">
-          <div className={`text-6xl font-bold ${getScoreColor(score)}`}>
-            {score}
-          </div>
-          <Badge variant="secondary" className="mt-2">
-            {getScoreLabel(score)}
-          </Badge>
+          {score === null ? (
+            <>
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                <ScanSearch className="h-10 w-10" />
+                <div className="text-lg font-semibold">
+                  {tx({ de: "Noch nicht analysiert", en: "Not analyzed yet", es: "Aún no analizado" })}
+                </div>
+                <p className="text-xs max-w-xs">
+                  {tx({ de: "Führe einen Scan durch, um einen echten Consistency Score für dieses Marken-Set zu erhalten.", en: "Run a scan to get a real consistency score for this brand kit.", es: "Ejecuta un análisis para obtener una puntuación de consistencia real para este kit de marca." })}
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className={`text-6xl font-bold ${getScoreColor(score)}`}>
+                {score}
+              </div>
+              <Badge variant="secondary" className="mt-2">
+                {getScoreLabel(score)}
+              </Badge>
+            </>
+          )}
 
           {(hasMasterBadge || hasProBadge) && (
             <div className="flex justify-center gap-2 mt-3">
@@ -101,23 +129,34 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
           )}
         </div>
 
-        <div>
-          <Progress value={score} className="h-3" />
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            {tx({ de: `Basierend auf ${recentChecks.length} ${recentChecks.length === 1 ? "Analyse" : "Analysen"}`, en: `Based on ${recentChecks.length} ${recentChecks.length === 1 ? "analysis" : "analyses"}`, es: `Basado en ${recentChecks.length} ${recentChecks.length === 1 ? "análisis" : "análisis"}` })}
-          </p>
-        </div>
+        {score !== null && (
+          <div>
+            <Progress value={score} className="h-3" />
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              {tx({ de: `Basierend auf ${recentChecks.length} ${recentChecks.length === 1 ? "Analyse" : "Analysen"}`, en: `Based on ${recentChecks.length} ${recentChecks.length === 1 ? "analysis" : "analyses"}`, es: `Basado en ${recentChecks.length} ${recentChecks.length === 1 ? "análisis" : "análisis"}` })}
+            </p>
+          </div>
+        )}
 
         <div className="space-y-2">
-          <p className="text-sm font-medium">{tx({ de: "Verbesserungsvorschläge:", en: "Suggestions for improvement:", es: "Sugerencias de mejora:" })}</p>
-          {suggestions.map((suggestion, idx) => (
-            <div key={idx} className="flex items-start gap-2 text-sm">
-              <suggestion.icon className={`h-4 w-4 mt-0.5 ${
-                suggestion.type === "success" ? "text-green-500" : "text-primary"
-              }`} />
-              <span>{suggestion.text}</span>
-            </div>
-          ))}
+          <p className="text-sm font-medium">
+            {hasRealFeedback
+              ? tx({ de: "Verbesserungsvorschläge (aus deiner Analyse):", en: "Suggestions for improvement (from your analysis):", es: "Sugerencias de mejora (de tu análisis):" })
+              : tx({ de: "Generische Tipps — nicht auf Basis deiner Inhalte:", en: "Generic tips — not based on your content:", es: "Consejos genéricos — no basados en tu contenido:" })}
+          </p>
+          {hasRealFeedback
+            ? realFeedbackItems.map((text, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-sm">
+                  <TrendingUp className="h-4 w-4 mt-0.5 text-primary" />
+                  <span>{text}</span>
+                </div>
+              ))
+            : genericSuggestions.map((suggestion, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <suggestion.icon className="h-4 w-4 mt-0.5" />
+                  <span>{suggestion.text}</span>
+                </div>
+              ))}
         </div>
 
         {recentChecks.length > 0 && (

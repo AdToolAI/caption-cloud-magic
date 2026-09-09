@@ -19,13 +19,17 @@ function hexToRgb(hex: string) {
   return { r: (v >> 16) & 255, g: (v >> 8) & 255, b: v & 255 };
 }
 
+// HONESTY NOTE: this is NOT a real image/color-vision analysis. It is a
+// deterministic heuristic derived from a hash of the image bytes and the
+// palette size — it does not "see" the image at all. It exists as a cheap
+// placeholder until a real vision model / pixel-level ΔE check (like
+// computeCIMatchScore, which runs client-side via <canvas>) is wired in for
+// server-side scans. Always tag its output with method: "heuristic" so the
+// UI can label it as basic heuristic rather than AI analysis.
 async function colorDriftFromImage(imageUrl: string, palette: string[]): Promise<number> {
   try {
     const res = await fetch(imageUrl);
     if (!res.ok) return 0;
-    // Naive: skip pixel-level OffscreenCanvas (not in Deno). We use perceptual stub
-    // based on URL hash + palette length so the score is deterministic-ish.
-    // Real ΔE check runs client-side via computeCIMatchScore.
     const buf = new Uint8Array(await res.arrayBuffer());
     let acc = 0;
     for (let i = 0; i < Math.min(buf.length, 4096); i += 32) acc = (acc + buf[i]) % 255;
@@ -91,7 +95,7 @@ serve(async (req) => {
           severity: score < 40 ? "high" : "medium",
           score,
           preview_url: v.thumbnail_url,
-          suggested_fix: { kind: "recolor", target: "primary", hex: kit.primary_color },
+          suggested_fix: { kind: "recolor", target: "primary", hex: kit.primary_color, method: "heuristic" },
         });
       }
     }
