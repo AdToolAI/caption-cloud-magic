@@ -6,7 +6,7 @@ import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-m
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond, VIDEO_PRICING_CATALOG } from "../_shared/videoPricingCatalog.ts";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

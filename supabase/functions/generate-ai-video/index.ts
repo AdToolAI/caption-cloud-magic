@@ -6,7 +6,7 @@ import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { withTimeout, isTimeoutError } from "../_shared/timeout.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

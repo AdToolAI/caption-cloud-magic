@@ -6,7 +6,7 @@ import { getVisualStyleHint, type ComposerVisualStyle } from "../_shared/compose
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

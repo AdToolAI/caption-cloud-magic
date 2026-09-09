@@ -20,7 +20,7 @@ const corsHeaders = {
 // Seedance 2.0 pricing is now sourced from the canonical catalog so the UI
 // preview and the deducted amount can never diverge again.
 import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
-import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 
 // Replicate model slug per tier
 // Verified against https://replicate.com/bytedance (2026-07-21).

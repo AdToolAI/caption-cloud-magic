@@ -30,22 +30,42 @@ export async function resolveAccountDiscountFactor(
 }
 
 /**
- * Canonical LIST per-second price for a model.
+ * Canonical LIST per-second price for a model — or `null` when the canonical
+ * catalog does not know the id.
+ *
+ * There is deliberately NO local fallback table any more: a stale per-function
+ * price table charged a different amount than the UI preview showed. When the
+ * catalog cannot price a model, the request must fail closed
+ * (`pricingUnavailableResponse`) instead of billing an invented rate.
  *
  * IMPORTANT: the account discount is applied by the `deduct_ai_video_credits`
  * and `refund_ai_video_credits` RPCs (they multiply by
  * `get_ai_discount_factor(user)`), so callers must pass the LIST price — a
  * discount applied here as well would be charged twice over.
- * `fallbackPerSecond` is only used when the model is missing from the catalog.
  */
 export async function resolveAccountCostPerSecond(
   _supabaseAdmin: { from: (t: string) => any },
   _userId: string,
   modelId: string,
   currency: "EUR" | "USD",
-  fallbackPerSecond: number,
-): Promise<number> {
-  const base = resolveCostPerSecond(modelId, currency) ?? fallbackPerSecond;
+): Promise<number | null> {
+  const base = resolveCostPerSecond(modelId, currency);
+  if (base == null || !Number.isFinite(base) || base <= 0) return null;
   // Same rounding as `pricing-catalog`, so the deduction equals the preview.
   return Math.round(base * 100) / 100;
 }
+
+/** Fail-closed answer when no canonical price exists — never a guessed rate. */
+export function pricingUnavailableResponse(
+  corsHeaders: Record<string, string>,
+): Response {
+  return new Response(
+    JSON.stringify({
+      error:
+        "Pricing is temporarily unavailable for this model. No generation was started and nothing was charged.",
+      code: "PRICING_UNAVAILABLE",
+    }),
+    { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+
