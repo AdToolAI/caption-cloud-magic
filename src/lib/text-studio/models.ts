@@ -8,16 +8,17 @@ export type TextModelId =
   | "openai-gpt-5-6-luna"
   | "openai-gpt-5-6-terra"
   | "openai-gpt-5-6-sol"
+  | "openai-gpt-6-astra"
   // Google
   | "google-gemini-3-1-flash-lite"
-  | "google-gemini-3-6-flash"
+  | "google-gemini-3-8-flash"
   | "google-gemini-3-1-pro"
   // Anthropic
   | "anthropic-claude-4-1-opus";
 
 export type TextProvider = "lovable-gateway" | "anthropic";
 export type TextProviderKey = "openai" | "google" | "anthropic";
-export type TextTier = "fast" | "balanced" | "max";
+export type TextTier = "fast" | "balanced" | "max" | "ultra";
 
 export interface TextModel {
   id: TextModelId;
@@ -36,6 +37,8 @@ export interface TextModel {
   strengths: string[];
   /** Whether this model supports a reasoning_effort parameter */
   supportsReasoningEffort: boolean;
+  /** Models that always reason (e.g. GPT-6 Astra) cannot be set to "off" */
+  requiresReasoning?: boolean;
   /** Context window in tokens for display */
   contextWindow: number;
   /** Whether the model is enabled by default (Claude requires ANTHROPIC_API_KEY) */
@@ -52,12 +55,14 @@ export const TIER_LABELS: Record<TextTier, string> = {
   fast: tx({ de: 'Schnell', en: 'Fast', es: 'Rápido' }),
   balanced: tx({ de: 'Ausgewogen', en: 'Balanced', es: 'Equilibrado' }),
   max: tx({ de: 'Maximum', en: 'Maximum', es: 'Máximo' }),
+  ultra: tx({ de: 'Höchststufe', en: 'Ultra', es: 'Ultra' }),
 };
 
 export const TIER_DESCRIPTIONS: Record<TextTier, string> = {
   fast: tx({ de: "Sekundenschnell, günstig – ideal für kurze Texte und viele Varianten", en: "Lightning fast, affordable – ideal for short texts and many variations", es: "Rapidísimo, económico – ideal para textos cortos y muchas variaciones" }),
   balanced: tx({ de: "Bestes Verhältnis aus Qualität, Tempo und Preis", en: "Best balance of quality, speed, and price", es: "Mejor relación calidad, velocidad y precio" }),
   max: tx({ de: "Höchste Qualität für komplexe Analysen und lange Texte", en: "Highest quality for complex analyses and long texts", es: "Máxima calidad para análisis complejos y textos largos" }),
+  ultra: tx({ de: "Neueste Generation mit tiefem Denken für die schwersten Aufgaben", en: "Latest generation with deep thinking for the hardest tasks", es: "Última generación con razonamiento profundo para las tareas más difíciles" }),
 };
 
 export const TEXT_MODELS: Record<TextModelId, TextModel> = {
@@ -104,6 +109,21 @@ export const TEXT_MODELS: Record<TextModelId, TextModel> = {
     supportsReasoningEffort: true,
     contextWindow: 400_000,
   },
+  "openai-gpt-6-astra": {
+    id: "openai-gpt-6-astra",
+    label: "GPT-6 Astra",
+    provider: "lovable-gateway",
+    providerKey: "openai",
+    tier: "ultra",
+    apiModel: "openai/gpt-6-astra",
+    description: tx({ de: "Neuestes Spitzenmodell für Recherche, Analyse und lange Dokumente", en: "Newest frontier model for research, analysis, and long documents", es: "El modelo más nuevo para investigación, análisis y documentos largos" }),
+    inputPricePer1k: 0.0195,
+    outputPricePer1k: 0.0975,
+    strengths: ["Reasoning", tx({ de: "Recherche", en: "Research", es: "Investigación" }), "Premium"],
+    supportsReasoningEffort: true,
+    requiresReasoning: true,
+    contextWindow: 400_000,
+  },
 
   // ---------- Google ----------
   "google-gemini-3-1-flash-lite": {
@@ -120,13 +140,13 @@ export const TEXT_MODELS: Record<TextModelId, TextModel> = {
     supportsReasoningEffort: false,
     contextWindow: 1_000_000,
   },
-  "google-gemini-3-6-flash": {
-    id: "google-gemini-3-6-flash",
-    label: "Gemini 3.6 Flash",
+  "google-gemini-3-8-flash": {
+    id: "google-gemini-3-8-flash",
+    label: "Gemini 3.8 Flash",
     provider: "lovable-gateway",
     providerKey: "google",
     tier: "balanced",
-    apiModel: "google/gemini-3.6-flash",
+    apiModel: "google/gemini-3.8-flash",
     description: tx({ de: "Schnelles Allround-Modell mit 1M Kontext", en: "Fast all-round model with 1M context", es: "Modelo rápido y completo con contexto 1M" }),
     inputPricePer1k: 0.0005,
     outputPricePer1k: 0.0033,
@@ -170,7 +190,7 @@ export const TEXT_MODELS: Record<TextModelId, TextModel> = {
 export const TEXT_MODEL_LIST = Object.values(TEXT_MODELS);
 
 export const PROVIDER_ORDER: TextProviderKey[] = ["openai", "google", "anthropic"];
-export const TIER_ORDER: TextTier[] = ["fast", "balanced", "max"];
+export const TIER_ORDER: TextTier[] = ["fast", "balanced", "max", "ultra"];
 
 export function modelsByProvider(providerKey: TextProviderKey): TextModel[] {
   return TEXT_MODEL_LIST.filter((m) => m.providerKey === providerKey).sort(
@@ -182,11 +202,12 @@ export function findModel(providerKey: TextProviderKey, tier: TextTier): TextMod
   return TEXT_MODEL_LIST.find((m) => m.providerKey === providerKey && m.tier === tier);
 }
 
-export const DEFAULT_TEXT_MODEL: TextModelId = "google-gemini-3-6-flash";
+export const DEFAULT_TEXT_MODEL: TextModelId = "google-gemini-3-8-flash";
 
 /** Legacy IDs from the previous registry -> current equivalents */
 export const LEGACY_MODEL_ALIASES: Record<string, TextModelId> = {
   "openai-gpt-5-5-pro": "openai-gpt-5-6-sol",
+  "google-gemini-3-6-flash": "google-gemini-3-8-flash",
   "google-gemini-3-1-pro": "google-gemini-3-1-pro",
 };
 
