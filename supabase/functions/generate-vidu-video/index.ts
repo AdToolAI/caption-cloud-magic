@@ -38,7 +38,11 @@ const MAX_DURATION = 16;
 const DEFAULT_DURATION = 5;
 const ALLOWED_ASPECTS = new Set(["16:9", "9:16", "1:1", "4:3", "3:4"]);
 const ALLOWED_RESOLUTIONS = new Set(["540p", "720p", "1080p"]);
-const MAX_REFERENCES = 7;
+// Route truth (Replicate `vidu/q3-*`, 11.08.2026): exactly ONE image input
+// (`start_image`, optionally paired with `end_image`). There is no reference
+// array, so more than one uploaded reference is REJECTED instead of being
+// folded into the prompt and billed as if it had been sent.
+const MAX_REFERENCES = 1;
 const VALID_ROLES = new Set(["character", "product", "location", "style", "prop"]);
 
 interface GenerateRequest {
@@ -282,7 +286,9 @@ serve(async (req) => {
       }
       if (referenceImages.length > MAX_REFERENCES) {
         return new Response(JSON.stringify({
-          error: `Maximum ${MAX_REFERENCES} reference images allowed.`,
+          error:
+            "Vidu Q3 accepts exactly one image (start frame, optionally with an end frame). " +
+            "Additional reference images are NOT sent to the provider — please remove them.",
           code: "TOO_MANY_REFERENCES",
         }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
