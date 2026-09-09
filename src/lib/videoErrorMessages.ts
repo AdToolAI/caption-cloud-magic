@@ -148,10 +148,11 @@ export function friendlyVideoErrorMessage(errorMessage: string | null | undefine
       });
     case 'copyright_output':
       return tx({
-        de: `Der Anbieter hat das Ergebnis wegen möglicher Urheberrechte gesperrt – das passiert oft bei bekannten Marken, Figuren, Songs oder Filmszenen, besonders bei langen Clips. ${REFUND.de} Beschreibe die Szene mit eigenen Motiven, ohne Marken- oder Songnamen, oder wähle eine kürzere Länge.`,
-        en: `The provider blocked the result over possible copyright – this often happens with well-known brands, characters, songs or movie scenes, especially in long clips. ${REFUND.en} Describe the scene with your own motifs, without brand or song names, or choose a shorter length.`,
-        es: `El proveedor bloqueó el resultado por posibles derechos de autor: suele ocurrir con marcas, personajes, canciones o escenas de películas conocidas, sobre todo en clips largos. ${REFUND.es} Describe la escena con motivos propios, sin nombres de marcas o canciones, o elige una duración más corta.`,
+        de: `Der Anbieter hat das Ergebnis wegen möglicher Urheberrechte gesperrt – das passiert oft bei bekannten Marken, Figuren, Songs oder Filmszenen, besonders bei langen Clips. ${REFUND.de} Beschreibe die Szene mit eigenen Motiven, ohne Marken- oder Songnamen, wähle eine kürzere Länge – oder nutze ein toleranteres Modell wie Kling 3 oder Wan 2.6 Pro.`,
+        en: `The provider blocked the result over possible copyright – this often happens with well-known brands, characters, songs or movie scenes, especially in long clips. ${REFUND.en} Describe the scene with your own motifs, without brand or song names, choose a shorter length – or use a more tolerant model such as Kling 3 or Wan 2.6 Pro.`,
+        es: `El proveedor bloqueó el resultado por posibles derechos de autor: suele ocurrir con marcas, personajes, canciones o escenas de películas conocidas, sobre todo en clips largos. ${REFUND.es} Describe la escena con motivos propios, sin nombres de marcas o canciones, elige una duración más corta o usa un modelo más tolerante como Kling 3 o Wan 2.6 Pro.`,
       });
+
     case 'moderation':
 
       return tx({
