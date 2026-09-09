@@ -47,6 +47,9 @@ const LEGACY_ALIASES: Record<string, string> = {
   "google-gemini-3-6-flash": "google-gemini-3-8-flash",
 };
 
+/** Models that reject reasoning_effort "none" and must always reason. */
+const ALWAYS_REASONING_MODELS = new Set(["openai/gpt-6-astra"]);
+
 function estimateTokens(text: string): number {
   return Math.max(1, Math.ceil((text || "").length / 4));
 }
@@ -80,6 +83,16 @@ Deno.serve(async (req) => {
     const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
     if (userErr || !userData?.user) return jsonResponse({ error: "Unauthorized" }, 401);
     const userId = userData.user.id;
+
+    // --- Premium gate: Text Studio is included in paid plans only. ---
+    // Checked before the conversation is created and before any provider
+    // request, so a direct API call cannot bypass the UI gate.
+    if (!(await isTextStudioEntitled(supabaseAdmin, userId, (k) => Deno.env.get(k)))) {
+      return jsonResponse(
+        { error: TEXT_STUDIO_PREMIUM_MESSAGE, code: TEXT_STUDIO_PREMIUM_REQUIRED },
+        403,
+      );
+    }
 
     const body = await req.json().catch(() => null);
     if (!body) return jsonResponse({ error: "Invalid body" }, 400);
@@ -204,7 +217,11 @@ Deno.serve(async (req) => {
       };
       if (isOpenAI) {
         // GPT-5.6 models require an explicit reasoning_effort; "none" disables thinking.
-        reqBody.reasoning_effort = reasoningEffort && reasoningEffort !== "none" ? reasoningEffort : "none";
+        // GPT-6 Astra always reasons and rejects "none"/"minimal" -> floor at "low".
+        const requested = reasoningEffort && reasoningEffort !== "none" ? reasoningEffort : "none";
+        reqBody.reasoning_effort = ALWAYS_REASONING_MODELS.has(route.apiModel)
+          ? (requested === "none" ? "low" : requested)
+          : requested;
         reqBody.max_completion_tokens = outputTokenCap;
       } else {
         reqBody.max_tokens = outputTokenCap;
@@ -258,7 +275,11 @@ Deno.serve(async (req) => {
     // --- Stream + capture full assistant text for DB write after end ---
     let fullAssistant = "";
     let outputTokens = 0;
-    let inputTokens = estInputTokens;
+    // Telemetry estimate from what we actually send; real provider usage
+    // overwrites it below when the stream reports it.
+    let inputTokens = estimateTokens(
+      [...sysMsg, ...cleanMessages].map((m) => m.content).join("\n"),
+    );
 
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
