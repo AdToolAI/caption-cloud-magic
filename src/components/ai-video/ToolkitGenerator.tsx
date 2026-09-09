@@ -1240,7 +1240,21 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       refetchWallet();
       onAfterGenerate?.();
     } catch (err: any) {
-      toast.error(friendlyVideoErrorMessage(err?.message));
+      const kind = classifyVideoError(err?.message);
+      const tolerantId = getToolkitModelById('kling-3') ? 'kling-3' : (getToolkitModelById('wan-2-6-pro') ? 'wan-2-6-pro' : null);
+      const offerSwitch = (kind === 'copyright_output' || kind === 'real_person_image') && tolerantId && model.id !== tolerantId;
+      toast.error(friendlyVideoErrorMessage(err?.message), offerSwitch ? {
+        duration: 12000,
+        action: {
+          label: tx({
+            de: `Mit ${getToolkitModelById(tolerantId!)?.name ?? 'Kling 3'} versuchen`,
+            en: `Try with ${getToolkitModelById(tolerantId!)?.name ?? 'Kling 3'}`,
+            es: `Probar con ${getToolkitModelById(tolerantId!)?.name ?? 'Kling 3'}`,
+          }),
+          onClick: () => setModelId(tolerantId!),
+        },
+      } : undefined);
+
       if (rejectedSlotRef.current !== null) {
         // Set after the state reset effect so the highlight survives.
         const idx = rejectedSlotRef.current;
