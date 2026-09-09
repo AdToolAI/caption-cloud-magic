@@ -11,8 +11,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useUserRoles } from '@/hooks/useUserRoles';
+import { useAuth } from '@/hooks/useAuth';
+import { useTrialAccess } from '@/hooks/useTrialAccess';
+
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
 import { EnhanceRunProgress } from '@/components/ai-video/EnhanceRunProgress';
