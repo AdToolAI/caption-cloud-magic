@@ -99,6 +99,8 @@ const SPECIALIST_TIERS: QualityTier[] = ['fast', 'pro', 'ultra', 'flux'];
 
 export function ImageGenerator() {
   const { user } = useAuth();
+  const { isEntitled } = usePicturePremium();
+  const [premiumDialogOpen, setPremiumDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { wallet } = useAIVideoWallet();
   const { data: activeBrandKit } = useActiveBrandKit();
@@ -670,6 +672,7 @@ export function ImageGenerator() {
   const handleGenerate = () => {
     if (!prompt.trim()) { toast.error(t('picStudio.promptRequired')); return; }
     if (!user) { toast.error(t('picStudio.loginRequired')); return; }
+    if (isSpecialistTier(tier) && !isEntitled) { setPremiumDialogOpen(true); return; }
     // Free tier (Gemini/Standard "Gratis im Abo") skips confirm.
     if (cost <= 0) { void runGenerate(); return; }
     if (hasInsufficientCredits) {
