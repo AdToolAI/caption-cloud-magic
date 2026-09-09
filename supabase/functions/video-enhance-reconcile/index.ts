@@ -180,7 +180,7 @@ serve(async (req) => {
         summary.pending++;
         continue;
       }
-      const providerCost = extractProviderCost(prediction, run.model_id);
+      const providerCost = extractProviderCost(prediction, run.model_id, run);
 
       if (prediction.status === "succeeded") {
         const output = prediction.output;
@@ -298,7 +298,7 @@ serve(async (req) => {
         await applyLateCostTrueUp(admin, run, { source: "unavailable" });
         continue;
       }
-      const cost = extractProviderCost(prediction, run.model_id);
+      const cost = extractProviderCost(prediction, run.model_id, run);
       const applied = await applyLateCostTrueUp(admin, run, cost);
       if (applied.applied) lateCostVerified++;
     }

@@ -515,9 +515,10 @@ export const VIDEO_RATE_CARDS: Record<string, VideoRateCard> = {
   'bytedance-vcube': {
     currency: 'USD',
     type: 'per_second_matrix',
+    // VERIFIED 2026-09-09 against real billed AdTool runs (1080p30 / 4K30 /
+    // 4K60): the published per-output-second matrix matched to the cent.
     source: 'Replicate bytedance/video-upscaler published billing tiers (per output second)',
-    checkedAt: '2026-09-05',
-    costUnverified: true,
+    checkedAt: '2026-09-09',
     entries: VCUBE_ENTRIES,
   },
   'topaz-video-upscale': {

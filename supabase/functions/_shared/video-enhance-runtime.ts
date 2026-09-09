@@ -6,7 +6,12 @@
  * and can safely race each other.
  */
 
-import { actualMargin, costDrift, VIDEO_RATE_CARDS } from './video-enhance-models.ts';
+import {
+  actualMargin,
+  costDrift,
+  videoProviderCostDetail,
+  VIDEO_RATE_CARDS,
+} from './video-enhance-models.ts';
 import { topazCreditDrift } from './topaz-cost-estimator.ts';
 
 // deno-lint-ignore no-explicit-any
@@ -82,8 +87,42 @@ export interface ProviderCostReading {
   processingSeconds?: number;
 }
 
+/**
+ * Money for a card that prices billed OUTPUT SECONDS (ByteDance vCube).
+ *
+ * The provider reports `video_output_duration_seconds`, never a price, so the
+ * verified rate matrix converts the billed seconds into the actual cost. The
+ * lookup uses the run's own order (mode / resolution / fps / tier); if any of
+ * that is missing or unpriceable the reading stays usage-only and the existing
+ * late-cost re-read picks the run up again later.
+ */
 // deno-lint-ignore no-explicit-any
-export function extractProviderCost(prediction: any, modelId?: string): ProviderCostReading {
+function matrixUsageUsd(card: any, run: any, outputSeconds: number): number | undefined {
+  if (!run || card?.type !== 'per_second_matrix') return undefined;
+  const fps = Number(run.fps ?? run.source_fps);
+  if (!run.mode || !run.resolution || !run.tier || !Number.isFinite(fps)) return undefined;
+  try {
+    const detail = videoProviderCostDetail(card, {
+      mode: String(run.mode),
+      resolution: run.resolution,
+      fps: Math.round(fps),
+      tier: run.tier,
+      outputSeconds,
+    });
+    return Number.isFinite(detail.costUsd) && detail.costUsd >= 0 ? detail.costUsd : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// deno-lint-ignore no-explicit-any
+export function extractProviderCost(
+  // deno-lint-ignore no-explicit-any
+  prediction: any,
+  modelId?: string,
+  // deno-lint-ignore no-explicit-any
+  run?: any,
+): ProviderCostReading {
   const metrics = prediction?.metrics ?? {};
   const processingSeconds =
     typeof metrics.predict_time === 'number' && Number.isFinite(metrics.predict_time)
@@ -108,7 +147,8 @@ export function extractProviderCost(prediction: any, modelId?: string): Provider
     if (card && card.type === 'per_unit') {
       return { usd: units * card.unitUsd, source: 'provider_usage', units, processingSeconds };
     }
-    return { usd: undefined, source: 'provider_usage', units, processingSeconds };
+    const matrixUsd = matrixUsageUsd(card, run, units);
+    return { usd: matrixUsd, source: 'provider_usage', units, processingSeconds };
   }
   return { source: 'unavailable', processingSeconds };
 }
