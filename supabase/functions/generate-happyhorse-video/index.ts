@@ -292,7 +292,7 @@ serve(async (req) => {
         duration_seconds: duration,
         aspect_ratio: aspectRatio,
         resolution,
-        cost_per_second: costPerSecond,
+        cost_per_second: effectiveCps,
         total_cost_euros: totalCost,
         status: "pending",
         source_image_url: hasImage ? image : null,

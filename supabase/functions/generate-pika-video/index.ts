@@ -241,7 +241,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
         duration_seconds: duration,
         aspect_ratio: aspectRatio,
         resolution: model === 'pika-2-2-pro' ? '1080p' : '720p',
-        cost_per_second: costPerSecond,
+        cost_per_second: effectiveCps,
         total_cost_euros: totalCost,
         status: "pending",
         source_image_url: startImageUrl ?? null,
