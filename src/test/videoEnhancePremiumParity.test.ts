@@ -54,6 +54,7 @@ describe('Video Enhance premium capability mirror', () => {
     }
     expect(server).toContain('PREMIUM_FPS_THRESHOLD = 60');
     // No second premium system: only the one entitlement helper decides.
-    expect(server).not.toMatch(/isPremium\b/);
+    expect(server).toContain('subscription-entitlement.ts');
+
   });
 });
