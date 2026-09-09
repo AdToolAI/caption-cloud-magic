@@ -41,8 +41,8 @@
 
 ## Brand Kit v2 (Sep 9)
 - [x] Website URL + updated_at on brand kits
-- [ ] Server-side form-first precedence in generate-brand-kit (presence-aware, no merge-back)
-- [ ] Editable tone/style/keywords/values/fonts in create form
-- [ ] "Re-analyze website" refresh dialog with per-field Keep current / Use new (single UPDATE)
-- [ ] Motion Studio generative brand context (separate from deterministic branding)
-- [ ] Free tests A-I; paid E2E only after approval
+- [x] Server-side form-first precedence in generate-brand-kit (presence-aware, no merge-back)
+- [x] Editable tone/style/keywords/values/fonts in create form
+- [x] "Re-analyze website" refresh dialog with per-field Keep current / Use new (single UPDATE)
+- [x] Motion Studio generative brand context (separate from deterministic branding)
+- [ ] Live E2E (paid) — awaiting approval; DB/precedence tests done
