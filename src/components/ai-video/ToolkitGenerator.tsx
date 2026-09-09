@@ -52,7 +52,7 @@ import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor'
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
 import { extractEdgeErrorMessage, extractEdgeErrorPayload } from '@/lib/edgeFunctionError';
 import { findDuplicateReferences, isReferenceRole } from '@/lib/ai-video/referenceBinding';
-import { friendlyVideoErrorMessage } from '@/lib/videoErrorMessages';
+import { friendlyVideoErrorMessage, classifyVideoError } from '@/lib/videoErrorMessages';
 
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters } from '@/hooks/useBrandCharacters';
