@@ -11,7 +11,10 @@ import {
   type EnhanceConfig,
   type SourceMetadata,
   DISABLED_VIDEO_ENHANCE_MODELS,
+  VERIFIED_PROVIDER_ENTITLEMENTS,
+  availableTiers,
 } from '@/config/videoEnhanceModels';
+
 import { priceVideoEnhanceRun as priceClient } from '@/lib/videoEnhance/pricing';
 import { VIDEO_RATE_CARDS as CLIENT_CARDS } from '@/lib/videoEnhance/rates';
 import {
