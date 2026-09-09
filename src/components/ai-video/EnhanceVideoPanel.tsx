@@ -240,6 +240,10 @@ export function EnhanceVideoPanel({
   // Only validation accounts may start a model whose credit consumption is
   // still unconfirmed; the server enforces the same rule.
   const { isAdmin: isEnhanceTestUser } = useUserRoles();
+  const { subscribed } = useAuth();
+  const { isPaid } = useTrialAccess();
+  const [premiumOpen, setPremiumOpen] = useState(false);
+
   const lang: Lang = (['en', 'de', 'es'].includes(language) ? language : 'en') as Lang;
 
   const models = useMemo(() => visibleVideoEnhanceModels(), []);
