@@ -209,6 +209,11 @@ const COPY = {
     es: 'Por encima de 30 fotogramas por segundo cuesta unas dos veces más. La mayoría no nota diferencia a 120.',
   },
   premiumBadge: { en: 'Premium', de: 'Premium', es: 'Premium' },
+  premiumAdvancedBadge: {
+    en: 'Advanced Premium',
+    de: 'Advanced Premium',
+    es: 'Advanced Premium',
+  },
 
   premiumTitle: {
     en: 'Topaz Video AI is a Premium feature',
@@ -220,6 +225,26 @@ const COPY = {
     de: 'Upgrade dein AdTool-AI-Abo, um professionelle Topaz-Videoverbesserung und -Hochskalierung zu nutzen.',
     es: 'Mejora tu suscripción de AdTool AI para acceder al escalado y la mejora de vídeo profesional de Topaz.',
   },
+  premiumProTitle: {
+    en: 'Pro quality is a Premium feature',
+    de: 'Pro-Qualität ist eine Premium-Funktion',
+    es: 'La calidad Pro es una función Premium',
+  },
+  premiumProBody: {
+    en: 'Upgrade your AdTool AI subscription to use Pro processing. Your video and settings stay exactly as they are.',
+    de: 'Upgrade dein AdTool-AI-Abo, um die Pro-Verarbeitung zu nutzen. Dein Video und deine Einstellungen bleiben erhalten.',
+    es: 'Mejora tu suscripción de AdTool AI para usar el procesado Pro. Tu vídeo y tus ajustes se mantienen.',
+  },
+  premiumFpsTitle: {
+    en: 'High frame rate is a Premium feature',
+    de: 'Hohe Bildrate ist eine Premium-Funktion',
+    es: 'La alta tasa de fotogramas es una función Premium',
+  },
+  premiumFpsBody: {
+    en: 'Upgrade your AdTool AI subscription for 120 frames per second. Your video and settings stay exactly as they are.',
+    de: 'Upgrade dein AdTool-AI-Abo für 120 Bilder pro Sekunde. Dein Video und deine Einstellungen bleiben erhalten.',
+    es: 'Mejora tu suscripción de AdTool AI para 120 fotogramas por segundo. Tu vídeo y tus ajustes se mantienen.',
+  },
   premiumUpgrade: {
     en: 'Upgrade to Premium',
     de: 'Auf Premium upgraden',
@@ -230,7 +255,18 @@ const COPY = {
     de: 'Mit ByteDance fortfahren',
     es: 'Continuar con ByteDance',
   },
+  premiumFallbackStandard: {
+    en: 'Continue with Standard',
+    de: 'Mit Standard fortfahren',
+    es: 'Continuar con Estándar',
+  },
+  premiumFallbackFps: {
+    en: 'Continue with 60 FPS',
+    de: 'Mit 60 FPS fortfahren',
+    es: 'Continuar con 60 FPS',
+  },
 } as const;
+
 
 
 function tx(key: keyof typeof COPY, lang: Lang): string {
