@@ -590,13 +590,17 @@ export default function MediaLibrary() {
     const fileSizeMb = file.size / 1024 / 1024;
 
     // Auto-FIFO cleanup (or block if cloud connected)
-    const decision = enforceLimits<CleanupMediaItem>({
-      media: media as CleanupMediaItem[],
-      incoming: { type: isVideo ? 'video' : 'image', sizeMb: fileSizeMb },
-      hasCloud: !!cloudConnection,
-      limits: { maxVideos: MAX_VIDEOS, maxImages: MAX_IMAGES, maxStorageMb: MAX_STORAGE_GB * 1024 },
-      currentUsedMb: storageQuota.used_mb,
-    });
+    const isArchiveExempt = user.id === ARCHIVE_EXEMPT_USER_ID;
+    const decision = isArchiveExempt
+      ? { toDelete: [] as CleanupMediaItem[], blocked: false as const }
+      : enforceLimits<CleanupMediaItem>({
+          media: media as CleanupMediaItem[],
+          incoming: { type: isVideo ? 'video' : 'image', sizeMb: fileSizeMb },
+          hasCloud: !!cloudConnection,
+          limits: { maxVideos: MAX_VIDEOS, maxImages: MAX_IMAGES, maxStorageMb: MAX_STORAGE_GB * 1024 },
+          currentUsedMb: storageQuota.used_mb,
+        });
+
 
     if (decision.blocked) {
       if (decision.blockReason === 'cloud_offload_required') {
