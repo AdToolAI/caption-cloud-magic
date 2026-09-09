@@ -156,6 +156,25 @@ serve(async (req) => {
       );
     }
 
+    // Subscription gate BEFORE pricing, wallet mutation, provider call and job creation.
+    if (isSpecialistTier(tier)) {
+      const entitled = await isPictureStudioPremiumEntitled(
+        supabaseAdmin,
+        user.id,
+        (key) => Deno.env.get(key) ?? undefined,
+      );
+      if (!entitled) {
+        return new Response(
+          JSON.stringify({
+            error: "Specialist models require an active subscription.",
+            code: PICTURE_SPECIALIST_PREMIUM_REQUIRED,
+            fallbackTier: PICTURE_FALLBACK_TIER,
+          }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Wallet currency + balance
     const { data: wallet, error: walletError } = await supabaseAdmin
       .from('ai_video_wallets')

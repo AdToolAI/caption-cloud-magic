@@ -61,6 +61,25 @@ serve(async (req) => {
     if (!spec) return json({ error: "Unknown model", code: "UNKNOWN_MODEL" }, 400);
     if (!body.imageUrl?.trim()) return json({ error: "imageUrl is required" }, 400);
 
+    // Subscription gate BEFORE pricing, wallet mutation, provider call and job creation.
+    if (isPremiumEnhanceModel(body.modelId)) {
+      const entitled = await isPictureStudioPremiumEntitled(
+        supabaseAdmin,
+        user.id,
+        (key) => Deno.env.get(key) ?? undefined,
+      );
+      if (!entitled) {
+        return json(
+          {
+            error: "Professional enhance requires an active subscription.",
+            code: PICTURE_ENHANCE_PREMIUM_REQUIRED,
+            fallbackModelId: PICTURE_FALLBACK_ENHANCE_MODEL,
+          },
+          403,
+        );
+      }
+    }
+
     if (!isModelUnlocked(spec, (key) => Deno.env.get(key) ?? undefined, user.id)) {
       return json(
         {
