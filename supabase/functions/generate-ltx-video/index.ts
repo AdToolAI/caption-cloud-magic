@@ -266,17 +266,23 @@ serve(async (req) => {
         })
         .eq('id', generation.id);
 
-      // Refund
-      const { error: refundError } = await supabaseAdmin.rpc('refund_ai_video_credits', {
-        p_user_id: user.id,
-        p_amount_euros: totalCost,
-        p_generation_id: generation.id
-      });
-
-      if (refundError) {
-        console.error('[generate-ltx-video] Refund failed:', refundError);
+      if (included.claimed) {
+        // Included generation: give the monthly allowance back, no wallet move.
+        await releaseIncluded();
+        console.log('[generate-ltx-video] ✅ included allowance restored');
       } else {
-        console.log(`[generate-ltx-video] ✅ ${currencySymbol}${totalCost.toFixed(2)} refunded`);
+        // Refund
+        const { error: refundError } = await supabaseAdmin.rpc('refund_ai_video_credits', {
+          p_user_id: user.id,
+          p_amount_euros: totalCost,
+          p_generation_id: generation.id
+        });
+
+        if (refundError) {
+          console.error('[generate-ltx-video] Refund failed:', refundError);
+        } else {
+          console.log(`[generate-ltx-video] ✅ ${currencySymbol}${totalCost.toFixed(2)} refunded`);
+        }
       }
 
       if (replicateError?.response?.status === 429) {
@@ -297,12 +303,16 @@ serve(async (req) => {
         success: true,
         generationId: generation.id,
         cost: totalCost,
-        currency: wallet.currency,
+        currency: wallet?.currency ?? currency,
+        included: included.claimed,
+        includedUsed: included.claimed ? included.used : undefined,
+        includedLimit: included.claimed ? included.limit : undefined,
         newBalance,
         status: 'processing'
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
+
 
   } catch (error: any) {
     console.error("[generate-ltx-video] Error:", error);
