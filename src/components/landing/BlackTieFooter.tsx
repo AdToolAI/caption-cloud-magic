@@ -54,7 +54,7 @@ export const BlackTieFooter = () => {
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
       
       <div className="container max-w-7xl mx-auto px-4 py-16">
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-8 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
           <div className="col-span-2">
             <Link to="/" className="flex items-center gap-2 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-gold-dark flex items-center justify-center">
@@ -106,19 +106,6 @@ export const BlackTieFooter = () => {
           </div>
 
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-4">{t("landing.footer.company")}</h4>
-            <ul className="space-y-3">
-              {footerLinks.company.map((link) => (
-                <li key={link.label}>
-                  <Link to={link.href} className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
             <h4 className="text-sm font-semibold text-foreground mb-4">{t("landing.footer.legal")}</h4>
             <ul className="space-y-3">
               {footerLinks.legal.map((link) => (
@@ -141,15 +128,10 @@ export const BlackTieFooter = () => {
           </div>
         </div>
 
-        <div className="pt-8 border-t border-border/50 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="pt-8 border-t border-border/50 flex justify-center md:justify-start">
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} AdTool AI. {t("landing.footer.allRightsReserved")}
           </p>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>{t("landing.footer.madeWith")}</span>
-            <span className="text-primary">♥</span>
-            <span>{t("landing.footer.inGermany")}</span>
-          </div>
         </div>
       </div>
     </footer>
