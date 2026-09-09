@@ -107,34 +107,55 @@ serve(async (req) => {
     const costPerSecond = await resolveAccountCostPerSecond(
       supabaseAdmin, user.id, model, currency as "EUR" | "USD", 0.135,
     );
-    const totalCost = duration * costPerSecond;
+    const listCost = duration * costPerSecond;
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 
+    // Monthly included usage: short fast videos (<= 5 s) are included with an
+    // active subscription / Creator account. Claimed before any wallet work
+    // and released again if the provider call fails.
+    const includedEligible = model === 'ltx-standard' && duration <= 5;
+    const jobKey = includedEligible
+      ? await allowanceJobKey([
+          (body as { requestId?: string }).requestId,
+          user.id, model, duration, aspectRatio, prompt,
+          (body as { requestId?: string }).requestId ? null : Math.floor(Date.now() / 60_000),
+        ])
+      : '';
+    const included = includedEligible
+      ? await claimIncludedAllowance(supabaseAdmin, user.id, 'fast_video', jobKey, Deno.env.get('STRIPE_SECRET_KEY'))
+      : { claimed: false, duplicate: false, used: 0, limit: 0 };
+    const totalCost = included.claimed ? 0 : listCost;
+    const releaseIncluded = async () => {
+      if (included.claimed) await releaseIncludedAllowance(supabaseAdmin, user.id, 'fast_video', jobKey);
+    };
+
     // Wallet balance
-    const { data: wallet, error: walletError } = await supabaseAdmin
+    const { data: wallet } = await supabaseAdmin
       .from('ai_video_wallets')
       .select('balance_euros, currency')
       .eq('user_id', user.id)
       .single();
 
-    if (walletError || !wallet) {
-      return new Response(
-        JSON.stringify({ error: "No AI Video wallet found. Please purchase credits first.", code: "NO_WALLET", needsPurchase: true }),
-        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!included.claimed) {
+      if (!wallet) {
+        return new Response(
+          JSON.stringify({ error: "No AI Video wallet found. Please purchase credits first.", code: "NO_WALLET", needsPurchase: true }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (wallet.balance_euros < totalCost) {
+        return new Response(
+          JSON.stringify({
+            error: `Insufficient credits. Need ${totalCost.toFixed(2)}, have ${wallet.balance_euros.toFixed(2)}`,
+            code: "INSUFFICIENT_CREDITS", needsPurchase: true,
+            required: totalCost, available: wallet.balance_euros, currency: wallet.currency
+          }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
-    const currencySymbol = wallet.currency === 'USD' ? '$' : '€';
-    if (wallet.balance_euros < totalCost) {
-      return new Response(
-        JSON.stringify({
-          error: `Insufficient credits. Need ${currencySymbol}${totalCost.toFixed(2)}, have ${currencySymbol}${wallet.balance_euros.toFixed(2)}`,
-          code: "INSUFFICIENT_CREDITS", needsPurchase: true,
-          required: totalCost, available: wallet.balance_euros, currency: wallet.currency
-        }),
-        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const currencySymbol = (wallet?.currency ?? currency) === 'USD' ? '$' : '€';
 
     // Create generation record
     const resolution = gate.resolutionLabel ?? requestedResolution;
@@ -148,7 +169,7 @@ serve(async (req) => {
         duration_seconds: duration,
         aspect_ratio: aspectRatio,
         resolution,
-        cost_per_second: costPerSecond,
+        cost_per_second: included.claimed ? 0 : costPerSecond,
         total_cost_euros: totalCost,
         status: 'pending',
         source_image_url: startImageUrl || null,
@@ -156,24 +177,34 @@ serve(async (req) => {
       .select()
       .single();
 
-    if (genError) throw genError;
-
-    // Deduct credits
-    const { data: newBalance, error: deductError } = await supabaseAdmin.rpc(
-      'deduct_ai_video_credits',
-      { p_user_id: user.id, p_amount: totalCost, p_generation_id: generation.id }
-    );
-
-    if (deductError || newBalance === null || newBalance === undefined) {
-      console.error('[generate-ltx-video] Deduct credits error:', deductError);
-      await supabaseAdmin
-        .from('ai_video_generations')
-        .update({ status: 'failed', error_message: 'Failed to deduct credits' })
-        .eq('id', generation.id);
-      throw new Error("Failed to deduct credits");
+    if (genError) {
+      await releaseIncluded();
+      throw genError;
     }
 
-    console.log(`[generate-ltx-video] Credits deducted. New balance: ${currencySymbol}${newBalance.toFixed(2)}`);
+    let newBalance: number | null = null;
+    if (!included.claimed) {
+      // Deduct credits
+      const { data: balanceAfter, error: deductError } = await supabaseAdmin.rpc(
+        'deduct_ai_video_credits',
+        { p_user_id: user.id, p_amount: totalCost, p_generation_id: generation.id }
+      );
+
+      if (deductError || balanceAfter === null || balanceAfter === undefined) {
+        console.error('[generate-ltx-video] Deduct credits error:', deductError);
+        await supabaseAdmin
+          .from('ai_video_generations')
+          .update({ status: 'failed', error_message: 'Failed to deduct credits' })
+          .eq('id', generation.id);
+        throw new Error("Failed to deduct credits");
+      }
+      newBalance = balanceAfter;
+      console.log(`[generate-ltx-video] Credits deducted. New balance: ${currencySymbol}${balanceAfter.toFixed(2)}`);
+    } else {
+      newBalance = wallet?.balance_euros ?? null;
+      console.log(`[generate-ltx-video] Covered by included monthly allowance (${included.used}/${included.limit}).`);
+    }
+
 
     // Replicate
     const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
