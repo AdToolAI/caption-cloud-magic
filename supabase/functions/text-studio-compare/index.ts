@@ -2,6 +2,11 @@
 // Calls all 3 models in parallel (non-streaming) and returns aggregated results.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import {
+  TEXT_STUDIO_PREMIUM_MESSAGE,
+  TEXT_STUDIO_PREMIUM_REQUIRED,
+  isTextStudioEntitled,
+} from "../_shared/text-studio-premium.ts";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 
 const corsHeaders = {
@@ -14,8 +19,9 @@ const PRICING: Record<string, { input: number; output: number }> = {
   "openai-gpt-5-6-luna": { input: 0.0004, output: 0.0026 },
   "openai-gpt-5-6-terra": { input: 0.0021, output: 0.0169 },
   "openai-gpt-5-6-sol": { input: 0.0195, output: 0.0975 },
+  "openai-gpt-6-astra": { input: 0.0195, output: 0.0975 },
   "google-gemini-3-1-flash-lite": { input: 0.00013, output: 0.0005 },
-  "google-gemini-3-6-flash": { input: 0.0005, output: 0.0033 },
+  "google-gemini-3-8-flash": { input: 0.0005, output: 0.0033 },
   "google-gemini-3-1-pro": { input: 0.0016, output: 0.013 },
   "anthropic-claude-4-1-opus": { input: 0.0195, output: 0.0975 },
 };
@@ -24,8 +30,9 @@ const PROVIDER_MAP: Record<string, { provider: "gateway" | "anthropic"; apiModel
   "openai-gpt-5-6-luna": { provider: "gateway", apiModel: "openai/gpt-5.6-luna" },
   "openai-gpt-5-6-terra": { provider: "gateway", apiModel: "openai/gpt-5.6-terra" },
   "openai-gpt-5-6-sol": { provider: "gateway", apiModel: "openai/gpt-5.6-sol" },
+  "openai-gpt-6-astra": { provider: "gateway", apiModel: "openai/gpt-6-astra" },
   "google-gemini-3-1-flash-lite": { provider: "gateway", apiModel: "google/gemini-3.1-flash-lite" },
-  "google-gemini-3-6-flash": { provider: "gateway", apiModel: "google/gemini-3.6-flash" },
+  "google-gemini-3-8-flash": { provider: "gateway", apiModel: "google/gemini-3.8-flash" },
   "google-gemini-3-1-pro": { provider: "gateway", apiModel: "google/gemini-3.1-pro-preview" },
   "anthropic-claude-4-1-opus": { provider: "anthropic", apiModel: "claude-opus-4-1" },
 };
@@ -33,6 +40,7 @@ const PROVIDER_MAP: Record<string, { provider: "gateway" | "anthropic"; apiModel
 // Legacy IDs from the previous registry
 const LEGACY_ALIASES: Record<string, string> = {
   "openai-gpt-5-5-pro": "openai-gpt-5-6-sol",
+  "google-gemini-3-6-flash": "google-gemini-3-8-flash",
 };
 
 function estimateTokens(text: string): number {
