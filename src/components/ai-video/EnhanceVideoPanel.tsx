@@ -34,6 +34,12 @@ import type { CanonicalVideoAsset } from '@/lib/videoEnhance/canonicalVideoAsset
 import { isAiGeneratedSource } from '@/lib/videoEnhance/recommend';
 import { engineErrorText } from '@/lib/videoEnhance/engineErrors';
 import {
+  isPremiumErrorCode,
+  premiumCapabilityRequired,
+  type PremiumCode,
+} from '@/lib/videoEnhance/premium';
+
+import {
   describeResolutionChoices,
   firstUpscaleResolution,
   formatFrame,
