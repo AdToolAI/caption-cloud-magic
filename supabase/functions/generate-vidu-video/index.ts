@@ -8,6 +8,7 @@ import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-m
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
+import { pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -349,7 +350,7 @@ serve(async (req) => {
         duration_seconds: duration,
         aspect_ratio: aspectRatio,
         resolution,
-        cost_per_second: perSecond,
+        cost_per_second: effectivePerSecond,
         total_cost_euros: totalCost,
         status: "pending",
         source_image_url: startImageUrl ?? referenceImages[0] ?? null,
