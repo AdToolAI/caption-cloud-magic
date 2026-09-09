@@ -98,7 +98,7 @@ export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
         </div>
 
         <div className="grid gap-3 mt-2">
-          {benefits.map(({ icon: Icon, title, text }) => (
+          {buildBenefits().map(({ icon: Icon, title, text }) => (
             <div
               key={title}
               className="flex gap-3 p-3 rounded-lg border border-border/50 bg-card/50"
@@ -125,7 +125,7 @@ export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
 
         <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
           <Clock className="h-3.5 w-3.5" />
-          <span>{tx({ de: "Beta-Phase: 26.07.2026 – 26.10.2026 · Founders-Rabatt auf KI-Credits: 24 Monate ab Signup", en: "Beta phase: July 26, 2026 - October 26, 2026 · Founders discount on AI credits: 24 months from signup", es: "Fase Beta: 26 de julio de 2026 - 26 de octubre de 2026 · Descuento para fundadores en créditos de IA: 24 meses desde el registro" })}</span>
+          <span>{tx({ de: "Beta-Phase: 26.07.2026 – 26.10.2026 · Founders-Rabatt auf bezahlte KI-Nutzung: 24 Monate ab Signup", en: "Beta phase: July 26, 2026 - October 26, 2026 · Founders discount on paid AI model usage: 24 months from signup", es: "Fase Beta: 26 de julio de 2026 - 26 de octubre de 2026 · Descuento Founders en el uso de IA de pago: 24 meses desde el registro" })}</span>
         </div>
 
         <DialogFooter className="mt-4 gap-2 sm:gap-2">
