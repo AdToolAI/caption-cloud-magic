@@ -756,8 +756,17 @@ export function EnhanceVideoPanel({
                   <SelectContent>
                     {tierChoicesForModel.map((t) => (
                       <SelectItem key={t} value={t}>
-                        {t === 'pro' ? tx('tierPro', lang) : tx('tierStandard', lang)}
+                        <span className="flex items-center gap-2">
+                          <span>{t === 'pro' ? tx('tierPro', lang) : tx('tierStandard', lang)}</span>
+                          {t === 'pro' && !premiumEntitled && (
+                            <Badge variant="outline" className="gap-1 text-[10px]">
+                              <Lock className="w-3 h-3" aria-hidden="true" />
+                              {tx('premiumBadge', lang)}
+                            </Badge>
+                          )}
+                        </span>
                       </SelectItem>
+
                     ))}
                   </SelectContent>
                 </Select>
@@ -1006,18 +1015,41 @@ export function EnhanceVideoPanel({
       <Dialog open={premiumOpen} onOpenChange={setPremiumOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{tx('premiumTitle', lang)}</DialogTitle>
-            <DialogDescription>{tx('premiumBody', lang)}</DialogDescription>
+            <DialogTitle>
+              {premiumCode === 'VCUBE_PRO_PREMIUM_REQUIRED'
+                ? tx('premiumProTitle', lang)
+                : premiumCode === 'VCUBE_120FPS_PREMIUM_REQUIRED'
+                  ? tx('premiumFpsTitle', lang)
+                  : tx('premiumTitle', lang)}
+            </DialogTitle>
+            <DialogDescription>
+              {premiumCode === 'VCUBE_PRO_PREMIUM_REQUIRED'
+                ? tx('premiumProBody', lang)
+                : premiumCode === 'VCUBE_120FPS_PREMIUM_REQUIRED'
+                  ? tx('premiumFpsBody', lang)
+                  : tx('premiumBody', lang)}
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-2">
+            {/* Fallback keeps the uploaded clip and every other setting. */}
             <Button
               variant="outline"
               onClick={() => {
                 setPremiumOpen(false);
-                if (models.some((m) => m.id === 'bytedance-vcube')) setModelId('bytedance-vcube');
+                if (premiumCode === 'VCUBE_PRO_PREMIUM_REQUIRED') {
+                  setTier('standard');
+                } else if (premiumCode === 'VCUBE_120FPS_PREMIUM_REQUIRED') {
+                  setFps(fpsChoices.includes(60) ? 60 : null);
+                } else if (models.some((m) => m.id === 'bytedance-vcube')) {
+                  setModelId('bytedance-vcube');
+                }
               }}
             >
-              {tx('premiumFallback', lang)}
+              {premiumCode === 'VCUBE_PRO_PREMIUM_REQUIRED'
+                ? tx('premiumFallbackStandard', lang)
+                : premiumCode === 'VCUBE_120FPS_PREMIUM_REQUIRED'
+                  ? tx('premiumFallbackFps', lang)
+                  : tx('premiumFallback', lang)}
             </Button>
             <Button asChild>
               {/* New tab: the chosen video and settings stay untouched here. */}
@@ -1026,6 +1058,7 @@ export function EnhanceVideoPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </Card>
   );
 }
