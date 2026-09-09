@@ -5,7 +5,7 @@
  *
  * Es gibt genau EIN Abomodell: Beta-Basic 14,95 pro Monat — ohne Rabatt,
  * mit festen Preisen in EUR (Basis), USD und GBP.
- * Der Founders-Vorteil ist ein 20-%-Rabatt auf jeden Credit-Kauf (24 Monate),
+ * Der Founders-Vorteil ist ein 10-%-Rabatt auf jeden Credit-Kauf (24 Monate),
  * siehe `ai-video-purchase-credits` + Coupon FOUNDERS_CREDIT_COUPON.
  */
 
