@@ -1,72 +1,37 @@
 import { tx } from "@/lib/i18nText";
-import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { FOUNDERS_MAX_SLOTS } from "@/config/stripe";
-import { useFounderStatus } from "@/hooks/useFounderStatus";
 
 interface Props {
   className?: string;
 }
 
 /**
- * Live counter showing how many of the first 1000 Founders slots are still available.
- * Founders pay the same €14.95 subscription — their benefit is 10% off every AI credit purchase for 24 months.
+ * Founders program badge.
  *
- * ANONYMITY CONTRACT: hidden for users who already hold a founder slot — the
- * counter combined with their own join time would let them infer their position.
+ * ANONYMITY CONTRACT: no remaining-slot count, no position, no ranking and no
+ * join date is ever shown publicly. Only the program cap is communicated.
  */
 export const FoundersSlotBadge = ({ className = "" }: Props) => {
-  const [claimed, setClaimed] = useState<number | null>(null);
-  const founder = useFounderStatus();
-
-  const isFounder = !founder.loading && founder.isActive;
-
-  useEffect(() => {
-    if (isFounder) return;
-    let cancelled = false;
-    const load = async () => {
-      const { data, error } = await supabase.rpc("count_founders_claimed");
-      if (!cancelled && !error && typeof data === "number") {
-        setClaimed(data);
-      }
-    };
-    load();
-    const id = setInterval(load, 30_000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [isFounder]);
-
-  if (isFounder) return null;
-
-  const remaining =
-    claimed === null ? null : Math.max(0, FOUNDERS_MAX_SLOTS - claimed);
-  const soldOut = remaining === 0;
-
-
   return (
     <div className={`inline-flex flex-col items-center gap-1 ${className}`}>
-      <div
-        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/40 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 text-xs font-medium tracking-wide"
-      >
+      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/40 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 text-xs font-medium tracking-wide">
         <Sparkles className="w-3.5 h-3.5 text-primary" />
-        {soldOut ? (
-          <span className="text-muted-foreground">
-            {tx({ de: "Founders-Plätze ausverkauft", en: "Founders slots sold out", es: "Plazas Founders agotadas" })}
+        <span className="text-foreground">
+          {tx({
+            de: "Founders-Programm",
+            en: "Founders Program",
+            es: "Programa Founders",
+          })}{" "}
+          ·{" "}
+          <span className="text-primary">
+            {tx({
+              de: `Begrenzt auf ${FOUNDERS_MAX_SLOTS.toLocaleString("de-DE")} Mitglieder`,
+              en: `Limited to ${FOUNDERS_MAX_SLOTS.toLocaleString("en-US")} members`,
+              es: `Limitado a ${FOUNDERS_MAX_SLOTS.toLocaleString("es-ES")} miembros`,
+            })}
           </span>
-        ) : remaining === null ? (
-          <span className="text-muted-foreground">{tx({ de: "Founders-Deal verfügbar…", en: "Founders deal available…", es: "Oferta Founders disponible…" })}</span>
-        ) : (
-          <span className="text-foreground">
-            <span className="text-primary font-bold tabular-nums">
-              {remaining}
-            </span>{" "}
-            / {FOUNDERS_MAX_SLOTS} {tx({ de: "Founders-Plätze frei —", en: "founders slots left —", es: "plazas Founders libres —" })}{" "}
-            <span className="text-primary">{tx({ de: "10 % auf alle KI-Credits, 24 Monate", en: "10% off all AI credits, 24 months", es: "10 % en todos los créditos de IA, 24 meses" })}</span>
-          </span>
-        )}
+        </span>
       </div>
       <a
         href="/legal/terms#section-8"

@@ -1,6 +1,7 @@
 import { tx } from "@/lib/i18nText";
 import { Link } from "react-router-dom";
-import { Crown, ShieldCheck, Percent, Clock, AlertTriangle, Sparkles } from "lucide-react";
+import { Crown, ShieldCheck, Percent, Clock, AlertTriangle, Sparkles, Brain, Wrench } from "lucide-react";
+import { subscriptionPricePerMonth } from "@/lib/pricingDisplay";
 import {
   Dialog,
   DialogContent,
@@ -17,28 +18,59 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-const benefits = [
+const buildBenefits = () => [
   {
     icon: ShieldCheck,
-    title: tx({ de: "Ein Abo. 14,95 € im Monat.", en: "One plan. $14.95 per month.", es: "Un plan. 14,95 € al mes." }),
-    text: tx({ de: "Es gibt genau ein Modell: 14,95 € pro Monat für den kompletten Studio-Zugang. Keine Tarifstufen, keine Upsells, keine versteckten Gebühren.", en: "There is exactly one model: $14.95 per month for complete Studio access. No tiers, no upsells, no hidden fees.", es: "Solo hay un modelo: 14,95 € al mes para acceso completo al Studio. Sin niveles, sin ventas adicionales, sin tarifas ocultas." }),
+    title: tx({
+      de: `Ein Abo. Dein komplettes KI-Studio. ${subscriptionPricePerMonth()}.`,
+      en: `One subscription. Your entire AI studio. ${subscriptionPricePerMonth()}.`,
+      es: `Una suscripción. Todo tu estudio de IA. ${subscriptionPricePerMonth()}.`,
+    }),
+    text: tx({
+      de: "Texte, Bilder, Videos und Musik erstellen, Inhalte veredeln, komplette Produktionen schneiden und direkt auf deinen Social-Kanälen veröffentlichen — alles in AdTool AI.",
+      en: "Create text, images, videos and music, enhance your content, edit complete productions and publish across your social channels — all inside AdTool AI.",
+      es: "Crea textos, imágenes, vídeos y música, mejora tu contenido, edita producciones completas y publica en tus canales sociales: todo dentro de AdTool AI.",
+    }),
   },
   {
-    icon: Percent,
-    title: tx({ de: "10 % auf alle KI-Credits — 24 Monate", en: "10% on all AI credits — 24 months", es: "10 % en todos los créditos de IA: 24 meses" }),
-    text: tx({ de: "Als einer der ersten 1.000 Founders bekommst du 24 Monate lang 10 % Rabatt auf jeden Kauf von KI-Credits (Video, Bild, Audio). Der Rabatt wird an der Kasse automatisch abgezogen — kein Code nötig.", en: "As one of the first 1,000 Founders, you get a 10% discount for 24 months on every purchase of AI credits (video, image, audio). The discount is automatically applied at checkout — no code needed.", es: "Como uno de los primeros 1.000 Founders, obtendrás un 10% de descuento durante 24 meses en cada compra de créditos de IA (video, imagen, audio). El descuento se aplica automáticamente al finalizar la compra, sin necesidad de código." }),
+    icon: Brain,
+    title: tx({ de: "Führende KI-Modelle enthalten", en: "Leading AI models included", es: "Modelos de IA líderes incluidos" }),
+    text: "ChatGPT Astra · Claude 4.1 Opus · Gemini · GPT Image · Gemini Image",
   },
   {
     icon: Sparkles,
-    title: tx({ de: "Voller Studio-Zugang während der Beta", en: "Full Studio access during beta", es: "Acceso completo al Studio durante la beta" }),
-    text: tx({ de: "Der komplette Produktionsworkflow ist freigeschaltet: führende KI-Modelle, Stimmen, Multi-Speaker-Lip-Sync und Schnitt — in einem System statt in fünf Abos.", en: "The complete production workflow is unlocked: leading AI models, voices, multi-speaker lip-sync, and editing — in one system instead of five subscriptions.", es: "El flujo de trabajo de producción completo está desbloqueado: modelos de IA líderes, voces, sincronización labial de múltiples oradores y edición, todo en un solo sistema en lugar de cinco suscripciones." }),
+    title: tx({ de: "Monatliche KI-Generierung enthalten", en: "Monthly AI generation included", es: "Generación mensual de IA incluida" }),
+    text: tx({
+      de: "10 Fast AI Videos jeden Monat · KI-Musik mit MiniMax Music 1.5 enthalten — vollständige Songs mit Gesang und Instrumentierung, im monatlichen Fair-Use-Kontingent ohne Credit-Abzug.",
+      en: "10 Fast AI Videos every month · AI Music with MiniMax Music 1.5 included — create full-length songs with vocals and instrumentation, within the monthly fair-use allowance and without credit deduction.",
+      es: "10 Fast AI Videos cada mes · Música con IA con MiniMax Music 1.5 incluida: canciones completas con voces e instrumentación, dentro del uso justo mensual y sin consumir créditos.",
+    }),
+  },
+  {
+    icon: Wrench,
+    title: tx({ de: "Profi-Werkzeuge enthalten", en: "Professional tools included", es: "Herramientas profesionales incluidas" }),
+    text: tx({
+      de: "Motion Studio · Picture Studio · Spezialmodelle · Topaz Enhance & Upscale · Content Command Center · Social Connections · Render-Queue · Planung und Veröffentlichung.",
+      en: "Motion Studio · Picture Studio · Specialist Models · Topaz Enhance & Upscale · Content Command Center · Social Connections · Render Queue · scheduling and publishing tools.",
+      es: "Motion Studio · Picture Studio · Modelos especializados · Topaz Enhance & Upscale · Content Command Center · Social Connections · cola de renderizado · programación y publicación.",
+    }),
+  },
+  {
+    icon: Percent,
+    title: tx({ de: "10 % auf bezahlte KI-Nutzung — 24 Monate", en: "10% off all paid AI model usage — 24 months", es: "10 % en todo el uso de IA de pago: 24 meses" }),
+    text: tx({
+      de: "Founders erhalten 24 Monate lang 10 % Rabatt auf zusätzlich bezahlte KI-Nutzung — zusätzlich zu den Werkzeugen und den monatlich enthaltenen Generierungen des Abos. Der Rabatt wird an der Kasse automatisch abgezogen.",
+      en: "Founders receive 10% off additional paid AI model usage for 24 months — on top of the tools and monthly generations already included with the subscription. Applied automatically at checkout.",
+      es: "Los Founders reciben un 10 % de descuento durante 24 meses en el uso de IA de pago adicional, además de las herramientas y las generaciones mensuales ya incluidas. Se aplica automáticamente al pagar.",
+    }),
   },
   {
     icon: Crown,
-    title: tx({ de: "Direkter Draht zum Team", en: "Direct line to the team", es: "Línea directa al equipo." }),
+    title: tx({ de: "Direkter Draht zum Team", en: "Direct line to the team", es: "Línea directa al equipo" }),
     text: tx({ de: "Priorisiertes Feedback, Early-Access zu neuen Features und persönlicher Support.", en: "Prioritized feedback, early access to new features, and personal support.", es: "Comentarios priorizados, acceso anticipado a nuevas funciones y soporte personal." }),
   },
 ];
+
 
 export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
   return (
@@ -66,7 +98,7 @@ export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
         </div>
 
         <div className="grid gap-3 mt-2">
-          {benefits.map(({ icon: Icon, title, text }) => (
+          {buildBenefits().map(({ icon: Icon, title, text }) => (
             <div
               key={title}
               className="flex gap-3 p-3 rounded-lg border border-border/50 bg-card/50"
@@ -93,7 +125,7 @@ export const FoundersBenefitsDialog = ({ open, onOpenChange }: Props) => {
 
         <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
           <Clock className="h-3.5 w-3.5" />
-          <span>{tx({ de: "Beta-Phase: 26.07.2026 – 26.10.2026 · Founders-Rabatt auf KI-Credits: 24 Monate ab Signup", en: "Beta phase: July 26, 2026 - October 26, 2026 · Founders discount on AI credits: 24 months from signup", es: "Fase Beta: 26 de julio de 2026 - 26 de octubre de 2026 · Descuento para fundadores en créditos de IA: 24 meses desde el registro" })}</span>
+          <span>{tx({ de: "Beta-Phase: 26.07.2026 – 26.10.2026 · Founders-Rabatt auf bezahlte KI-Nutzung: 24 Monate ab Signup", en: "Beta phase: July 26, 2026 - October 26, 2026 · Founders discount on paid AI model usage: 24 months from signup", es: "Fase Beta: 26 de julio de 2026 - 26 de octubre de 2026 · Descuento Founders en el uso de IA de pago: 24 meses desde el registro" })}</span>
         </div>
 
         <DialogFooter className="mt-4 gap-2 sm:gap-2">
