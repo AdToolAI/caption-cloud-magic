@@ -192,7 +192,22 @@ const COPY = {
     de: 'Messenger wie WhatsApp rechnen Videos beim Versenden stark herunter. Lade die Datei herunter und verschicke sie als Dokument, um die volle Qualität zu behalten.',
     es: 'Los mensajeros como WhatsApp reducen los vídeos al enviarlos. Descarga el archivo y envíalo como documento para conservar toda la calidad.',
   },
+  qualityTier: { en: 'Processing quality', de: 'Verarbeitungsqualität', es: 'Calidad de procesado' },
+  tierStandard: { en: 'Standard', de: 'Standard', es: 'Estándar' },
+  tierPro: { en: 'Pro · finer detail', de: 'Pro · feinere Details', es: 'Pro · más detalle' },
+  tierProHint: {
+    en: 'Pro uses the higher-quality model — best for real people and skin. It costs clearly more; the price shown already includes it.',
+    de: 'Pro nutzt das hochwertigere Modell – am besten für echte Menschen und Haut. Es kostet deutlich mehr; der angezeigte Preis enthält das bereits.',
+    es: 'Pro usa el modelo de mayor calidad, ideal para personas reales y piel. Cuesta claramente más; el precio mostrado ya lo incluye.',
+  },
+  fpsAdvanced: { en: 'Advanced · high frame rate', de: 'Erweitert · hohe Bildrate', es: 'Avanzado · alta tasa de fotogramas' },
+  fpsHighHint: {
+    en: 'Above 30 frames per second costs about twice as much. Most viewers see no difference at 120.',
+    de: 'Über 30 Bilder pro Sekunde kostet etwa doppelt so viel. Die meisten sehen bei 120 keinen Unterschied.',
+    es: 'Por encima de 30 fotogramas por segundo cuesta unas dos veces más. La mayoría no nota diferencia a 120.',
+  },
   premiumBadge: { en: 'Premium', de: 'Premium', es: 'Premium' },
+
   premiumTitle: {
     en: 'Topaz Video AI is a Premium feature',
     de: 'Topaz Video AI ist eine Premium-Funktion',
