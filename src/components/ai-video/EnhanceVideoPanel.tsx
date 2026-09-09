@@ -302,6 +302,7 @@ export function EnhanceVideoPanel({
   const { isAdmin: isEnhanceTestUser } = useUserRoles();
   const { subscribed } = useAuth();
   const { isPaid } = useTrialAccess();
+  const { isCreator } = useAccountType();
   const [premiumOpen, setPremiumOpen] = useState(false);
   const [premiumCode, setPremiumCode] = useState<PremiumCode>('TOPAZ_PREMIUM_REQUIRED');
 
