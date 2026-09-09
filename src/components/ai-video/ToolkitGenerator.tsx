@@ -701,10 +701,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   const blockingIssue = capabilityViolation?.message ?? placementViolation ?? inputViolation ?? audioViolation;
 
-  /* ── Model switch: URL sync ONLY ──
-   * No silent resets. Duration / aspect ratio / resolution / audio / uploads
-   * and the chosen placement are the user's state; an unsupported combination
-   * is surfaced above and blocks the start until the user resolves it. */
+  /* ── Model switch: URL sync ──
+   * Duration / aspect ratio / resolution / audio stay the user's state; an
+   * unsupported combination is surfaced above and blocks the start. */
   useEffect(() => {
     if (searchParams.get('model') !== model.id) {
       const next = new URLSearchParams(searchParams);
@@ -713,6 +712,48 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model.id]);
+
+  /* ── Model switch: release inputs the NEW route cannot accept ──
+   * Reference images, a reference video or an end/anchor placement carried
+   * over from the previous model kept resolving the generation mode to
+   * something the new route has no mode for (Kling 3 landed in `reference`
+   * although its uploader is not even rendered any more — an unresolvable
+   * block). Nothing is silently converted: every released input is named. */
+  const prevModelIdRef = useRef(model.id);
+  useEffect(() => {
+    if (prevModelIdRef.current === model.id) return;
+    prevModelIdRef.current = model.id;
+
+    const released: string[] = [];
+    if (viduReferences.length > 0 && !model.capabilities.multiRef) {
+      setViduReferences([]);
+      released.push(tx({ de: 'Referenzbilder', en: 'reference images', es: 'imágenes de referencia' }));
+    }
+    if (referenceVideoUrl && !model.capabilities.v2v) {
+      setReferenceVideoUrl(null);
+      released.push(tx({ de: 'Referenzvideo', en: 'reference video', es: 'vídeo de referencia' }));
+    }
+    if (startImageUrl && !model.capabilities.i2v && !model.capabilities.anchorOnly) {
+      setStartImageUrl(null);
+      released.push(tx({ de: 'Startbild', en: 'start image', es: 'imagen inicial' }));
+    }
+    if (
+      (referencePlacement === 'end' && !supportsEndOnlyPlacement(model.id)) ||
+      (referencePlacement === 'anchor' && !model.capabilities.anchorOnly)
+    ) {
+      setReferencePlacement('start');
+      released.push(tx({ de: 'Bild-Platzierung', en: 'image placement', es: 'ubicación de la imagen' }));
+    }
+    if (released.length) {
+      toast.info(tx({
+        de: `${model.name} kann Folgendes nicht verarbeiten – entfernt: ${released.join(', ')}.`,
+        en: `${model.name} cannot use the following – removed: ${released.join(', ')}.`,
+        es: `${model.name} no admite lo siguiente – eliminado: ${released.join(', ')}.`,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model.id]);
+
 
 
   // Canonical per-second price from server catalog (falls back to local config).
