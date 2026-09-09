@@ -14,6 +14,8 @@ export interface ActiveBrandKit {
   style_direction: string | null;
   target_audience: string | null;
   brand_tone: string | null;
+  brand_values: string[] | null;
+  color_palette: Record<string, unknown> | null;
 }
 
 /**
@@ -31,7 +33,7 @@ export function useActiveBrandKit() {
       if (!user) return null;
       const { data, error } = await supabase
         .from('brand_kits')
-        .select('id, brand_name, primary_color, secondary_color, accent_color, mood, logo_url, keywords, style_direction, target_audience, brand_tone')
+        .select('id, brand_name, primary_color, secondary_color, accent_color, mood, logo_url, keywords, style_direction, target_audience, brand_tone, brand_values, color_palette')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .is('archived_at', null)

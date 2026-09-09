@@ -66,22 +66,67 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const requestBody = await req.json();
-    const { 
-      logoUrl, 
-      primaryColor, 
-      secondaryColor, 
-      brandDescription, 
-      tonePreference, 
+    const {
+      logoUrl,
+      primaryColor,
+      secondaryColor,
+      brandDescription,
+      tonePreference,
       targetAudience,
       brandName,
       brandValues,
       language,
       stylePreference,
+      moodPreference,
+      keywords: submittedKeywords,
+      fonts: submittedFonts,
+      palette: submittedPalette,
+      websiteUrl,
       extractedDna
     } = requestBody;
 
+    /**
+     * Precedence contract (v2):
+     *   submitted form value  ->  AI suggestion  ->  default
+     * A field that is PRESENT in the request body is authoritative, even when
+     * it is empty — that means the user deliberately cleared it. Extraction
+     * data is only used for fields the form did not submit at all.
+     */
+    const has = (key: string) => Object.prototype.hasOwnProperty.call(requestBody, key);
+    const submittedText = (key: string, value: unknown): string | null | undefined => {
+      if (!has(key)) return undefined;                       // omitted -> fall through
+      if (typeof value !== 'string') return null;            // present but not text -> cleared
+      const trimmed = value.trim();
+      return trimmed.length ? trimmed : null;                // present & empty -> cleared
+    };
+    const submittedList = (key: string, value: unknown): string[] | undefined => {
+      if (!has(key)) return undefined;
+      if (Array.isArray(value)) {
+        return value.filter((v: unknown): v is string => typeof v === 'string' && !!v.trim()).map((v) => v.trim());
+      }
+      if (typeof value === 'string') {
+        return value.split(',').map((v) => v.trim()).filter(Boolean);
+      }
+      return [];                                             // present but unusable -> cleared
+    };
+
+    const formName = submittedText('brandName', brandName);
+    const formAudience = submittedText('targetAudience', targetAudience);
+    const formTone = submittedText('tonePreference', tonePreference);
+    const formStyle = submittedText('stylePreference', stylePreference);
+    const formMood = submittedText('moodPreference', moodPreference);
+    const formValues = submittedList('brandValues', brandValues);
+    const formKeywords = submittedList('keywords', submittedKeywords);
+    const formPalette = submittedList('palette', submittedPalette);
+    const formFontHead = submittedFonts && typeof submittedFonts === 'object'
+      ? submittedText('fonts', (submittedFonts as any).headline) ?? (has('fonts') ? null : undefined)
+      : (has('fonts') ? null : undefined);
+    const formFontBody = submittedFonts && typeof submittedFonts === 'object'
+      ? submittedText('fonts', (submittedFonts as any).body) ?? (has('fonts') ? null : undefined)
+      : (has('fonts') ? null : undefined);
+
     // Real values extracted from the user's website (Brand DNA extractor).
-    // These are observed facts and must win over anything the model invents.
+    // Used as prompt context, and only persisted where the form said nothing.
     const dna = extractedDna && typeof extractedDna === 'object' ? extractedDna : null;
     const dnaPalette: string[] = Array.isArray(dna?.palette) ? dna.palette.filter((c: unknown) => typeof c === 'string') : [];
     const dnaKeywords: string[] = Array.isArray(dna?.keywords) ? dna.keywords.filter((k: unknown) => typeof k === 'string') : [];
@@ -91,6 +136,7 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     console.log('Request body received:', JSON.stringify(requestBody).substring(0, 300));
     console.log('Processing for user:', userId, '| Brand:', brandName, '| Color:', primaryColor);
 
+
     // Build comprehensive AI prompt
     console.log('Building AI prompt...');
     let prompt = `You are a professional brand psychology and design AI assistant.
@@ -99,7 +145,7 @@ Given the following brand information, create a comprehensive brand identity for
 Brand Information:
 - Brand Name: ${brandName || 'Unnamed Brand'}
 - Target Audience: ${targetAudience || 'General audience'}
-- Brand Values: ${brandValues || 'Professional, trustworthy'}
+- Brand Values: ${(Array.isArray(brandValues) ? brandValues.join(', ') : brandValues) || 'Professional, trustworthy'}
 - Primary Color: ${primaryColor}
 ${secondaryColor ? `- Secondary Color: ${secondaryColor}` : ''}
 - Brand Description: ${brandDescription || 'No description provided'}
@@ -254,10 +300,26 @@ Language: ${language || 'de'}`;
 
     // Validate and prepare data with fallbacks
     console.log('Validating brand kit data...');
+    // Resolved with strict precedence: submitted form value -> AI -> default.
+    const resolvedPalette = formPalette !== undefined ? formPalette : dnaPalette;
+    const resolvedFontHead =
+      formFontHead !== undefined
+        ? (formFontHead ?? brandKit.font_pairing?.headline ?? 'Montserrat')
+        : (dnaFonts?.headline || brandKit.font_pairing?.headline || 'Montserrat');
+    const resolvedFontBody =
+      formFontBody !== undefined
+        ? (formFontBody ?? brandKit.font_pairing?.body ?? 'Open Sans')
+        : (dnaFonts?.body || brandKit.font_pairing?.body || 'Open Sans');
+    const fontSource =
+      formFontHead !== undefined || formFontBody !== undefined
+        ? 'manual'
+        : (dnaFonts?.headline || dnaFonts?.body ? 'website' : 'ai');
+
     const insertData = {
       user_id: userId,
-      brand_name: brandName || 'Meine Marke',
-      target_audience: targetAudience || null,
+      brand_name: (formName !== undefined ? formName : brandName) || 'Meine Marke',
+      target_audience: formAudience !== undefined ? formAudience : (targetAudience || null),
+      website_url: submittedText('websiteUrl', websiteUrl) ?? null,
       logo_url: logoUrl || null,
       primary_color: primaryColor || '#6366F1',
       secondary_color: secondaryColor || null,
@@ -268,28 +330,25 @@ Language: ${language || 'de'}`;
           accent: '#6366F1',
           neutrals: ['#F3F4F6', '#1F2937'],
         }),
-        // Keep the real colors found on the website alongside the generated set
-        ...(dnaPalette.length ? { extracted: dnaPalette } : {}),
-        ...(dna?.accent_color ? { accent: dna.accent_color } : {}),
+        // Real colors found on the website / chosen by the user
+        ...(resolvedPalette.length ? { extracted: resolvedPalette } : {}),
+        ...(dna?.accent_color && formPalette === undefined ? { accent: dna.accent_color } : {}),
       },
-      font_pairing: (dnaFonts?.headline || dnaFonts?.body)
-        ? {
-            headline: dnaFonts?.headline || brandKit.font_pairing?.headline || 'Montserrat',
-            body: dnaFonts?.body || brandKit.font_pairing?.body || 'Open Sans',
-            source: 'website',
-          }
-        : (brandKit.font_pairing || { headline: 'Montserrat', body: 'Open Sans' }),
-      mood: dna?.mood || brandKit.mood || 'professionell',
-      style_direction: brandKit.style_direction || stylePreference || 'modern',
-      brand_tone: dna?.tone || brandKit.brand_tone || tonePreference || 'professionell',
-      brand_values: dnaValues.length
-        ? dnaValues
-        : (Array.isArray(brandKit.brand_emotions) ? brandKit.brand_emotions : []),
+      font_pairing: { headline: resolvedFontHead, body: resolvedFontBody, source: fontSource },
+      mood: formMood !== undefined ? formMood : (brandKit.mood || dna?.mood || 'professionell'),
+      style_direction: formStyle !== undefined ? formStyle : (brandKit.style_direction || 'modern'),
+      brand_tone: formTone !== undefined ? formTone : (brandKit.brand_tone || dna?.tone || 'professionell'),
+      // Never merge extracted values back in: what the user submitted is final.
+      brand_values: formValues !== undefined
+        ? formValues
+        : (dnaValues.length ? dnaValues : (Array.isArray(brandKit.brand_emotions) ? brandKit.brand_emotions : [])),
       brand_emotions: Array.isArray(brandKit.brand_emotions) ? brandKit.brand_emotions : [],
-      keywords: Array.from(new Set([
-        ...dnaKeywords,
-        ...(Array.isArray(brandKit.keywords) ? brandKit.keywords : []),
-      ])),
+      keywords: formKeywords !== undefined
+        ? Array.from(new Set(formKeywords))
+        : Array.from(new Set([
+            ...dnaKeywords,
+            ...(Array.isArray(brandKit.keywords) ? brandKit.keywords : []),
+          ])),
       recommended_hashtags: Array.isArray(brandKit.recommended_hashtags) ? brandKit.recommended_hashtags : [],
       emoji_suggestions: Array.from(new Set([
         ...(Array.isArray(dna?.emoji_suggestions) ? dna.emoji_suggestions : []),
@@ -301,6 +360,7 @@ Language: ${language || 'de'}`;
       consistency_score: 100,
       is_active: true
     };
+
 
     console.log('Inserting brand kit into database...');
     console.log('Insert data keys:', Object.keys(insertData));

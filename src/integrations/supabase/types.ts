@@ -3202,9 +3202,11 @@ export type Database = {
           style_direction: string | null
           target_audience: string | null
           templates_used: Json | null
+          updated_at: string
           usage_examples: Json | null
           user_id: string
           version: number | null
+          website_url: string | null
         }
         Insert: {
           accent_color?: string | null
@@ -3238,9 +3240,11 @@ export type Database = {
           style_direction?: string | null
           target_audience?: string | null
           templates_used?: Json | null
+          updated_at?: string
           usage_examples?: Json | null
           user_id: string
           version?: number | null
+          website_url?: string | null
         }
         Update: {
           accent_color?: string | null
@@ -3274,9 +3278,11 @@ export type Database = {
           style_direction?: string | null
           target_audience?: string | null
           templates_used?: Json | null
+          updated_at?: string
           usage_examples?: Json | null
           user_id?: string
           version?: number | null
+          website_url?: string | null
         }
         Relationships: []
       }
