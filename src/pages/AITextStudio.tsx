@@ -100,8 +100,10 @@ interface Conversation {
 export default function AITextStudio() {
   const { user, subscribed } = useAuth();
   const { isPaid } = useTrialAccess();
-  // Display/UX only — the edge functions enforce the same subscription rule.
-  const textStudioEntitled = !!(subscribed || isPaid);
+  const { isCreator } = useAccountType();
+  // Display/UX only — the edge functions enforce the same subscription rule
+  // (creator accounts are entitled there as well).
+  const textStudioEntitled = !!(subscribed || isPaid || isCreator);
   const [premiumOpen, setPremiumOpen] = useState(false);
   const { pinned, pin, unpin } = usePinnedChat();
   const [tab, setTab] = useState("chat");
