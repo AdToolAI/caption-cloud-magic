@@ -5,6 +5,8 @@ import Replicate from "npm:replicate@0.25.2";
 import { resolveAccountCostPerSecond } from "../_shared/accountVideoPricing.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
+import { allowanceJobKey, claimIncludedAllowance, releaseIncludedAllowance } from "../_shared/included-allowance.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
