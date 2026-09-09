@@ -68,6 +68,8 @@ import {
   visibleVideoEnhanceModels,
   type EnhanceConfig,
   type VideoResolution,
+  type QualityTier,
+
 } from '@/config/videoEnhanceModels';
 
 /**
