@@ -19074,6 +19074,36 @@ export type Database = {
         }
         Relationships: []
       }
+      video_mirror_errors: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          operation: string
+          source_user_id: string
+          source_video_id: string
+          target_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          operation: string
+          source_user_id: string
+          source_video_id: string
+          target_user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          operation?: string
+          source_user_id?: string
+          source_video_id?: string
+          target_user_id?: string
+        }
+        Relationships: []
+      }
       video_model_tier_parity: {
         Row: {
           api_route: string
