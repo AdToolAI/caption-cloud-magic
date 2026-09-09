@@ -3,6 +3,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { tl, withLang } from "../_shared/i18n.ts";
+import { allowanceJobKey, claimIncludedAllowance, releaseIncludedAllowance } from "../_shared/included-allowance.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
