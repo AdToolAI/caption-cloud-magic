@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react
 import { Helmet } from "react-helmet-async";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Calendar as CalendarIcon, FileText, Package, Clock, Plus } from "lucide-react";
+import { Calendar as CalendarIcon, FileText, Package, Clock, Plus, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,6 +10,9 @@ import { PageWrapper } from "@/components/layout/PageWrapper";
 import { useTranslation } from "@/hooks/useTranslation";
 import { cn } from "@/lib/utils";
 import type { CommandCenterView } from "@/components/routing/CommandCenterRedirect";
+import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
+import { UpgradeAccessDialog } from "@/components/access/UpgradeAccessDialog";
+import { tx } from "@/lib/i18nText";
 
 const CalendarPage = lazy(() => import("./Calendar"));
 const PlannerV2Lazy = lazy(() =>
@@ -67,6 +70,11 @@ function KeepAlive({
 export default function CommandCenter() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { canUseContentCommandCenter, isLoading: accessLoading } = useSubscriptionAccess();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  /* Gesperrt = kein aktives Abo und kein Creator-Konto. Die Oberfläche bleibt
+     sichtbar; jede Aktion öffnet stattdessen das Upgrade-Fenster. */
+  const locked = !accessLoading && !canUseContentCommandCenter;
 
   const raw = searchParams.get("view") as CommandCenterView | null;
   const view: CommandCenterView = raw && VIEWS.includes(raw) ? raw : "calendar";
@@ -149,8 +157,11 @@ export default function CommandCenter() {
               </h1>
               <p className="mt-1 text-sm md:text-base text-muted-foreground">{t("cc.subtitle")}</p>
             </div>
-            <Button onClick={() => setComposer(true)} className="gap-2 shadow-glow-gold">
-              <Plus className="h-4 w-4" />
+            <Button
+              onClick={() => (locked ? setUpgradeOpen(true) : setComposer(true))}
+              className="gap-2 shadow-glow-gold"
+            >
+              {locked ? <Lock className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {t("cc.newPost")}
             </Button>
           </div>
@@ -172,7 +183,7 @@ export default function CommandCenter() {
                   aria-selected={selected}
                   aria-controls={`cc-panel-${id}`}
                   tabIndex={selected ? 0 : -1}
-                  onClick={() => setView(id)}
+                  onClick={() => (locked ? setUpgradeOpen(true) : setView(id))}
                   onKeyDown={onTabKeyDown}
                   className={cn(
                     "flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -190,7 +201,34 @@ export default function CommandCenter() {
         </motion.header>
 
         {/* Ansichten — einmal geladen, danach nur noch ein-/ausgeblendet */}
+        {locked ? (
+          <section className="rounded-2xl border border-primary/20 bg-card/60 p-10 text-center backdrop-blur-md">
+            <Lock className="mx-auto mb-4 h-8 w-8 text-primary" />
+            <h2 className="font-heading text-2xl font-semibold">
+              {tx({
+                de: "Content Command Center freischalten",
+                en: "Unlock Content Command Center",
+                es: "Desbloquea el Content Command Center",
+              })}
+            </h2>
+            <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+              {tx({
+                de: "Verbinde deine Social-Accounts, plane Kampagnen, terminiere Inhalte und veröffentliche direkt aus AdTool AI. Enthalten in Beta Basic und in Creator-Konten.",
+                en: "Connect your social accounts, plan campaigns, schedule content and publish directly from AdTool AI. Included with Beta Basic and Creator accounts.",
+                es: "Conecta tus cuentas sociales, planifica campañas, programa contenido y publica directamente desde AdTool AI. Incluido en Beta Basic y en las cuentas Creator.",
+              })}
+            </p>
+            <Button className="mt-6" onClick={() => setUpgradeOpen(true)}>
+              {tx({
+                de: "Upgrade auf Beta Basic – 14,95 €/Monat",
+                en: "Upgrade to Beta Basic – €14.95/month",
+                es: "Mejora a Beta Basic – 14,95 €/mes",
+              })}
+            </Button>
+          </section>
+        ) : (
         <Suspense fallback={<ViewFallback />}>
+
           <div id="cc-panel-calendar" role="tabpanel" aria-labelledby="cc-tab-calendar">
             <KeepAlive active={view === "calendar"} visited={visited.includes("calendar")}>
               <CalendarPage embedded />
@@ -212,10 +250,11 @@ export default function CommandCenter() {
             </KeepAlive>
           </div>
         </Suspense>
+        )}
       </div>
 
       {/* Composer-Ebene */}
-      <Dialog open={composerOpen} onOpenChange={(open) => setComposer(open)}>
+      <Dialog open={composerOpen && !locked} onOpenChange={(open) => setComposer(open)}>
         <DialogContent className="max-w-[min(1400px,96vw)] h-[92vh] overflow-y-auto p-0 gap-0">
           <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border/60 bg-background/85 px-5 py-3 backdrop-blur-xl">
             <DialogTitle className="font-heading text-lg">{t("cc.newPost")}</DialogTitle>
@@ -228,6 +267,8 @@ export default function CommandCenter() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <UpgradeAccessDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
     </PageWrapper>
   );
 }

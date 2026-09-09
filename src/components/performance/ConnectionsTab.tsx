@@ -27,6 +27,9 @@ import { FacebookPageSelectDialog } from "./FacebookPageSelectDialog";
 import { RefreshCw } from "lucide-react";
 import { tx } from '@/lib/i18nText';
 import { classifyConnectionHealth } from '@/lib/socialConnectionHealth';
+import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
+import { UpgradeAccessDialog } from '@/components/access/UpgradeAccessDialog';
+import { tx as txt } from '@/lib/i18nText';
 
 const PROVIDERS = [
   { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'bg-pink-500' },
@@ -59,6 +62,8 @@ export const ConnectionsTab = () => {
       ? t('socialIntegrations.sessionBusyRetry')
       : (error?.message || fallback);
 
+  const { canUseSocialConnections } = useSubscriptionAccess();
+  const [connectUpgradeOpen, setConnectUpgradeOpen] = useState(false);
   const [connections, setConnections] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCSVUpload, setShowCSVUpload] = useState(false);
@@ -295,6 +300,12 @@ export const ConnectionsTab = () => {
     providerName: string,
     forceAccountChooser = false,
   ) => {
+    // Abo-Sperre: Neue Verbindungen brauchen ein aktives Abo oder ein
+    // Creator-Konto. Bestehende Verbindungen bleiben unangetastet.
+    if (!canUseSocialConnections) {
+      setConnectUpgradeOpen(true);
+      return;
+    }
     // Diagnostic instrumentation — makes it possible to see in the browser
     // console exactly which path Instagram OAuth took (frontend builder vs.
     // backend `instagram-oauth-start`) and whether we are running on the
@@ -1392,6 +1403,15 @@ export const ConnectionsTab = () => {
         }}
       />
 
+      <UpgradeAccessDialog
+        open={connectUpgradeOpen}
+        onOpenChange={setConnectUpgradeOpen}
+        title={txt({
+          de: 'Social-Verbindungen freischalten',
+          en: 'Unlock social connections',
+          es: 'Desbloquea las conexiones sociales',
+        })}
+      />
     </div>
   );
 };

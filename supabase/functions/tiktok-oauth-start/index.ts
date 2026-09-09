@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { buildAuthUrl, getTikTokRedirectUri } from '../_shared/tiktok-api.ts';
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { isSocialPremiumEntitled, socialPremiumDeniedResponse } from '../_shared/social-premium.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,6 +39,12 @@ serve(async (req) => {
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) throw new Error('Unauthorized');
+
+    // Subscription gate: creating a NEW social connection requires an active
+    // subscription or a Creator account. Existing connections stay untouched.
+    if (!(await isSocialPremiumEntitled(supabase, user.id, (k) => Deno.env.get(k)))) {
+      return socialPremiumDeniedResponse(corsHeaders);
+    }
 
     // Parse returnTo from body
     let returnTo: string | null = null;
