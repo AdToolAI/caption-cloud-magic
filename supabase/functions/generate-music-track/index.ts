@@ -374,12 +374,16 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       console.warn('[generate-music-track] Asset insert warning:', insertError);
     }
 
-    const { data: newBalance, error: deductError } = await supabaseAdmin.rpc(
-      'deduct_ai_video_credits',
-      { p_user_id: user.id, p_amount: cost, p_generation_id: asset?.id || null }
-    );
-    if (deductError) {
-      console.error('[generate-music-track] Deduct error:', deductError);
+    let newBalance: number | null = null;
+    if (!included.claimed) {
+      const { data: balanceAfter, error: deductError } = await supabaseAdmin.rpc(
+        'deduct_ai_video_credits',
+        { p_user_id: user.id, p_amount: cost, p_generation_id: asset?.id || null }
+      );
+      if (deductError) {
+        console.error('[generate-music-track] Deduct error:', deductError);
+      }
+      newBalance = balanceAfter ?? null;
     }
 
     return new Response(JSON.stringify({
@@ -393,9 +397,13 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       },
       cost,
       currency,
-      newBalance: newBalance ?? (wallet.balance_euros - cost),
+      included: included.claimed,
+      includedUsed: included.claimed ? included.used : undefined,
+      includedLimit: included.claimed ? included.limit : undefined,
+      newBalance: newBalance ?? ((wallet?.balance_euros ?? 0) - cost),
       tier: engineId,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
 
   } catch (error: any) {
     console.error("[generate-music-track] Error:", error);
