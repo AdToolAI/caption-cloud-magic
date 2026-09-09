@@ -17,6 +17,7 @@ import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { transitionScene } from "../_shared/scene-state.ts";
 import { materializeCompatibilityOutput } from "../_shared/materialize-scene-output.ts";
+import { motionStudioGateForUser } from "../_shared/motion-studio-premium.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -98,6 +99,12 @@ serve(async (req) => {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+    // Motion Studio premium gate — subscription or Creator account required
+    // before any generation, render or edit. Existing work stays untouched.
+    {
+      const denied = await motionStudioGateForUser(user.id, corsHeaders);
+      if (denied) return denied;
     }
 
     const supabaseAdmin = createClient(

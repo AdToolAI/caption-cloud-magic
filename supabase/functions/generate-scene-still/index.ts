@@ -14,6 +14,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
+import { motionStudioGateForUser } from "../_shared/motion-studio-premium.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -129,6 +130,12 @@ serve(async (req) => {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+    // Motion Studio premium gate — subscription or Creator account required
+    // before any generation, render or edit. Existing work stays untouched.
+    {
+      const denied = await motionStudioGateForUser(user.id, corsHeaders);
+      if (denied) return denied;
     }
 
     const admin = createClient(

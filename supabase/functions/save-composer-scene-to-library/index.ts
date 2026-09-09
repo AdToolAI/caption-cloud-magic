@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
+import { motionStudioGateForUser } from "../_shared/motion-studio-premium.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,6 +34,12 @@ serve(async (req) => {
     const token = authHeader.replace(/^Bearer\s+/i, "");
     const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
     if (authErr || !user) return err("auth", "Unauthorized", 401);
+    // Motion Studio premium gate — subscription or Creator account required
+    // before any generation, render or edit. Existing work stays untouched.
+    {
+      const denied = await motionStudioGateForUser(user.id, corsHeaders);
+      if (denied) return denied;
+    }
 
     const body = await req.json();
     const {

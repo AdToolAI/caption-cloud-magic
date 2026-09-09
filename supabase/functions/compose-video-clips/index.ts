@@ -78,6 +78,7 @@ import {
   normalizeGender,
 } from "../_shared/v506-identity-verdict.ts";
 import { detectFacesMediaPipe } from "../_shared/face-detect-mediapipe.ts";
+import { motionStudioGateForUser } from "../_shared/motion-studio-premium.ts";
 import { enforceMinFaceSize } from "../_shared/anchor-min-face-size.ts";
 import { classifySplitScreenLayout } from "../_shared/split-screen-layout.ts";
 import { probeAnchorSeams } from "../_shared/anchor-seam-probe.ts";
@@ -316,6 +317,12 @@ serve(async (req) => {
       user = authData.user;
     }
     if (!user) throw new Error("Unauthorized");
+    // Motion Studio premium gate — subscription or Creator account required
+    // before any generation, render or edit. Existing work stays untouched.
+    {
+      const denied = await motionStudioGateForUser(user.id, corsHeaders);
+      if (denied) return denied;
+    }
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",

@@ -7,6 +7,7 @@ import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME, REMOTION_BUNDLE
 import { isQaMockRequest, qaMockResponse, qaMockJson } from "../_shared/qaMock.ts";
 import { pickRenderTier, checkRenderAdmission } from "../_shared/render-concurrency.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
+import { motionStudioGateForUser } from "../_shared/motion-studio-premium.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -373,6 +374,12 @@ serve((req: Request) => withLang(req, () => (async (req) => {
       }
       userId = user.id;
       console.log('🔐 User JWT authentication - userId:', userId);
+      // Motion Studio premium gate — subscription or Creator account required
+      // before any generation, render or edit. Existing work stays untouched.
+      {
+        const denied = await motionStudioGateForUser(userId, corsHeaders);
+        if (denied) return denied;
+      }
     }
 
     // Calculate dimensions based on aspect ratio and quality
