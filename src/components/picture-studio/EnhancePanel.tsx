@@ -639,6 +639,13 @@ export function EnhancePanel() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PicturePremiumDialog
+        open={premiumDialogOpen}
+        onOpenChange={setPremiumDialogOpen}
+        fallbackLabel="Clarity Pro"
+        onFallback={() => setModelId(PICTURE_FALLBACK_ENHANCE_MODEL)}
+      />
     </div>
   );
 }
