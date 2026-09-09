@@ -44,10 +44,12 @@ export const SUBSCRIPTION_PRICE_IDS = new Set<string>([
 /** Legacy-Alias — wird von bestehenden Imports weiterverwendet. */
 export const PRO_PRICE_IDS = SUBSCRIPTION_PRICE_IDS;
 
-/** Founders: 20 % auf jeden Credit-Kauf, 24 Monate ab Slot-Claim. */
-export const FOUNDERS_CREDIT_COUPON = "FOUNDERS_VIDEO_20";
+/** Founders: 10 % auf jeden Credit-Kauf, 24 Monate ab Slot-Claim. */
+export const FOUNDERS_CREDIT_COUPON = "FOUNDERS_VIDEO_10";
+export const FOUNDERS_CREDIT_DISCOUNT_PERCENT = 10;
 export const FOUNDERS_DISCOUNT_MONTHS = 24;
 export const FOUNDERS_MAX_SLOTS = 1000;
+
 
 /**
  * Interne Marker in `public.founders_signups`. Das sind KEINE Stripe-Coupons —
