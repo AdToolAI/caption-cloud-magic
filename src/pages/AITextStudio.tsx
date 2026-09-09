@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useTrialAccess } from "@/hooks/useTrialAccess";
+import { useAccountType } from "@/hooks/useAccountType";
 import {
   Dialog,
   DialogContent,
