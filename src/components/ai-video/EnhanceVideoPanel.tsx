@@ -180,7 +180,29 @@ const COPY = {
     de: 'Messenger wie WhatsApp rechnen Videos beim Versenden stark herunter. Lade die Datei herunter und verschicke sie als Dokument, um die volle Qualität zu behalten.',
     es: 'Los mensajeros como WhatsApp reducen los vídeos al enviarlos. Descarga el archivo y envíalo como documento para conservar toda la calidad.',
   },
+  premiumBadge: { en: 'Premium', de: 'Premium', es: 'Premium' },
+  premiumTitle: {
+    en: 'Topaz Video AI is a Premium feature',
+    de: 'Topaz Video AI ist eine Premium-Funktion',
+    es: 'Topaz Video AI es una función Premium',
+  },
+  premiumBody: {
+    en: 'Upgrade your AdTool AI subscription to access professional Topaz video enhancement and upscaling.',
+    de: 'Upgrade dein AdTool-AI-Abo, um professionelle Topaz-Videoverbesserung und -Hochskalierung zu nutzen.',
+    es: 'Mejora tu suscripción de AdTool AI para acceder al escalado y la mejora de vídeo profesional de Topaz.',
+  },
+  premiumUpgrade: {
+    en: 'Upgrade to Premium',
+    de: 'Auf Premium upgraden',
+    es: 'Mejorar a Premium',
+  },
+  premiumFallback: {
+    en: 'Continue with ByteDance',
+    de: 'Mit ByteDance fortfahren',
+    es: 'Continuar con ByteDance',
+  },
 } as const;
+
 
 function tx(key: keyof typeof COPY, lang: Lang): string {
   return COPY[key][lang] ?? COPY[key].en;
