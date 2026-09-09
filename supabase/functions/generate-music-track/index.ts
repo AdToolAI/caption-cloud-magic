@@ -159,29 +159,53 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     const duration = Math.max(5, Math.min(engine.maxDuration, durationSeconds));
 
     // Wallet check
-    const { data: wallet, error: walletError } = await supabaseAdmin
+    const { data: wallet } = await supabaseAdmin
       .from('ai_video_wallets')
       .select('balance_euros, currency')
       .eq('user_id', user.id)
       .single();
-    if (walletError || !wallet) {
-      return new Response(JSON.stringify({
-        error: "No AI Credits wallet found. Please purchase credits first.",
-        code: "NO_WALLET", needsPurchase: true
-      }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const currency = (wallet.currency || 'EUR') as 'EUR' | 'USD';
-    const cost = computeCharge(engine, duration);
+
+    const currency = (wallet?.currency || 'EUR') as 'EUR' | 'USD';
+    const listCost = computeCharge(engine, duration);
     const currencySymbol = currency === 'USD' ? '$' : '€';
-    if (wallet.balance_euros < cost) {
-      return new Response(JSON.stringify({
-        error: `Insufficient credits. Need ${currencySymbol}${cost.toFixed(2)}, have ${currencySymbol}${wallet.balance_euros.toFixed(2)}`,
-        code: "INSUFFICIENT_CREDITS", needsPurchase: true, required: cost, available: wallet.balance_euros, currency,
-      }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    // Monthly included usage: MiniMax Music 1.5 is included with an active
+    // subscription / Creator account. Claimed BEFORE the provider call and
+    // released again whenever the generation does not succeed.
+    const includedEligible = engineId === 'minimax-15';
+    const jobKey = includedEligible
+      ? await allowanceJobKey([
+          (body as { requestId?: string }).requestId,
+          user.id, engineId, duration, prompt.trim(), (lyrics ?? '').trim(),
+          (body as { requestId?: string }).requestId ? null : Math.floor(Date.now() / 60_000),
+        ])
+      : '';
+    const included = includedEligible
+      ? await claimIncludedAllowance(supabaseAdmin, user.id, 'music', jobKey, Deno.env.get('STRIPE_SECRET_KEY'))
+      : { claimed: false, duplicate: false, used: 0, limit: 0 };
+    const cost = included.claimed ? 0 : listCost;
+    const releaseIncluded = async () => {
+      if (included.claimed) await releaseIncludedAllowance(supabaseAdmin, user.id, 'music', jobKey);
+    };
+
+    if (!included.claimed) {
+      if (!wallet) {
+        return new Response(JSON.stringify({
+          error: "No AI Credits wallet found. Please purchase credits first.",
+          code: "NO_WALLET", needsPurchase: true
+        }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (wallet.balance_euros < cost) {
+        return new Response(JSON.stringify({
+          error: `Insufficient credits. Need ${currencySymbol}${cost.toFixed(2)}, have ${currencySymbol}${wallet.balance_euros.toFixed(2)}`,
+          code: "INSUFFICIENT_CREDITS", needsPurchase: true, required: cost, available: wallet.balance_euros, currency,
+        }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     const enhancedPrompt = buildEnhancedPrompt(body);
-    console.log(`[generate-music-track] engine=${engineId} duration=${duration}s cost=${currencySymbol}${cost}`);
+    console.log(`[generate-music-track] engine=${engineId} duration=${duration}s cost=${currencySymbol}${cost} included=${included.claimed}`);
+
 
     let audioBuffer: ArrayBuffer | null = null;
     let engineUsed = engine.label;
