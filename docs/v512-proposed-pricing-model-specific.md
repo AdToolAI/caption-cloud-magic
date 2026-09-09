@@ -281,3 +281,41 @@ Targets: Seedance 2.5 1.38×, standard models ~1.50-1.58×, premium (Veo/Sora/Ha
 
 - none
 
+
+## Seedance 2.5 recommendation
+
+* Scenario A (VAT exclusive): keep 0.3333 €/s (already 1.38×) — only round the 480p tier
+  0.1932 → 0.165 €/s (1.60× → 1.37×). This is the aggressive hero price.
+* Scenario B (VAT inclusive): 0.3333 €/s is only 1.16× net and 1.04× for founders —
+  economically at the edge. Either raise to 0.40 €/s (1.39×) or accept a near-zero
+  contribution on founder traffic. Reporting, not auto-raising, per instruction.
+* Seedance rows stay two isolated catalog entries, so a future BytePlus volume deal
+  can be repriced independently without touching any other model.
+
+## Configurations currently above 1.80×
+
+* Scenario A: Seedance 1 Lite Draft 2.02×, Seedance 1 Lite 1080p 2.00×,
+  Seedance 2.0 Fast 1.92×, Seedance 2.0 1.93×, plus a cluster at 1.85-1.90×
+  (see the Scenario A table: every row whose "Current ×" exceeds 1.80).
+* Scenario B: none — all rows sit between 1.16× and 1.76×.
+
+## Founder-discount risk
+
+At the proposed prices the weakest founder multiple is Seedance 2.5 at 1.23×
+(Scenario A) / 1.25× (Scenario B) — positive, but the only route where a refund
+wave or a failed-generation cluster can erase the contribution. Recommend keeping
+the automatic refund path and excluding Seedance 2.5 from any further discount stacking.
+
+## Competitor reference (list prices, indicative)
+
+| Config | AdTool proposed (A) | Market |
+| --- | --- | --- |
+| Seedance 2.5 720p | 0.33 €/s | fal ≈ $0.473/s (~0.41 €/s) [2](https://fal.ai/learn/tools/how-to-access-seedance-2-5-on-fal) |
+| Seedance 2.5 480p | 0.165 €/s | fal ≈ $0.2205/s (~0.19 €/s) [2](https://fal.ai/learn/tools/how-to-access-seedance-2-5-on-fal) |
+| Veo 3.1 (audio, 1080p) | 0.79 €/s (Veo Fast row) | fal $0.40/s (~0.35 €/s) [3](https://fal.ai/models/fal-ai/veo3.1) |
+| Veo 3.1 Fast (audio) | — | fal $0.15/s (~0.13 €/s) [5](https://fal.ai/models/fal-ai/veo3.1/fast) |
+
+**Flag:** Seedance is comfortably under market. Veo is NOT — our stored provider cost
+(0.40 €/s Fast, 1.10 €/s Pro) is far above fal's list price for the same model. Before
+repricing Veo, verify the provider route: if we can source Veo at fal rates, the retail
+price should fall by roughly 60%, independent of the margin policy.
