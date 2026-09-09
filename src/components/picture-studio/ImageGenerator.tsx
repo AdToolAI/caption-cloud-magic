@@ -1526,6 +1526,13 @@ export function ImageGenerator() {
         onApply={handleHelperApply}
       />
 
+      <PicturePremiumDialog
+        open={premiumDialogOpen}
+        onOpenChange={setPremiumDialogOpen}
+        fallbackLabel="GPT Image"
+        onFallback={() => setTier(PICTURE_FALLBACK_TIER as QualityTier)}
+      />
+
       <AIVideoCostConfirmDialog
         open={costDialogOpen}
         payload={{
