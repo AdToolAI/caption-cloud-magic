@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Download, HelpCircle, Loader2, Sparkles, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, HelpCircle, Loader2, Lock, Sparkles, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -11,8 +11,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useUserRoles } from '@/hooks/useUserRoles';
+import { useAuth } from '@/hooks/useAuth';
+import { useTrialAccess } from '@/hooks/useTrialAccess';
+
 import { useEnhanceVideo } from '@/hooks/useEnhanceVideo';
 import { VideoSourcePicker } from '@/components/ai-video/VideoSourcePicker';
 import { EnhanceRunProgress } from '@/components/ai-video/EnhanceRunProgress';
@@ -180,7 +192,29 @@ const COPY = {
     de: 'Messenger wie WhatsApp rechnen Videos beim Versenden stark herunter. Lade die Datei herunter und verschicke sie als Dokument, um die volle Qualität zu behalten.',
     es: 'Los mensajeros como WhatsApp reducen los vídeos al enviarlos. Descarga el archivo y envíalo como documento para conservar toda la calidad.',
   },
+  premiumBadge: { en: 'Premium', de: 'Premium', es: 'Premium' },
+  premiumTitle: {
+    en: 'Topaz Video AI is a Premium feature',
+    de: 'Topaz Video AI ist eine Premium-Funktion',
+    es: 'Topaz Video AI es una función Premium',
+  },
+  premiumBody: {
+    en: 'Upgrade your AdTool AI subscription to access professional Topaz video enhancement and upscaling.',
+    de: 'Upgrade dein AdTool-AI-Abo, um professionelle Topaz-Videoverbesserung und -Hochskalierung zu nutzen.',
+    es: 'Mejora tu suscripción de AdTool AI para acceder al escalado y la mejora de vídeo profesional de Topaz.',
+  },
+  premiumUpgrade: {
+    en: 'Upgrade to Premium',
+    de: 'Auf Premium upgraden',
+    es: 'Mejorar a Premium',
+  },
+  premiumFallback: {
+    en: 'Continue with ByteDance',
+    de: 'Mit ByteDance fortfahren',
+    es: 'Continuar con ByteDance',
+  },
 } as const;
+
 
 function tx(key: keyof typeof COPY, lang: Lang): string {
   return COPY[key][lang] ?? COPY[key].en;
@@ -206,6 +240,10 @@ export function EnhanceVideoPanel({
   // Only validation accounts may start a model whose credit consumption is
   // still unconfirmed; the server enforces the same rule.
   const { isAdmin: isEnhanceTestUser } = useUserRoles();
+  const { subscribed } = useAuth();
+  const { isPaid } = useTrialAccess();
+  const [premiumOpen, setPremiumOpen] = useState(false);
+
   const lang: Lang = (['en', 'de', 'es'].includes(language) ? language : 'en') as Lang;
 
   const models = useMemo(() => visibleVideoEnhanceModels(), []);
@@ -362,10 +400,27 @@ export function EnhanceVideoPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source, modelId, mode, modeTouched, resolution, fps, outputQuality, interpolationModel, hasSource]);
 
+  // Display-only premium gate. The server decides authoritatively; this only
+  // spares non-entitled customers a request that would be refused anyway and
+  // keeps their video + settings while they upgrade.
+  const topazEntitled = subscribed === true || isPaid === true || isEnhanceTestUser;
+  const topazLocked = modelId === 'topaz-video-upscale' && !topazEntitled;
+
   const onStart = useCallback(() => {
     if (!config || !hasSource) return;
+    if (topazLocked) {
+      setPremiumOpen(true);
+      return;
+    }
     void startEnhance(source, config);
-  }, [config, hasSource, source, startEnhance]);
+  }, [config, hasSource, source, startEnhance, topazLocked]);
+
+  // A direct API refusal (e.g. subscription expired in another tab) surfaces
+  // the same modal instead of a raw error code.
+  useEffect(() => {
+    if (errorCode === 'TOPAZ_PREMIUM_REQUIRED') setPremiumOpen(true);
+  }, [errorCode]);
+
 
   const otherRuns = runs.filter((r) => r.id !== run?.id && isEnhanceLive(r.status));
 
@@ -500,8 +555,17 @@ export function EnhanceVideoPanel({
                 <SelectContent>
                   {models.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.name} — {m.positioning[lang]}
+                      <span className="flex items-center gap-2">
+                        <span>{m.name} — {m.positioning[lang]}</span>
+                        {m.id === 'topaz-video-upscale' && !topazEntitled && (
+                          <Badge variant="outline" className="gap-1 text-[10px]">
+                            <Lock className="w-3 h-3" aria-hidden="true" />
+                            {tx('premiumBadge', lang)}
+                          </Badge>
+                        )}
+                      </span>
                     </SelectItem>
+
                   ))}
                 </SelectContent>
               </Select>
@@ -838,6 +902,30 @@ export function EnhanceVideoPanel({
           )}
         </div>
       )}
+
+      <Dialog open={premiumOpen} onOpenChange={setPremiumOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{tx('premiumTitle', lang)}</DialogTitle>
+            <DialogDescription>{tx('premiumBody', lang)}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPremiumOpen(false);
+                if (models.some((m) => m.id === 'bytedance-vcube')) setModelId('bytedance-vcube');
+              }}
+            >
+              {tx('premiumFallback', lang)}
+            </Button>
+            <Button asChild>
+              {/* New tab: the chosen video and settings stay untouched here. */}
+              <a href="/pricing" target="_blank" rel="noreferrer">{tx('premiumUpgrade', lang)}</a>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

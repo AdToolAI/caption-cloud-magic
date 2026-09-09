@@ -22,6 +22,8 @@ import {
   type VideoResolution,
 } from "../_shared/video-enhance-models.ts";
 import { resolveAccountDiscountFactor } from "../_shared/accountVideoPricing.ts";
+import { fetchSubscriptionEntitlement } from "../_shared/subscription-entitlement.ts";
+
 
 
 import { evaluateUpscale, planDelivery } from "../_shared/video-enhance-frame.ts";
@@ -622,6 +624,31 @@ serve(async (req) => {
         403,
       );
     }
+
+    // ---- premium entitlement -------------------------------------------------
+    // Topaz is a subscription-gated premium engine. Wallet balance alone never
+    // grants access: BOTH an active subscription entitlement AND enough credits
+    // are required. Checked before reservation, before any wallet mutation and
+    // before a single provider request — a direct API call cannot bypass the UI.
+    if (spec.provider === "topaz" && !isTestAllowlisted(env, user.id)) {
+      const entitlement = await fetchSubscriptionEntitlement(
+        admin,
+        user.id,
+        env("STRIPE_SECRET_KEY"),
+      );
+      if (!entitlement.entitled) {
+        return json(
+          {
+            error: "Topaz Video AI is a Premium feature.",
+            code: "TOPAZ_PREMIUM_REQUIRED",
+            provider: "topaz",
+            fallbackModelId: "bytedance-vcube",
+          },
+          403,
+        );
+      }
+    }
+
 
     // Engine-wide outage on OUR provider account: refuse before reserving.
     if (await providerOutageActive(admin, config.modelId)) {
