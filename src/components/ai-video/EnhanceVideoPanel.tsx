@@ -68,6 +68,8 @@ import {
   visibleVideoEnhanceModels,
   type EnhanceConfig,
   type VideoResolution,
+  type QualityTier,
+
 } from '@/config/videoEnhanceModels';
 
 /**
@@ -192,7 +194,22 @@ const COPY = {
     de: 'Messenger wie WhatsApp rechnen Videos beim Versenden stark herunter. Lade die Datei herunter und verschicke sie als Dokument, um die volle Qualität zu behalten.',
     es: 'Los mensajeros como WhatsApp reducen los vídeos al enviarlos. Descarga el archivo y envíalo como documento para conservar toda la calidad.',
   },
+  qualityTier: { en: 'Processing quality', de: 'Verarbeitungsqualität', es: 'Calidad de procesado' },
+  tierStandard: { en: 'Standard', de: 'Standard', es: 'Estándar' },
+  tierPro: { en: 'Pro · finer detail', de: 'Pro · feinere Details', es: 'Pro · más detalle' },
+  tierProHint: {
+    en: 'Pro uses the higher-quality model — best for real people and skin. It costs clearly more; the price shown already includes it.',
+    de: 'Pro nutzt das hochwertigere Modell – am besten für echte Menschen und Haut. Es kostet deutlich mehr; der angezeigte Preis enthält das bereits.',
+    es: 'Pro usa el modelo de mayor calidad, ideal para personas reales y piel. Cuesta claramente más; el precio mostrado ya lo incluye.',
+  },
+  fpsAdvanced: { en: 'Advanced · high frame rate', de: 'Erweitert · hohe Bildrate', es: 'Avanzado · alta tasa de fotogramas' },
+  fpsHighHint: {
+    en: 'Above 30 frames per second costs about twice as much. Most viewers see no difference at 120.',
+    de: 'Über 30 Bilder pro Sekunde kostet etwa doppelt so viel. Die meisten sehen bei 120 keinen Unterschied.',
+    es: 'Por encima de 30 fotogramas por segundo cuesta unas dos veces más. La mayoría no nota diferencia a 120.',
+  },
   premiumBadge: { en: 'Premium', de: 'Premium', es: 'Premium' },
+
   premiumTitle: {
     en: 'Topaz Video AI is a Premium feature',
     de: 'Topaz Video AI ist eine Premium-Funktion',
@@ -254,6 +271,9 @@ export function EnhanceVideoPanel({
   const [modeTouched, setModeTouched] = useState(false);
   const [resolution, setResolution] = useState<VideoResolution>('1080p');
   const [fps, setFps] = useState<number | null>(null);
+  // Processing quality (ByteDance Standard vs Pro). Pro is only offered when
+  // the provider entitlement is verified — `availableTiers` decides that.
+  const [tier, setTier] = useState<QualityTier>('standard');
   const [outputQuality, setOutputQuality] = useState<TopazOutputQuality>(
     TOPAZ_DEFAULT_OUTPUT_QUALITY,
   );
@@ -329,6 +349,10 @@ export function EnhanceVideoPanel({
 
 
   const fpsChoices = model ? availableFps(model, mode, resolution) : [];
+  const tierChoicesForModel = useMemo(() => (model ? availableTiers(model) : []), [model]);
+  useEffect(() => {
+    if (!tierChoicesForModel.includes(tier)) setTier(tierChoicesForModel[0] ?? 'standard');
+  }, [tierChoicesForModel, tier]);
   useEffect(() => {
     if (fps !== null && !fpsChoices.includes(fps)) setFps(null);
   }, [fps, fpsChoices]);
@@ -383,7 +407,7 @@ export function EnhanceVideoPanel({
         modeExplicit: modeTouched,
         resolution,
         fps,
-        tier: availableTiers(model)[0] ?? 'standard',
+        tier: tierChoicesForModel.includes(tier) ? tier : (tierChoicesForModel[0] ?? 'standard'),
         // Topaz-only settings; an engine without an encoder or interpolation
         // choice must not receive them at all.
         ...(topazEngine ? { outputQuality } : {}),
@@ -398,7 +422,7 @@ export function EnhanceVideoPanel({
     if (!config || !hasSource) return;
     void previewPrice(source, config);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, modelId, mode, modeTouched, resolution, fps, outputQuality, interpolationModel, hasSource]);
+  }, [source, modelId, mode, modeTouched, resolution, fps, tier, outputQuality, interpolationModel, hasSource]);
 
   // Display-only premium gate. The server decides authoritatively; this only
   // spares non-entitled customers a request that would be refused anyway and
@@ -672,6 +696,25 @@ export function EnhanceVideoPanel({
             )}
 
 
+            {tierChoicesForModel.length > 1 && (
+              <div className="space-y-2">
+                <Label>{tx('qualityTier', lang)}</Label>
+                <Select value={tier} onValueChange={(v) => setTier(v as QualityTier)}>
+                  <SelectTrigger data-testid="enhance-quality-tier"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {tierChoicesForModel.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t === 'pro' ? tx('tierPro', lang) : tx('tierStandard', lang)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {tier === 'pro' && (
+                  <p className="text-xs text-amber-400">{tx('tierProHint', lang)}</p>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>{tx('resolution', lang)}</Label>
               <Select value={resolution} onValueChange={(v) => setResolution(v as VideoResolution)}>
@@ -715,10 +758,15 @@ export function EnhanceVideoPanel({
                 <SelectContent>
                   <SelectItem value="source">{tx('keepFps', lang)}</SelectItem>
                   {fpsChoices.map((f) => (
-                    <SelectItem key={f} value={String(f)}>{f} FPS</SelectItem>
+                    <SelectItem key={f} value={String(f)}>
+                      {f} FPS{f > 60 ? ` · ${tx('fpsAdvanced', lang)}` : ''}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {fps !== null && fps > 30 && (
+                <p className="text-xs text-muted-foreground">{tx('fpsHighHint', lang)}</p>
+              )}
             </div>
           </div>
 

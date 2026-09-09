@@ -11,7 +11,10 @@ import {
   type EnhanceConfig,
   type SourceMetadata,
   DISABLED_VIDEO_ENHANCE_MODELS,
+  VERIFIED_PROVIDER_ENTITLEMENTS,
+  availableTiers,
 } from '@/config/videoEnhanceModels';
+
 import { priceVideoEnhanceRun as priceClient } from '@/lib/videoEnhance/pricing';
 import { VIDEO_RATE_CARDS as CLIENT_CARDS } from '@/lib/videoEnhance/rates';
 import {
@@ -22,7 +25,11 @@ import {
   validateCombination as validateServer,
 } from '../../supabase/functions/_shared/video-enhance-models.ts';
 
+// Verified provider entitlement (real Pro run 2026-09-09) — the server mirror
+// reads it from the environment, the client mirror from the flags file.
 const noEnv = () => undefined;
+const proEnv = (key: string) =>
+  key === 'VIDEO_ENHANCE_VERIFIED_ENTITLEMENTS' ? 'bytedance-vcube:pro' : undefined;
 const entitled = (_id: string, tier: string) => tier !== 'pro';
 
 const source: SourceMetadata = {
@@ -108,7 +115,9 @@ describe('video enhance pricing parity', () => {
 describe('combination validation parity', () => {
   const cases: { config: EnhanceConfig; duration?: number; expected: string | true }[] = [
     { config: { modelId: 'bytedance-vcube', mode: 'aigc', resolution: '1080p', fps: 24, tier: 'standard' }, expected: true },
-    { config: { modelId: 'bytedance-vcube', mode: 'aigc', resolution: '4k', fps: 120, tier: 'standard' }, expected: 'unsupported_fps' },
+    { config: { modelId: 'bytedance-vcube', mode: 'aigc', resolution: '4k', fps: 120, tier: 'standard' }, expected: true },
+    { config: { modelId: 'bytedance-vcube', mode: 'old_film', resolution: '720p', fps: 24, tier: 'standard' }, expected: true },
+    { config: { modelId: 'topaz-video-upscale', mode: 'proteus', resolution: '4k', fps: 120, tier: 'standard' }, expected: 'unsupported_fps' },
     { config: { modelId: 'topaz-video-upscale', mode: 'proteus', resolution: '2k', fps: 30, tier: 'standard' }, expected: true },
     { config: { modelId: 'bytedance-vcube', mode: 'nope', resolution: '1080p', fps: 24, tier: 'standard' }, expected: 'unknown_mode' },
     { config: { modelId: 'bytedance-vcube', mode: 'aigc', resolution: '1080p', fps: 24, tier: 'pro' }, expected: 'tier_not_entitled' },
@@ -131,8 +140,8 @@ describe('combination validation parity', () => {
     const config: EnhanceConfig = {
       modelId: 'bytedance-vcube',
       mode: 'aigc',
-      resolution: '4k',
-      fps: 120,
+      resolution: '540p' as EnhanceConfig['resolution'],
+      fps: 24,
       tier: 'standard',
     };
     expect(validateServer(config, 8, noEnv).ok).toBe(false);
@@ -142,7 +151,7 @@ describe('combination validation parity', () => {
 });
 
 describe('provider entitlement', () => {
-  it('hides ByteDance Pro until the entitlement is verified', () => {
+  it('keeps Pro an entitlement: refused whenever the environment does not list it', () => {
     const model = getVideoEnhanceModel('bytedance-vcube')!;
     expect(model.entitlementTiers).toContain('pro');
     expect(
@@ -152,6 +161,60 @@ describe('provider entitlement', () => {
         noEnv,
       ).error,
     ).toBe('tier_not_entitled');
+  });
+
+  it('offers Pro in the client once the verified entitlement list carries it', () => {
+    expect(VERIFIED_PROVIDER_ENTITLEMENTS).toContain('bytedance-vcube:pro');
+    const model = getVideoEnhanceModel('bytedance-vcube')!;
+    expect(availableTiers(model)).toContain('pro');
+    expect(
+      validateClient(
+        { modelId: 'bytedance-vcube', mode: 'aigc', resolution: '1080p', fps: 24, tier: 'pro' },
+        8,
+      ).ok,
+    ).toBe(true);
+    expect(
+      validateServer(
+        { modelId: 'bytedance-vcube', mode: 'aigc', resolution: '1080p', fps: 24, tier: 'pro' },
+        8,
+        proEnv,
+      ).ok,
+    ).toBe(true);
+  });
+
+  it('prices Pro at exactly ten times Standard and 120 fps in the >30 fps band', () => {
+    const base = {
+      modelId: 'bytedance-vcube',
+      mode: 'aigc',
+      resolution: '720p',
+    } as const;
+    const std = priceServer({ ...base, fps: 24, tier: 'standard' }, source);
+    const pro = priceServer({ ...base, fps: 24, tier: 'pro' }, source);
+    expect(pro.providerCostUsdEstimated / std.providerCostUsdEstimated).toBeCloseTo(10, 6);
+    const hi60 = priceServer({ ...base, fps: 60, tier: 'standard' }, source);
+    const hi120 = priceServer({ ...base, fps: 120, tier: 'standard' }, source);
+    expect(hi120.providerCostUsdEstimated).toBeCloseTo(hi60.providerCostUsdEstimated, 9);
+    // published high band ($0.006887/s) is the rounded double of the low band
+    expect(hi120.providerCostUsdEstimated).toBeCloseTo(std.providerCostUsdEstimated * 2, 4);
+  });
+
+  it('prices every vCube scene identically — the provider does not bill by scene', () => {
+    const cost = (mode: string) =>
+      priceServer(
+        { modelId: 'bytedance-vcube', mode, resolution: '720p', fps: 24, tier: 'standard' },
+        source,
+      ).providerCostUsdEstimated;
+    for (const scene of ['aigc', 'short_series', 'ugc', 'old_film', 'common']) {
+      expect(cost(scene)).toBeCloseTo(cost('aigc'), 9);
+    }
+  });
+
+  it('keeps the small provider resolutions hidden on both sides', () => {
+    const model = getVideoEnhanceModel('bytedance-vcube')!;
+    const exposed = model.outputs.map((o) => o.resolution);
+    for (const hidden of ['240p', '360p', '480p', '540p']) {
+      expect(exposed).not.toContain(hidden);
+    }
   });
 
   it('accepts Pro once the environment lists the verified entitlement', () => {

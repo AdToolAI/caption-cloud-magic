@@ -28,10 +28,19 @@ describe('vCube rate card verification', () => {
     expect(CLIENT_CARDS['bytedance-vcube'].costUnverified).toBeFalsy();
   });
 
-  it('still exposes 24/30/60 fps only — 120 fps stays hidden', () => {
+  it('carries the verified 120 fps rows in the >30 fps band', () => {
     const card = CLIENT_CARDS['bytedance-vcube'];
     if (card.type !== 'per_second_matrix') throw new Error('expected matrix card');
-    expect([...new Set(card.entries.map((e) => e.fps))].sort((a, b) => a - b)).toEqual([24, 30, 60]);
+    expect([...new Set(card.entries.map((e) => e.fps))].sort((a, b) => a - b)).toEqual([
+      24, 30, 60, 120,
+    ]);
+    const at = (fps: number, tier: 'standard' | 'pro') =>
+      card.entries.find(
+        (e) => e.mode === 'aigc' && e.resolution === '720p' && e.fps === fps && e.tier === tier,
+      )!.usdPerSecond;
+    expect(at(120, 'standard')).toBeCloseTo(at(60, 'standard'), 9);
+    expect(at(120, 'standard')).toBeCloseTo(0.006887, 9);
+    expect(at(24, 'pro')).toBeCloseTo(at(24, 'standard') * 10, 9);
   });
 });
 
@@ -69,7 +78,7 @@ describe('vCube actual-cost backfill', () => {
     const reading = extractProviderCost(
       { metrics: { video_output_duration_seconds: 10 } },
       'bytedance-vcube',
-      run({ fps: 120 }),
+      run({ resolution: '540p' as never }),
     );
     expect(reading.source).toBe('provider_usage');
     expect(reading.usd).toBeUndefined();

@@ -29,10 +29,15 @@ export function isVideoEnhanceModelKilled(modelId: string): boolean {
 
 /**
  * Provider entitlements verified through a real run on the AdTool provider
- * account. ByteDance `pro` is an ENTITLEMENT, not a user-facing choice: until
- * it appears here it is offered nowhere.
+ * account. ByteDance `pro` is an ENTITLEMENT, not a marketing label.
+ *
+ * VERIFIED 2026-09-09: prediction 7vnmm9gz7nrmy0d0geyak811rc (720p/24fps, Pro)
+ * succeeded with `metrics.model_variant = "pro"`, and Replicate's published
+ * billing rules bill Pro at exactly 10x Standard on the same
+ * `video_output_duration_seconds` metric (Pro 720p <=30fps = $0.034435/s).
  */
-export const VERIFIED_PROVIDER_ENTITLEMENTS: string[] = [];
+export const VERIFIED_PROVIDER_ENTITLEMENTS: string[] = ['bytedance-vcube:pro'];
+
 
 export function isEntitlementVerified(modelId: string, tier: string): boolean {
   return VERIFIED_PROVIDER_ENTITLEMENTS.includes(`${modelId}:${tier}`);

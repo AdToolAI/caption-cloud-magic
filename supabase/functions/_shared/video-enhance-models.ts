@@ -160,10 +160,12 @@ export const VIDEO_ENHANCE_SPECS: Record<string, VideoEnhanceSpec> = {
     providerSchemaRef: 'replicate/bytedance-video-upscaler@2026-09-05',
     modes: [...VCUBE_SCENES],
     outputs: [
-      { resolution: '720p', fps: [24, 30, 60] },
-      { resolution: '1080p', fps: [24, 30, 60] },
-      { resolution: '2k', fps: [24, 30, 60] },
-      { resolution: '4k', fps: [24, 30, 60] },
+      // 120 fps VERIFIED 2026-09-09 (prediction hfysnz10mxrmr0d0geyaha22h8):
+      // real 120/1 fps output, billed in the provider's >30 fps band.
+      { resolution: '720p', fps: [24, 30, 60, 120] },
+      { resolution: '1080p', fps: [24, 30, 60, 120] },
+      { resolution: '2k', fps: [24, 30, 60, 120] },
+      { resolution: '4k', fps: [24, 30, 60, 120] },
     ],
     tiers: ['standard', 'pro'],
     entitlementTiers: ['pro'],
@@ -372,7 +374,7 @@ export function isModelUnlocked(
 // Rate cards — mirror of src/lib/videoEnhance/rates.ts
 // ---------------------------------------------------------------------------
 
-export const VIDEO_PROVIDER_PRICING_VERSION = 'video-rates-2026-09-06-topaz-direct-credits';
+export const VIDEO_PROVIDER_PRICING_VERSION = 'video-rates-2026-09-09-vcube-pro-120fps';
 /**
  * Hard ceiling on the customer price as a multiple of provider cost.
  * AdTool Video Enhance stays deliberately cheap: the effective multiplier must
@@ -443,12 +445,17 @@ const VCUBE_STANDARD_USD_PER_SECOND: Record<VideoResolution, { low: number; high
   '2k': { low: 0.013773, high: 0.027548 },
   '4k': { low: 0.027548, high: 0.055097 },
 };
-/** The Pro model is billed at ten times the Standard rate. */
+/**
+ * The Pro model is billed at ten times the Standard rate. VERIFIED 2026-09-09
+ * against Replicate's published billing rules for `bytedance/video-upscaler`:
+ * every Pro tier is exactly 10x its Standard counterpart on the same
+ * `video_output_duration_seconds` metric.
+ */
 const VCUBE_PRO_FACTOR = 10;
 
 const VCUBE_MODES: string[] = [...VCUBE_SCENES];
 const VCUBE_RESOLUTIONS: VideoResolution[] = ['720p', '1080p', '2k', '4k'];
-const VCUBE_FPS = [24, 30, 60];
+const VCUBE_FPS = [24, 30, 60, 120];
 
 const VCUBE_ENTRIES: MatrixEntry[] = VCUBE_MODES.flatMap((mode) =>
   VCUBE_RESOLUTIONS.flatMap((resolution) =>

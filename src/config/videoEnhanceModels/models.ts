@@ -105,11 +105,14 @@ export const VIDEO_ENHANCE_MODELS: VideoEnhanceModelDefinition[] = [
       },
     ],
     outputs: [
-      { resolution: '720p', fps: [24, 30, 60] },
-      { resolution: '1080p', fps: [24, 30, 60] },
-      { resolution: '2k', fps: [24, 30, 60] },
-      { resolution: '4k', fps: [24, 30, 60] },
+      // 120 fps VERIFIED 2026-09-09 (prediction hfysnz10mxrmr0d0geyaha22h8):
+      // real 120/1 fps output, billed in the provider's >30 fps band.
+      { resolution: '720p', fps: [24, 30, 60, 120] },
+      { resolution: '1080p', fps: [24, 30, 60, 120] },
+      { resolution: '2k', fps: [24, 30, 60, 120] },
+      { resolution: '4k', fps: [24, 30, 60, 120] },
     ],
+
     qualityTiers: ['standard', 'pro'],
     entitlementTiers: ['pro'],
     minDurationSeconds: 1,
