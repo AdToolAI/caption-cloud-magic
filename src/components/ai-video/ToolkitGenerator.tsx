@@ -1154,6 +1154,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       if (model.capabilities.v2v && referenceVideoUrl) {
         body.referenceVideoUrl = referenceVideoUrl;
         body.videoReferenceType = videoReferenceType;
+        // Length of the clip — billed like extra seconds on engines that
+        // charge for the material the model reads.
+        if (referenceVideoSeconds != null) {
+          body.referenceVideoDurations = [referenceVideoSeconds];
+        }
       }
       // multi-ref: reference images with roles.
       //  - Vidu Reference2V: at least 1 image is mandatory, field `referenceImages`.
@@ -1851,6 +1856,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 controls
                 muted
                 playsInline
+                onLoadedMetadata={(e) => {
+                  const d = e.currentTarget.duration;
+                  setReferenceVideoSeconds(Number.isFinite(d) && d > 0 ? d : null);
+                }}
                 className="w-full max-h-56 object-cover bg-black"
               />
             </div>
