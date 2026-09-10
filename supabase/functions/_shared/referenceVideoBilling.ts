@@ -12,8 +12,12 @@
 // seconds as the model has to read. We bill the same way, at the ordinary
 // resolution rate, and show the extra seconds to the user before generation.
 //
-// Only models in REFERENCE_SECONDS_BILLED_IDS behave this way (confirmed for
-// the direct ModelArk route). Every other engine keeps its current billing.
+// FAIL-CLOSED: if a clip's length cannot be measured we do NOT estimate. The
+// caller must stop before any wallet deduction and ask for another file — the
+// same rule already used for an unreadable wallet currency.
+//
+// NOTE: 480p (`seedance-2-5-480p`) is assumed to follow the same formula but
+// has NOT been measured yet. Marked unverified until a controlled 480p test.
 // ============================================================================
 
 /** Pricing ids whose provider bills reference seconds like output seconds. */
@@ -22,48 +26,43 @@ export const REFERENCE_SECONDS_BILLED_IDS: ReadonlySet<string> = new Set([
   "seedance-2-5-480p",
 ]);
 
-/**
- * Conservative assumption when a reference clip's length is unknown: the
- * longest clip the model accepts. We never guess LOW — that would silently
- * bill less than the provider charges us.
- */
-export const UNKNOWN_REFERENCE_SECONDS = 30;
+/** Longest reference clip the model accepts — measured values clamp here. */
+export const MAX_REFERENCE_SECONDS = 30;
 
 export function billsReferenceSeconds(pricingId: string): boolean {
   return REFERENCE_SECONDS_BILLED_IDS.has(pricingId);
 }
 
 /**
- * Billable seconds contributed by the attached reference clips.
- * Each clip is rounded UP to a whole second (the provider bills the material
- * it reads, and partial seconds still cost tokens).
+ * Billable seconds contributed by the attached reference clips, or `null` when
+ * any clip's length is unknown/invalid (caller must fail closed).
+ * Each measured clip is rounded UP to a whole second.
  */
 export function referenceBillableSeconds(
   pricingId: string,
   referenceCount: number,
   declaredDurations?: readonly (number | null | undefined)[] | null,
-): number {
+): number | null {
   if (!billsReferenceSeconds(pricingId)) return 0;
   const count = Math.max(0, Math.floor(referenceCount));
   if (count === 0) return 0;
   let total = 0;
   for (let i = 0; i < count; i++) {
     const raw = Number(declaredDurations?.[i]);
-    const seconds = Number.isFinite(raw) && raw > 0
-      ? Math.min(Math.ceil(raw), UNKNOWN_REFERENCE_SECONDS)
-      : UNKNOWN_REFERENCE_SECONDS;
-    total += seconds;
+    if (!Number.isFinite(raw) || raw <= 0) return null;
+    total += Math.min(Math.ceil(raw), MAX_REFERENCE_SECONDS);
   }
   return total;
 }
 
-/** Output seconds + reference seconds — the quantity we charge for. */
+/** Output seconds + reference seconds, or `null` when not billable yet. */
 export function computeBillableSeconds(
   pricingId: string,
   outputSeconds: number,
   referenceCount: number,
   declaredDurations?: readonly (number | null | undefined)[] | null,
-): number {
+): number | null {
   const out = Number.isFinite(outputSeconds) && outputSeconds > 0 ? outputSeconds : 0;
-  return out + referenceBillableSeconds(pricingId, referenceCount, declaredDurations);
+  const ref = referenceBillableSeconds(pricingId, referenceCount, declaredDurations);
+  return ref === null ? null : out + ref;
 }

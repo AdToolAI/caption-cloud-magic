@@ -1,5 +1,6 @@
 import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { probeMediaDuration } from '@/lib/probeMp4Duration';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -253,9 +254,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
   /** Measured length of the reference clip — it is billed like extra seconds. */
   const [referenceVideoSeconds, setReferenceVideoSeconds] = useState<number | null>(null);
-  // Any new (or removed) clip invalidates the measured length until the
-  // preview reports the real duration again.
-  useEffect(() => { setReferenceVideoSeconds(null); }, [referenceVideoUrl]);
+  // Any clip we did not measure ourselves (restored snapshot, model switch,
+  // removal) invalidates the length — an unmeasured clip is never billed.
+  const measuredRefUrl = useRef<string | null>(null);
+  useEffect(() => {
+    if (measuredRefUrl.current !== referenceVideoUrl) setReferenceVideoSeconds(null);
+  }, [referenceVideoUrl]);
   const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
   // Reference slots survive a reload: same order, same roles → identical
   // provider binding after resume (see referenceBinding.ts).
@@ -807,11 +811,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     : duration;
   // A reference clip is billed like extra video seconds on the engines whose
   // provider charges for the material it reads (Seedance 2.5 / ModelArk).
-  const referenceSeconds = referenceBillableSeconds(
+  const referenceSecondsOrNull = referenceBillableSeconds(
     billingPricingId,
     referenceVideoUrl ? 1 : 0,
     [referenceVideoSeconds],
   );
+  // Fail-closed: an unmeasurable clip has no price — the start is blocked
+  // instead of charging an estimate.
+  const referenceDurationUnknown = referenceSecondsOrNull === null;
+  const referenceSeconds = referenceSecondsOrNull ?? 0;
   const billableSeconds = billedSeconds + referenceSeconds;
   // Total is rounded exactly like the backend deduction chain.
   const cost = getTotalCost(billingPricingId, billingCurrency, billableSeconds)
@@ -865,6 +873,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       return;
     }
     setUploadingVideo(true);
+    // Measure the clip BEFORE uploading: its length is billed, so an
+    // unreadable file is rejected instead of being estimated.
+    let measuredSeconds: number;
+    const localUrl = URL.createObjectURL(file);
+    try {
+      measuredSeconds = await probeMediaDuration(localUrl);
+    } catch {
+      toast.error(tx({
+        de: 'Die Länge des Referenzclips konnte nicht ermittelt werden. Bitte lade das Video erneut hoch oder verwende eine andere kompatible Videodatei.',
+        en: 'The length of the reference clip could not be determined. Please upload the video again or use another compatible video file.',
+        es: 'No se pudo determinar la duración del clip de referencia. Vuelve a subir el video o usa otro archivo de video compatible.',
+      }));
+      URL.revokeObjectURL(localUrl);
+      setUploadingVideo(false);
+      return;
+    }
+    URL.revokeObjectURL(localUrl);
     try {
       const ext = file.name.split('.').pop() ?? 'mp4';
       const path = `${user.id}/toolkit-v2v-${Date.now()}.${ext}`;
@@ -875,6 +900,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       const { data: { publicUrl } } = supabase.storage
         .from('ai-video-reference')
         .getPublicUrl(path);
+      measuredRefUrl.current = publicUrl;
+      setReferenceVideoSeconds(measuredSeconds);
       setReferenceVideoUrl(publicUrl);
     } catch (err: any) {
       toast.error(err?.message ?? tx({ de: tx({ de: "Upload fehlgeschlagen", en: "Upload failed", es: "Error al subir" }), en: 'Upload failed', es: 'Error al subir' }));
@@ -891,6 +918,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     }
     if (!prompt.trim()) {
       toast.error(language === 'de' ? tx({ de: 'Bitte gib einen Prompt ein.', en: 'Please enter a prompt.', es: 'Por favor, introduce un prompt.' }) : 'Please enter a prompt.');
+      return;
+    }
+    // Fail closed: no job starts before the billable duration is known.
+    if (referenceDurationUnknown) {
+      toast.error(tx({
+        de: 'Die Länge des Referenzclips konnte nicht ermittelt werden. Bitte lade das Video erneut hoch oder verwende eine andere kompatible Videodatei.',
+        en: 'The length of the reference clip could not be determined. Please upload the video again or use another compatible video file.',
+        es: 'No se pudo determinar la duración del clip de referencia. Vuelve a subir el video o usa otro archivo de video compatible.',
+      }));
       return;
     }
     if (!canAfford) {
@@ -1562,11 +1598,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             {priceUnverified ? '—' : `${symbol}${cost.toFixed(2)}`}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            {priceUnverified
+            {priceUnverified || referenceDurationUnknown
               ? tx({ de: 'Aktueller Tarif wird geladen…', en: 'Loading current rate…', es: 'Cargando la tarifa actual…' })
               : `${billableSeconds}s × ${symbol}${pricePerSecond.toFixed(2)}/s · ${model.name}`}
           </p>
-          {!priceUnverified && referenceSeconds > 0 && (
+          {!priceUnverified && !referenceDurationUnknown && referenceSeconds > 0 && (
             <p className="text-[11px] text-amber-500/90">
               {tx({
                 de: `Enthält ${billedSeconds}s Video + ${referenceSeconds}s Referenzclip (wird mitberechnet)`,
@@ -1575,12 +1611,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               })}
             </p>
           )}
-          {!priceUnverified && billsReferenceSeconds(billingPricingId) && referenceVideoUrl && referenceVideoSeconds == null && (
+          {referenceDurationUnknown && (
             <p className="text-[11px] text-amber-500/90">
               {tx({
-                de: 'Länge des Referenzclips noch unbekannt — es werden vorsorglich 30 s berechnet.',
-                en: 'Reference clip length not read yet — 30 s are charged as a precaution.',
-                es: 'Aún no se conoce la duración del clip de referencia: se cobran 30 s por precaución.',
+                de: 'Die Länge des Referenzclips konnte nicht ermittelt werden. Bitte lade das Video erneut hoch oder verwende eine andere kompatible Videodatei.',
+                en: 'The length of the reference clip could not be determined. Please upload the video again or use another compatible video file.',
+                es: 'No se pudo determinar la duración del clip de referencia. Vuelve a subir el video o usa otro archivo de video compatible.',
               })}
             </p>
           )}
@@ -1588,7 +1624,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         <Button
           size="lg"
           onClick={handleGenerate}
-          disabled={generating || !prompt.trim() || !canAfford || priceUnverified || !!blockingIssue}
+          disabled={generating || !prompt.trim() || !canAfford || priceUnverified || referenceDurationUnknown || !!blockingIssue}
           className="min-w-[200px] bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {composingScene ? (
