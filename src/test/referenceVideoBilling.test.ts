@@ -3,7 +3,7 @@ import {
   billsReferenceSeconds,
   referenceBillableSeconds,
   computeBillableSeconds,
-  UNKNOWN_REFERENCE_SECONDS,
+  MAX_REFERENCE_SECONDS,
 } from '@/lib/cost/referenceVideoBilling';
 
 const SEEDANCE = 'seedance-2-5';
@@ -28,20 +28,20 @@ describe('reference-video billing (v518)', () => {
     expect(referenceBillableSeconds(SEEDANCE, 1, [8.042])).toBe(9);
   });
 
-  it('falls back to the maximum length when the duration is unknown', () => {
-    expect(referenceBillableSeconds(SEEDANCE, 1, [null])).toBe(UNKNOWN_REFERENCE_SECONDS);
-    expect(referenceBillableSeconds(SEEDANCE, 1, undefined)).toBe(UNKNOWN_REFERENCE_SECONDS);
-    expect(referenceBillableSeconds(SEEDANCE, 1, [0])).toBe(UNKNOWN_REFERENCE_SECONDS);
+  it('fails closed when a duration cannot be measured — never estimates', () => {
+    expect(referenceBillableSeconds(SEEDANCE, 1, [null])).toBeNull();
+    expect(referenceBillableSeconds(SEEDANCE, 1, undefined)).toBeNull();
+    expect(referenceBillableSeconds(SEEDANCE, 1, [0])).toBeNull();
+    expect(referenceBillableSeconds(SEEDANCE, 2, [4])).toBeNull();
+    expect(computeBillableSeconds(SEEDANCE, 8, 1, [null])).toBeNull();
   });
 
-  it('caps a single clip at 30 s', () => {
-    expect(referenceBillableSeconds(SEEDANCE, 1, [120])).toBe(30);
+  it('caps a single measured clip at the model maximum', () => {
+    expect(referenceBillableSeconds(SEEDANCE, 1, [120])).toBe(MAX_REFERENCE_SECONDS);
   });
 
   it('matches the documented examples', () => {
-    // 8 s output + 8 s reference = 16 billable seconds
     expect(computeBillableSeconds(SEEDANCE, 8, 1, [8])).toBe(16);
-    // 8 s output + 2 s reference = 10 billable seconds
     expect(computeBillableSeconds(SEEDANCE, 8, 1, [2])).toBe(10);
     expect(computeBillableSeconds(SEEDANCE, 5, 1, [4])).toBe(9);
     expect(computeBillableSeconds(SEEDANCE, 10, 1, [4])).toBe(14);
