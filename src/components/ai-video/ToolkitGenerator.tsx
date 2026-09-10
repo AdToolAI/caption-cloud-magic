@@ -1566,11 +1566,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             {priceUnverified ? '—' : `${symbol}${cost.toFixed(2)}`}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            {priceUnverified
+            {priceUnverified || referenceDurationUnknown
               ? tx({ de: 'Aktueller Tarif wird geladen…', en: 'Loading current rate…', es: 'Cargando la tarifa actual…' })
               : `${billableSeconds}s × ${symbol}${pricePerSecond.toFixed(2)}/s · ${model.name}`}
           </p>
-          {!priceUnverified && referenceSeconds > 0 && (
+          {!priceUnverified && !referenceDurationUnknown && referenceSeconds > 0 && (
             <p className="text-[11px] text-amber-500/90">
               {tx({
                 de: `Enthält ${billedSeconds}s Video + ${referenceSeconds}s Referenzclip (wird mitberechnet)`,
@@ -1579,12 +1579,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               })}
             </p>
           )}
-          {!priceUnverified && billsReferenceSeconds(billingPricingId) && referenceVideoUrl && referenceVideoSeconds == null && (
+          {referenceDurationUnknown && (
             <p className="text-[11px] text-amber-500/90">
               {tx({
-                de: 'Länge des Referenzclips noch unbekannt — es werden vorsorglich 30 s berechnet.',
-                en: 'Reference clip length not read yet — 30 s are charged as a precaution.',
-                es: 'Aún no se conoce la duración del clip de referencia: se cobran 30 s por precaución.',
+                de: 'Die Länge des Referenzclips konnte nicht ermittelt werden. Bitte lade das Video erneut hoch oder verwende eine andere kompatible Videodatei.',
+                en: 'The length of the reference clip could not be determined. Please upload the video again or use another compatible video file.',
+                es: 'No se pudo determinar la duración del clip de referencia. Vuelve a subir el video o usa otro archivo de video compatible.',
               })}
             </p>
           )}
@@ -1592,7 +1592,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         <Button
           size="lg"
           onClick={handleGenerate}
-          disabled={generating || !prompt.trim() || !canAfford || priceUnverified || !!blockingIssue}
+          disabled={generating || !prompt.trim() || !canAfford || priceUnverified || referenceDurationUnknown || !!blockingIssue}
           className="min-w-[200px] bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {composingScene ? (
