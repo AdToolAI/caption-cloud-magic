@@ -317,6 +317,18 @@ Deno.serve(async (req) => {
       refVideos.length,
       referenceVideoDurations,
     );
+    // Fail closed exactly like an unreadable wallet currency: we never estimate
+    // reference length, and no job starts before the billable duration is known.
+    if (referenceSeconds === null) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "The length of the reference clip could not be determined. Please upload the reference video again or use another compatible video file.",
+          code: "REFERENCE_DURATION_UNKNOWN",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
     const billableSeconds = billedDuration + referenceSeconds;
     const totalCost = +(billableSeconds * costPerSecond).toFixed(4);
 
