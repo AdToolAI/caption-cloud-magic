@@ -295,13 +295,8 @@ Deno.serve(async (req) => {
 
 
 
-    const { data: walletPreview } = await supabaseClient
-      .from("ai_video_wallets")
-      .select("currency")
-      .eq("user_id", user.id)
-      .single();
-
-    const currency = (walletPreview?.currency || "EUR") as "EUR" | "USD";
+    const currency = await resolveWalletCurrency(supabaseAdmin, user.id);
+    if (currency === null) return pricingUnavailableResponse(corsHeaders);
     // Billing identity comes from the canonical registry (tier-scoped pricing
     // id), never from a hand-written string here — the UI preview resolves the
     // identical id, so display and deduction cannot diverge.
@@ -312,7 +307,16 @@ Deno.serve(async (req) => {
       supabaseAdmin, user.id, pricingModelId, currency,
     );
     if (costPerSecond === null) return pricingUnavailableResponse(corsHeaders);
-    const totalCost = +(billedDuration * costPerSecond).toFixed(4);
+    // Reference clips are billed like extra output seconds (BytePlus bills the
+    // material the model reads — verified 10.09.2026). The UI shows the same
+    // split before generation.
+    const referenceSeconds = referenceBillableSeconds(
+      pricingModelId,
+      refVideos.length,
+      referenceVideoDurations,
+    );
+    const billableSeconds = billedDuration + referenceSeconds;
+    const totalCost = +(billableSeconds * costPerSecond).toFixed(4);
 
     const { data: wallet, error: walletError } = await supabaseAdmin
       .from("ai_video_wallets")
