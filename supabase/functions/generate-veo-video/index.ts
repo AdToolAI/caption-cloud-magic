@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
-import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse, resolveWalletCurrency } from "../_shared/accountVideoPricing.ts";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 
@@ -149,13 +149,8 @@ serve(async (req) => {
     console.log(`[generate-veo-video] Mode: ${mode}, Duration: ${duration}s, Audio: ${generateAudio}`);
 
     // Wallet currency
-    const { data: walletPreview } = await supabaseAdmin
-      .from('ai_video_wallets')
-      .select('currency')
-      .eq('user_id', user.id)
-      .single();
-
-    const currency = walletPreview?.currency || 'EUR';
+    const currency = await resolveWalletCurrency(supabaseAdmin, user.id);
+    if (currency === null) return pricingUnavailableResponse(corsHeaders);
 
     // Cost
     // Canonical price from the shared catalog (same source as the UI preview,

@@ -5,7 +5,7 @@ import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
-import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse, resolveWalletCurrency } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -97,13 +97,8 @@ serve(async (req) => {
     console.log(`[generate-luma-video] Mode: ${mode}, Duration: ${duration}s, Resolution: ${resolution}`);
 
     // Get wallet currency
-    const { data: walletPreview } = await supabaseClient
-      .from('ai_video_wallets')
-      .select('currency')
-      .eq('user_id', user.id)
-      .single();
-
-    const currency = walletPreview?.currency || 'EUR';
+    const currency = await resolveWalletCurrency(supabaseAdmin, user.id);
+    if (currency === null) return pricingUnavailableResponse(corsHeaders);
 
     // Calculate cost
     // Canonical price from the shared catalog (same source as the UI preview,

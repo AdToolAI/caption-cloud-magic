@@ -20,7 +20,7 @@ const corsHeaders = {
 // Seedance 2.0 pricing is now sourced from the canonical catalog so the UI
 // preview and the deducted amount can never diverge again.
 import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
-import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse, resolveWalletCurrency } from "../_shared/accountVideoPricing.ts";
 
 // Replicate model slug per tier
 // Verified against https://replicate.com/bytedance (2026-07-21).
@@ -132,13 +132,8 @@ serve(async (req) => {
     console.log(`[generate-seedance-video] Mode: ${mode}`);
 
     // Get wallet currency
-    const { data: walletPreview } = await supabaseClient
-      .from('ai_video_wallets')
-      .select('currency')
-      .eq('user_id', user.id)
-      .single();
-
-    const currency = (walletPreview?.currency || 'EUR') as 'EUR' | 'USD';
+    const currency = await resolveWalletCurrency(supabaseAdmin, user.id);
+    if (currency === null) return pricingUnavailableResponse(corsHeaders);
 
     // Calculate cost from the canonical shared catalog (single source of truth
     // shared with the frontend via /functions/v1/pricing-catalog).

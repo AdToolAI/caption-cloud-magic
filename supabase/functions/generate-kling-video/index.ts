@@ -6,7 +6,7 @@ import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-m
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond, VIDEO_PRICING_CATALOG } from "../_shared/videoPricingCatalog.ts";
-import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse, resolveWalletCurrency } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -153,13 +153,8 @@ serve(async (req) => {
     console.log(`[generate-kling-video] Mode: ${mode}`);
 
     // Get wallet currency
-    const { data: walletPreview } = await supabaseClient
-      .from('ai_video_wallets')
-      .select('currency')
-      .eq('user_id', user.id)
-      .single();
-
-    const currency = walletPreview?.currency || 'EUR';
+    const currency = await resolveWalletCurrency(supabaseAdmin, user.id);
+    if (currency === null) return pricingUnavailableResponse(corsHeaders);
 
     // Canonical price from shared pricing catalog — single source of truth.
     const costPerSecond = await resolveAccountCostPerSecond(
