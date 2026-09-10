@@ -83,7 +83,10 @@ serve(async (req) => {
     if (engines.length > 6) throw new Error("max 6 engines");
 
     // Get wallet currency
-    const { data: wallet } = await supabaseClient
+    // Service-role read: the wallet table only exposes a user's own row, and
+    // the anon client here carries no login — it always came back empty and
+    // silently fell through to EUR.
+    const { data: wallet } = await supabaseAdmin
       .from('ai_video_wallets')
       .select('currency, balance_euros')
       .eq('user_id', user.id)

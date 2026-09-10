@@ -4,7 +4,8 @@ import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.t
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
 import { resolvePricingId } from "../_shared/videoModelSpecs.ts";
-import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse, resolveWalletCurrency } from "../_shared/accountVideoPricing.ts";
+import { referenceBillableSeconds } from "../_shared/referenceVideoBilling.ts";
 import {
   createSeedance25Task,
   getModelArkTask,
@@ -66,6 +67,13 @@ interface GenerateRequest {
   referenceVideoUrls?: string[];
   /** Single reference clip sent by the shared v2v UI. */
   referenceVideoUrl?: string;
+  /**
+   * Measured length in seconds of each reference clip, in the same order as
+   * `referenceVideoUrls` (then `referenceVideoUrl`). Used for billing — the
+   * provider charges reference seconds like output seconds. Missing or
+   * implausible values fall back to the model maximum, never to zero.
+   */
+  referenceVideoDurations?: (number | null)[];
   /** Reference audio clips (role `reference_audio`, max 10). */
   referenceAudioUrls?: string[];
   /** Native audio generation (`generate_audio`). */
@@ -118,6 +126,7 @@ Deno.serve(async (req) => {
       referenceHashes,
       referenceVideoUrls,
       referenceVideoUrl,
+      referenceVideoDurations,
       referenceAudioUrls,
       generateAudio = false,
       suppressDialogue = false,
@@ -288,13 +297,8 @@ Deno.serve(async (req) => {
 
 
 
-    const { data: walletPreview } = await supabaseClient
-      .from("ai_video_wallets")
-      .select("currency")
-      .eq("user_id", user.id)
-      .single();
-
-    const currency = (walletPreview?.currency || "EUR") as "EUR" | "USD";
+    const currency = await resolveWalletCurrency(supabaseAdmin, user.id);
+    if (currency === null) return pricingUnavailableResponse(corsHeaders);
     // Billing identity comes from the canonical registry (tier-scoped pricing
     // id), never from a hand-written string here — the UI preview resolves the
     // identical id, so display and deduction cannot diverge.
@@ -305,7 +309,16 @@ Deno.serve(async (req) => {
       supabaseAdmin, user.id, pricingModelId, currency,
     );
     if (costPerSecond === null) return pricingUnavailableResponse(corsHeaders);
-    const totalCost = +(billedDuration * costPerSecond).toFixed(4);
+    // Reference clips are billed like extra output seconds (BytePlus bills the
+    // material the model reads — verified 10.09.2026). The UI shows the same
+    // split before generation.
+    const referenceSeconds = referenceBillableSeconds(
+      pricingModelId,
+      refVideos.length,
+      referenceVideoDurations,
+    );
+    const billableSeconds = billedDuration + referenceSeconds;
+    const totalCost = +(billableSeconds * costPerSecond).toFixed(4);
 
     const { data: wallet, error: walletError } = await supabaseAdmin
       .from("ai_video_wallets")
@@ -404,7 +417,11 @@ Deno.serve(async (req) => {
      */
     const settleSmartDuration = async (actualSeconds?: number) => {
       if (!smartDuration || !actualSeconds || actualSeconds >= billedDuration) return;
-      const actualCost = +(Math.max(MIN_DURATION, actualSeconds) * costPerSecond).toFixed(4);
+      // Only the OUTPUT seconds shrink — the reference seconds were really read
+      // by the provider and stay billed.
+      const actualCost = +(
+        (Math.max(MIN_DURATION, actualSeconds) + referenceSeconds) * costPerSecond
+      ).toFixed(4);
       const delta = +(totalCost - actualCost).toFixed(4);
       if (delta <= 0.001) return;
       const { error: refundError } = await supabaseAdmin.rpc("refund_ai_video_credits", {

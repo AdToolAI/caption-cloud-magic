@@ -6,7 +6,7 @@ import { isQaMockRequest, qaMockJson } from "../_shared/qaMock.ts";
 import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.ts";
 import { withTimeout, isTimeoutError } from "../_shared/timeout.ts";
 import { tl, withLang } from "../_shared/i18n.ts";
-import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse, resolveWalletCurrency } from "../_shared/accountVideoPricing.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -85,13 +85,8 @@ serve((req: Request) => withLang(req, () => (async (req) => {
     }
 
     // Get wallet currency (moved here before cost calculation)
-    const { data: walletPreview, error: walletPreviewError } = await supabaseClient
-      .from('ai_video_wallets')
-      .select('currency')
-      .eq('user_id', user.id)
-      .single();
-
-    const currency = walletPreview?.currency || 'EUR';
+    const currency = await resolveWalletCurrency(supabaseAdmin, user.id);
+    if (currency === null) return pricingUnavailableResponse(corsHeaders);
 
     // Calculate cost based on model and currency
     // Canonical price from the shared catalog (same source as the UI preview,

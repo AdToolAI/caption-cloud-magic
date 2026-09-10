@@ -69,3 +69,24 @@ export function pricingUnavailableResponse(
   );
 }
 
+
+/**
+ * Wallet currency for the account — the currency the deduction actually runs
+ * in. MUST be read with the service-role client: the wallet table only lets a
+ * user read their own row, and an anon client without the caller's login gets
+ * an empty result. The old `|| "EUR"` fallback turned that failed read into a
+ * silent EUR charge on USD wallets (~13% under-billing), so there is no
+ * fallback here — `null` means fail closed.
+ */
+export async function resolveWalletCurrency(
+  supabaseAdmin: { from: (t: string) => any },
+  userId: string,
+): Promise<"EUR" | "USD" | null> {
+  const { data, error } = await supabaseAdmin
+    .from("ai_video_wallets")
+    .select("currency")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error || !data?.currency) return null;
+  return data.currency === "USD" ? "USD" : "EUR";
+}

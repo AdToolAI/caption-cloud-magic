@@ -44,6 +44,7 @@ import {
 } from '@/lib/videoCapabilities/studioCapabilities';
 import { resolvePricingId } from '@/config/videoModelSpecs';
 import { VIDEO_PRICING_CATALOG } from '@/lib/cost/videoPricingCatalog';
+import { billsReferenceSeconds, referenceBillableSeconds } from '@/lib/cost/referenceVideoBilling';
 
 import { GenerateSection } from './generate/GenerateSection';
 import { QuickSettingsBar } from './generate/QuickSettingsBar';
@@ -250,6 +251,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     targetModelName: string;
   } | null>(null);
   const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
+  /** Measured length of the reference clip — it is billed like extra seconds. */
+  const [referenceVideoSeconds, setReferenceVideoSeconds] = useState<number | null>(null);
+  // Any new (or removed) clip invalidates the measured length until the
+  // preview reports the real duration again.
+  useEffect(() => { setReferenceVideoSeconds(null); }, [referenceVideoUrl]);
   const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
   // Reference slots survive a reload: same order, same roles → identical
   // provider binding after resume (see referenceBinding.ts).
@@ -799,9 +805,17 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const billedSeconds = duration === -1
     ? Math.max(...model.durations)
     : duration;
+  // A reference clip is billed like extra video seconds on the engines whose
+  // provider charges for the material it reads (Seedance 2.5 / ModelArk).
+  const referenceSeconds = referenceBillableSeconds(
+    billingPricingId,
+    referenceVideoUrl ? 1 : 0,
+    [referenceVideoSeconds],
+  );
+  const billableSeconds = billedSeconds + referenceSeconds;
   // Total is rounded exactly like the backend deduction chain.
-  const cost = getTotalCost(billingPricingId, billingCurrency, billedSeconds)
-    ?? billedSeconds * pricePerSecond;
+  const cost = getTotalCost(billingPricingId, billingCurrency, billableSeconds)
+    ?? billableSeconds * pricePerSecond;
 
 
   const symbol = billingCurrency === 'USD' ? '$' : '€';
@@ -1140,6 +1154,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       if (model.capabilities.v2v && referenceVideoUrl) {
         body.referenceVideoUrl = referenceVideoUrl;
         body.videoReferenceType = videoReferenceType;
+        // Length of the clip — billed like extra seconds on engines that
+        // charge for the material the model reads.
+        if (referenceVideoSeconds != null) {
+          body.referenceVideoDurations = [referenceVideoSeconds];
+        }
       }
       // multi-ref: reference images with roles.
       //  - Vidu Reference2V: at least 1 image is mandatory, field `referenceImages`.
@@ -1545,8 +1564,26 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           <p className="text-[11px] text-muted-foreground">
             {priceUnverified
               ? tx({ de: 'Aktueller Tarif wird geladen…', en: 'Loading current rate…', es: 'Cargando la tarifa actual…' })
-              : `${duration}s × ${symbol}${pricePerSecond.toFixed(2)}/s · ${model.name}`}
+              : `${billableSeconds}s × ${symbol}${pricePerSecond.toFixed(2)}/s · ${model.name}`}
           </p>
+          {!priceUnverified && referenceSeconds > 0 && (
+            <p className="text-[11px] text-amber-500/90">
+              {tx({
+                de: `Enthält ${billedSeconds}s Video + ${referenceSeconds}s Referenzclip (wird mitberechnet)`,
+                en: `Includes ${billedSeconds}s video + ${referenceSeconds}s reference clip (charged too)`,
+                es: `Incluye ${billedSeconds}s de video + ${referenceSeconds}s de clip de referencia (también se cobra)`,
+              })}
+            </p>
+          )}
+          {!priceUnverified && billsReferenceSeconds(billingPricingId) && referenceVideoUrl && referenceVideoSeconds == null && (
+            <p className="text-[11px] text-amber-500/90">
+              {tx({
+                de: 'Länge des Referenzclips noch unbekannt — es werden vorsorglich 30 s berechnet.',
+                en: 'Reference clip length not read yet — 30 s are charged as a precaution.',
+                es: 'Aún no se conoce la duración del clip de referencia: se cobran 30 s por precaución.',
+              })}
+            </p>
+          )}
         </div>
         <Button
           size="lg"
@@ -1837,6 +1874,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
                 controls
                 muted
                 playsInline
+                onLoadedMetadata={(e) => {
+                  const d = e.currentTarget.duration;
+                  setReferenceVideoSeconds(Number.isFinite(d) && d > 0 ? d : null);
+                }}
                 className="w-full max-h-56 object-cover bg-black"
               />
             </div>
@@ -2330,9 +2371,18 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           lines: [
             {
               label: language === 'de' ? 'Länge × Preis / Sekunde' : 'Duration × price/second',
-              value: `${duration}s × ${symbol}${pricePerSecond.toFixed(2)}`,
+              value: `${billedSeconds}s × ${symbol}${pricePerSecond.toFixed(2)}`,
               detail: `${aspectRatio} · ${model.name}`,
             },
+            ...(referenceSeconds > 0 ? [{
+              label: tx({ de: 'Referenzclip × Preis / Sekunde', en: 'Reference clip × price/second', es: 'Clip de referencia × precio/segundo' }),
+              value: `${referenceSeconds}s × ${symbol}${pricePerSecond.toFixed(2)}`,
+              detail: tx({
+                de: 'Der Anbieter berechnet auch das Material, das das Modell liest.',
+                en: 'The provider also charges for the material the model reads.',
+                es: 'El proveedor también cobra el material que lee el modelo.',
+              }),
+            }] : []),
           ],
           totalLabel: language === 'de' ? 'Gesamtkosten' : 'Total',
           totalValue: `${symbol}${cost.toFixed(2)}`,
