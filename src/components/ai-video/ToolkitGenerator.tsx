@@ -807,11 +807,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     : duration;
   // A reference clip is billed like extra video seconds on the engines whose
   // provider charges for the material it reads (Seedance 2.5 / ModelArk).
-  const referenceSeconds = referenceBillableSeconds(
+  const referenceSecondsOrNull = referenceBillableSeconds(
     billingPricingId,
     referenceVideoUrl ? 1 : 0,
     [referenceVideoSeconds],
   );
+  // Fail-closed: an unmeasurable clip has no price — the start is blocked
+  // instead of charging an estimate.
+  const referenceDurationUnknown = referenceSecondsOrNull === null;
+  const referenceSeconds = referenceSecondsOrNull ?? 0;
   const billableSeconds = billedSeconds + referenceSeconds;
   // Total is rounded exactly like the backend deduction chain.
   const cost = getTotalCost(billingPricingId, billingCurrency, billableSeconds)
