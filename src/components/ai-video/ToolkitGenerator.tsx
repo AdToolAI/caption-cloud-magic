@@ -2371,9 +2371,18 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           lines: [
             {
               label: language === 'de' ? 'Länge × Preis / Sekunde' : 'Duration × price/second',
-              value: `${duration}s × ${symbol}${pricePerSecond.toFixed(2)}`,
+              value: `${billedSeconds}s × ${symbol}${pricePerSecond.toFixed(2)}`,
               detail: `${aspectRatio} · ${model.name}`,
             },
+            ...(referenceSeconds > 0 ? [{
+              label: tx({ de: 'Referenzclip × Preis / Sekunde', en: 'Reference clip × price/second', es: 'Clip de referencia × precio/segundo' }),
+              value: `${referenceSeconds}s × ${symbol}${pricePerSecond.toFixed(2)}`,
+              detail: tx({
+                de: 'Der Anbieter berechnet auch das Material, das das Modell liest.',
+                en: 'The provider also charges for the material the model reads.',
+                es: 'El proveedor también cobra el material que lee el modelo.',
+              }),
+            }] : []),
           ],
           totalLabel: language === 'de' ? 'Gesamtkosten' : 'Total',
           totalValue: `${symbol}${cost.toFixed(2)}`,
