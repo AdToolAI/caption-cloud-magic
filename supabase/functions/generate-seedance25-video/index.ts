@@ -4,7 +4,8 @@ import { gateVideoCapability, inferMode } from "../_shared/videoCapabilityGate.t
 import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 import { resolveCostPerSecond } from "../_shared/videoPricingCatalog.ts";
 import { resolvePricingId } from "../_shared/videoModelSpecs.ts";
-import { resolveAccountCostPerSecond, pricingUnavailableResponse } from "../_shared/accountVideoPricing.ts";
+import { resolveAccountCostPerSecond, pricingUnavailableResponse, resolveWalletCurrency } from "../_shared/accountVideoPricing.ts";
+import { referenceBillableSeconds } from "../_shared/referenceVideoBilling.ts";
 import {
   createSeedance25Task,
   getModelArkTask,
@@ -416,7 +417,11 @@ Deno.serve(async (req) => {
      */
     const settleSmartDuration = async (actualSeconds?: number) => {
       if (!smartDuration || !actualSeconds || actualSeconds >= billedDuration) return;
-      const actualCost = +(Math.max(MIN_DURATION, actualSeconds) * costPerSecond).toFixed(4);
+      // Only the OUTPUT seconds shrink — the reference seconds were really read
+      // by the provider and stay billed.
+      const actualCost = +(
+        (Math.max(MIN_DURATION, actualSeconds) + referenceSeconds) * costPerSecond
+      ).toFixed(4);
       const delta = +(totalCost - actualCost).toFixed(4);
       if (delta <= 0.001) return;
       const { error: refundError } = await supabaseAdmin.rpc("refund_ai_video_credits", {
