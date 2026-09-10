@@ -897,6 +897,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       toast.error(language === 'de' ? tx({ de: 'Bitte gib einen Prompt ein.', en: 'Please enter a prompt.', es: 'Por favor, introduce un prompt.' }) : 'Please enter a prompt.');
       return;
     }
+    // Fail closed: no job starts before the billable duration is known.
+    if (referenceDurationUnknown) {
+      toast.error(tx({
+        de: 'Die Länge des Referenzclips konnte nicht ermittelt werden. Bitte lade das Video erneut hoch oder verwende eine andere kompatible Videodatei.',
+        en: 'The length of the reference clip could not be determined. Please upload the video again or use another compatible video file.',
+        es: 'No se pudo determinar la duración del clip de referencia. Vuelve a subir el video o usa otro archivo de video compatible.',
+      }));
+      return;
+    }
     if (!canAfford) {
       toast.error(
         language === 'de'
