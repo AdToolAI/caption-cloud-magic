@@ -66,6 +66,13 @@ interface GenerateRequest {
   referenceVideoUrls?: string[];
   /** Single reference clip sent by the shared v2v UI. */
   referenceVideoUrl?: string;
+  /**
+   * Measured length in seconds of each reference clip, in the same order as
+   * `referenceVideoUrls` (then `referenceVideoUrl`). Used for billing — the
+   * provider charges reference seconds like output seconds. Missing or
+   * implausible values fall back to the model maximum, never to zero.
+   */
+  referenceVideoDurations?: (number | null)[];
   /** Reference audio clips (role `reference_audio`, max 10). */
   referenceAudioUrls?: string[];
   /** Native audio generation (`generate_audio`). */
