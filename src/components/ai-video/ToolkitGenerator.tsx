@@ -44,6 +44,7 @@ import {
 } from '@/lib/videoCapabilities/studioCapabilities';
 import { resolvePricingId } from '@/config/videoModelSpecs';
 import { VIDEO_PRICING_CATALOG } from '@/lib/cost/videoPricingCatalog';
+import { billsReferenceSeconds, referenceBillableSeconds } from '@/lib/cost/referenceVideoBilling';
 
 import { GenerateSection } from './generate/GenerateSection';
 import { QuickSettingsBar } from './generate/QuickSettingsBar';
@@ -250,6 +251,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     targetModelName: string;
   } | null>(null);
   const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
+  /** Measured length of the reference clip — it is billed like extra seconds. */
+  const [referenceVideoSeconds, setReferenceVideoSeconds] = useState<number | null>(null);
   const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
   // Reference slots survive a reload: same order, same roles → identical
   // provider binding after resume (see referenceBinding.ts).
