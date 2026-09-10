@@ -85,3 +85,15 @@ reference clip of ≤ 0.2 × output length — practically nothing.
   settlement; the provider-reported `completion_tokens` above is the same quantity the invoice bills.
 - Currency defect observed, not changed: the wallet is USD, but the charge used the EUR rate
   (€0.3333 → $0.33/s) instead of the derived USD rate ($0.3833/s). Worth a separate look.
+
+## 7. v519 amendment (10.09.2026)
+
+- **No estimated reference duration.** If the clip length cannot be measured, the
+  request stops before any wallet deduction (`REFERENCE_DURATION_UNKNOWN`, 400) and the
+  user is asked to re-upload or use another file. Same fail-closed rule as unknown wallet
+  currency. The former 30 s fallback is removed; 30 s remains only as a clamp for
+  *measured* lengths (model input maximum).
+- **480p reference formula: UNVERIFIED.** `seedance-2-5-480p` assumes reference+output
+  billing by analogy only; it stays flagged until a controlled 480p test is run.
+- **Open:** BytePlus invoice line for `cgt-20260910081232-ckdrt` still unsettled;
+  predicted $3.7075 (346,500 tokens x $0.0107/K) to be reconciled once it appears.
