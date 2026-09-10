@@ -253,9 +253,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
   /** Measured length of the reference clip — it is billed like extra seconds. */
   const [referenceVideoSeconds, setReferenceVideoSeconds] = useState<number | null>(null);
-  // Any new (or removed) clip invalidates the measured length until the
-  // preview reports the real duration again.
-  useEffect(() => { setReferenceVideoSeconds(null); }, [referenceVideoUrl]);
+  // Any clip we did not measure ourselves (restored snapshot, model switch,
+  // removal) invalidates the length — an unmeasured clip is never billed.
+  const measuredRefUrl = useRef<string | null>(null);
+  useEffect(() => {
+    if (measuredRefUrl.current !== referenceVideoUrl) setReferenceVideoSeconds(null);
+  }, [referenceVideoUrl]);
   const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
   // Reference slots survive a reload: same order, same roles → identical
   // provider binding after resume (see referenceBinding.ts).
@@ -869,6 +872,23 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       return;
     }
     setUploadingVideo(true);
+    // Measure the clip BEFORE uploading: its length is billed, so an
+    // unreadable file is rejected instead of being estimated.
+    let measuredSeconds: number;
+    const localUrl = URL.createObjectURL(file);
+    try {
+      measuredSeconds = await probeMediaDuration(localUrl);
+    } catch {
+      toast.error(tx({
+        de: 'Die Länge des Referenzclips konnte nicht ermittelt werden. Bitte lade das Video erneut hoch oder verwende eine andere kompatible Videodatei.',
+        en: 'The length of the reference clip could not be determined. Please upload the video again or use another compatible video file.',
+        es: 'No se pudo determinar la duración del clip de referencia. Vuelve a subir el video o usa otro archivo de video compatible.',
+      }));
+      URL.revokeObjectURL(localUrl);
+      setUploadingVideo(false);
+      return;
+    }
+    URL.revokeObjectURL(localUrl);
     try {
       const ext = file.name.split('.').pop() ?? 'mp4';
       const path = `${user.id}/toolkit-v2v-${Date.now()}.${ext}`;
