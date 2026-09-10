@@ -1,90 +1,122 @@
-# Brand Kit: manual override, website refresh, Motion Studio brand context
+# Two separate proposals: (A) Seedance video-reference pricing, (B) currency defect
 
-## 1. Manual edits always win
+Both are reported here first. Nothing is implemented, no retail price is changed, no paid job is run.
 
-Today the extraction result is sent along to the server a second time at save, and the server
-prefers it over the form for tone, mood, values, keywords and fonts. That is why a hand-edited
-tone can be silently replaced.
+---
 
-New rule, applied to every editable field:
+## A — Seedance 2.5 video-reference: pay for what the provider bills
+
+### What the paid test proved
+
+BytePlus bills Seedance 2.5 on tokens, and the token count follows
+**reference duration + output duration** at the ordinary resolution rate
+(measured 21.656 K tokens/s vs. the September-measured 21.66 K/s for normal 720p).
+Video input is therefore not a fixed 4.2x surcharge — it costs exactly as much as the
+extra seconds of material the model has to read.
+
+### Proposed billing rule
 
 ```text
-form value (what the user sees and edited)  ->  wins
-extracted value                             ->  only prefills the form
-AI / default                                ->  only when the form field is empty
+billable seconds = output seconds + reference video seconds (all references, summed)
+charge           = billable seconds x resolution retail rate x discount factor
 ```
 
-Changes:
-- Extraction applies once into the form (as now) and is marked as "applied". At save, only the
-  fields that have **no form counterpart** still travel with the extraction: full color palette,
-  fonts, emoji suggestions, extraction comment.
-- The Brand Kit function stops preferring the extraction for: brand name, description, primary
-  and secondary color, target audience, values, tone, mood/style direction, keywords. It uses the
-  submitted form value, then the AI suggestion, then the default.
-- Fields that are only extractable today (tone, style direction, keywords, values) get visible,
-  editable inputs in the create form, so a user can actually correct them before saving.
+Normal text-to-video and image-to-video stay exactly as today (reference seconds = 0).
+No change to any retail per-second rate; the only change is what counts as a billable second.
 
-## 2. Refresh an existing Brand Kit from the website
+Examples at the current 720p rate (EUR 0.3333/s), standard customer:
 
-New action on each kit in "Manage": **Re-analyze website**.
+| Reference | Output 5 s | Output 8 s | Output 10 s | Output 15 s |
+| --- | --- | --- | --- | --- |
+| none | 1.67 EUR | 2.67 EUR | 3.33 EUR | 5.00 EUR |
+| 2 s | 2.33 EUR | 3.33 EUR | 4.00 EUR | 5.67 EUR |
+| 4 s | 3.00 EUR | 4.00 EUR | 4.67 EUR | 6.33 EUR |
+| 8 s | 4.33 EUR | 5.33 EUR | 6.00 EUR | 7.67 EUR |
 
-Flow: pick kit -> enter/confirm URL -> extract -> comparison dialog -> user picks per field ->
-update the same row.
+480p uses the 480p rate on the same formula.
 
-Comparison dialog lists, side by side, current vs. newly detected: brand name, description,
-primary/secondary color, palette, fonts, tone, mood/style, keywords, values. Each row has
-"Keep current" / "Use new", defaulting to keep. Only chosen fields are written.
+### What the customer sees before generating
 
-Persistence: a single `update` on the existing `brand_kits` row by id. No insert, no delete.
-`id`, `created_at`, `is_active`, share links, uploaded assets and every `brand_kit_id`
-reference from posts, projects, calendar, characters and locations therefore stay untouched.
-Nothing about the archive or active-kit logic changes.
+The price box gains a second, always-visible line whenever a reference clip is attached:
 
-## 3. Motion Studio brand context
+```text
+Video               8 s        2.67 EUR
+Reference clip      8 s        2.67 EUR
+------------------------------------------
+Total              16 s        5.33 EUR
+```
 
-A new helper builds a small, purposeful brand-context object and the AI Director sends it to
-`motion-studio-director` when brand use is switched on (toggle in the brief dialog, on by
-default when an active kit exists).
+Plus one sentence in EN/DE/ES: a reference clip is billed like extra video seconds, so a
+shorter reference clip is cheaper. No hidden surcharge, no rounding tricks.
 
-Sent to scene/script generation:
-brand name, style direction, tone, mood, target audience, keywords, brand values, and the
-primary/secondary/accent colors as soft visual guidance.
+### Discount and refunds
 
-Not sent: fonts, logo URL, hashtags, captions, emojis, full asset list.
+- The Founder / creator discount stays where it is today — applied exactly once inside the
+  deduction function on the final total. The formula only changes the second count fed into it.
+- Refunds keep using the same total that was charged, with the existing idempotent key, so a
+  rejected or failed provider job is still refunded in full including the reference seconds.
 
-Unchanged and still deterministic: colors, fonts, logo/watermark and overlays applied by the
-composer and templates.
+### Seamless transitions stay on the cheap path
 
-## 4. Palette and fonts usage
+Motion Studio / Composer keep the existing last-frame / image-based transition as the default.
+Video reference remains an explicitly chosen advanced option for cases that need the real
+temporal motion of the source clip, and it will then show its own price.
 
-- Fonts stay out of image and video prompts; they keep driving overlays, templates and UI.
-- Picture Studio, only when Brand Kit Lock is on, adds the palette as soft guidance:
-  "Preferred brand palette: #.., #.., #.. — use where naturally appropriate." No requirement
-  that every image contains every color.
-- Brandboard, Carousel and Motion Studio deterministic design keep using the palette as today.
+### Open items to settle before this goes live
 
-## 5. Confidence
+1. The BytePlus invoice line for task `cgt-20260910081232-ckdrt` has not settled yet.
+   I will re-read the billing export once it appears and confirm SKU, K-tokens and USD total
+   against the provider-reported 346,500 tokens.
+2. 480p has never run with a video reference, so the same formula is assumed, not measured.
+   Cheapest possible confirmation: one 480p job, 4 s reference + 4 s output, roughly
+   0.09 USD provider cost. I will ask for approval before running it.
 
-No change. No hardcoded confidence, no score shown.
+Margin note at the current rate: 720p video reference lands near break-even, worse for
+Founders. That is a retail-rate question and stays parked until the BytePlus volume-discount
+answer arrives, as instructed.
 
-## 6. Tests (no paid provider calls)
+---
 
-- Typecheck and build.
-- Update path: refresh an existing kit and assert the row id, created_at, active flag and all
-  referencing rows are unchanged, and that no second kit appears.
-- Precedence: edit tone/mood/keywords after applying extraction, save, reload, assert the edited
-  values persisted.
-- Create path still works with and without an extraction.
+## B — Currency defect: root cause found, nothing changed
 
-Afterwards I report results and propose the live end-to-end test separately, naming provider,
-model, exact number of paid generations and estimated cost, for your approval before running it.
+### What happened
 
-## Technical notes
+The paid test ran on a **USD** wallet but was charged **0.33 per second**, the EUR rate.
+The correct USD rate is 0.3833.
 
-- `src/pages/BrandKit.tsx`: form fields for tone/style/keywords/values, extraction payload
-  narrowed to non-form fields, refresh action and comparison dialog.
-- `supabase/functions/generate-brand-kit/index.ts`: form-first precedence, plus an optional
-  `brandKitId` + `applyFields` path that updates instead of inserts.
-- New `src/lib/brandContext.ts` (Motion Studio brand-context builder), used by
-  `AIDirectorBriefDialog.tsx`; `supabase/functions/motion-studio-director/index.ts` consumes it.
-- Picture Studio palette guidance in `supabase/functions/_shared/picturePromptBuilder.ts`.
+### Root cause
+
+Each generation function reads the wallet currency through a client that is created with the
+public key but **without passing the caller's login**. The wallet table only lets a user read
+their own row, so with no identity attached the read returns nothing — and the code then
+silently falls back to "EUR". The fallback hides the failure completely.
+
+This is not specific to Seedance. The same pattern exists in the Kling, Hailuo, Wan, Luma, LTX,
+Grok, Seedance 1/2 and generic video functions. Veo already reads it correctly.
+The price *display* endpoint reads the wallet correctly, so USD customers are shown the USD
+price and charged the EUR one.
+
+### Impact
+
+- USD wallets are charged about 13 % less than displayed. Never more — no customer was
+  overcharged, so there is nothing to reimburse.
+- 248 jobs on USD wallets in the last 90 days, 1,445.11 charged — roughly 190 of under-billing.
+- GBP: wallets only exist in EUR and USD, so there is no GBP charging path to fix; only Stripe
+  purchase prices are GBP-denominated.
+
+### Proposed fix (separate change, not mixed with A)
+
+1. Read the wallet currency with the trusted server key, as Veo already does.
+2. Remove the silent "EUR" fallback: if the wallet cannot be read, the request fails closed with
+   the existing "pricing unavailable" answer instead of guessing a currency.
+3. Apply this to every affected generation function in one pass, plus a regression test that a
+   USD wallet resolves the USD rate.
+4. No retroactive re-billing.
+
+### Technical notes
+
+- Formula and preview: `supabase/functions/generate-seedance25-video/index.ts`,
+  `_shared/videoPricingCatalog.ts` (billable-seconds helper), `useVideoPricingCatalog.ts`,
+  `ToolkitGenerator.tsx` price box, EN/DE/ES strings.
+- Currency: replace the anon-key wallet read in the `generate-*-video` functions with the
+  service-role read used by `generate-veo-video`, and drop the `|| 'EUR'` default.
