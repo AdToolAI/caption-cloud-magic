@@ -253,6 +253,9 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
   /** Measured length of the reference clip — it is billed like extra seconds. */
   const [referenceVideoSeconds, setReferenceVideoSeconds] = useState<number | null>(null);
+  // Any new (or removed) clip invalidates the measured length until the
+  // preview reports the real duration again.
+  useEffect(() => { setReferenceVideoSeconds(null); }, [referenceVideoUrl]);
   const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
   // Reference slots survive a reload: same order, same roles → identical
   // provider binding after resume (see referenceBinding.ts).
