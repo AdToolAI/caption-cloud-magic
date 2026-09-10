@@ -1564,8 +1564,26 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           <p className="text-[11px] text-muted-foreground">
             {priceUnverified
               ? tx({ de: 'Aktueller Tarif wird geladen…', en: 'Loading current rate…', es: 'Cargando la tarifa actual…' })
-              : `${duration}s × ${symbol}${pricePerSecond.toFixed(2)}/s · ${model.name}`}
+              : `${billableSeconds}s × ${symbol}${pricePerSecond.toFixed(2)}/s · ${model.name}`}
           </p>
+          {!priceUnverified && referenceSeconds > 0 && (
+            <p className="text-[11px] text-amber-500/90">
+              {tx({
+                de: `Enthält ${billedSeconds}s Video + ${referenceSeconds}s Referenzclip (wird mitberechnet)`,
+                en: `Includes ${billedSeconds}s video + ${referenceSeconds}s reference clip (charged too)`,
+                es: `Incluye ${billedSeconds}s de video + ${referenceSeconds}s de clip de referencia (también se cobra)`,
+              })}
+            </p>
+          )}
+          {!priceUnverified && billsReferenceSeconds(billingPricingId) && referenceVideoUrl && referenceVideoSeconds == null && (
+            <p className="text-[11px] text-amber-500/90">
+              {tx({
+                de: 'Länge des Referenzclips noch unbekannt — es werden vorsorglich 30 s berechnet.',
+                en: 'Reference clip length not read yet — 30 s are charged as a precaution.',
+                es: 'Aún no se conoce la duración del clip de referencia: se cobran 30 s por precaución.',
+              })}
+            </p>
+          )}
         </div>
         <Button
           size="lg"
