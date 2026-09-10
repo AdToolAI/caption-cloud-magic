@@ -125,6 +125,7 @@ Deno.serve(async (req) => {
       referenceHashes,
       referenceVideoUrls,
       referenceVideoUrl,
+      referenceVideoDurations,
       referenceAudioUrls,
       generateAudio = false,
       suppressDialogue = false,
