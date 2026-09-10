@@ -1,5 +1,6 @@
 import { tx } from "@/lib/i18nText";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { probeMediaDuration } from '@/lib/probeMp4Duration';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -899,6 +900,8 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       const { data: { publicUrl } } = supabase.storage
         .from('ai-video-reference')
         .getPublicUrl(path);
+      measuredRefUrl.current = publicUrl;
+      setReferenceVideoSeconds(measuredSeconds);
       setReferenceVideoUrl(publicUrl);
     } catch (err: any) {
       toast.error(err?.message ?? tx({ de: tx({ de: "Upload fehlgeschlagen", en: "Upload failed", es: "Error al subir" }), en: 'Upload failed', es: 'Error al subir' }));
