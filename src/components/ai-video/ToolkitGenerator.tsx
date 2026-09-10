@@ -802,9 +802,17 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const billedSeconds = duration === -1
     ? Math.max(...model.durations)
     : duration;
+  // A reference clip is billed like extra video seconds on the engines whose
+  // provider charges for the material it reads (Seedance 2.5 / ModelArk).
+  const referenceSeconds = referenceBillableSeconds(
+    billingPricingId,
+    referenceVideoUrl ? 1 : 0,
+    [referenceVideoSeconds],
+  );
+  const billableSeconds = billedSeconds + referenceSeconds;
   // Total is rounded exactly like the backend deduction chain.
-  const cost = getTotalCost(billingPricingId, billingCurrency, billedSeconds)
-    ?? billedSeconds * pricePerSecond;
+  const cost = getTotalCost(billingPricingId, billingCurrency, billableSeconds)
+    ?? billableSeconds * pricePerSecond;
 
 
   const symbol = billingCurrency === 'USD' ? '$' : '€';
