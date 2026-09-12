@@ -54,7 +54,7 @@ const Home = () => {
   const navigate = useNavigate();
   const { topInsight } = useNewsRadar();
   const sm = useStrategyMode();
-  const welcomeBonus = useWelcomeBonus();
+  
   const [todayPosts, setTodayPosts] = useState<Post[]>([]);
   const [weekDays, setWeekDays] = useState<{ date: string; name: string; day: number; isToday: boolean; posts: WeekPost[] }[]>([]);
   const [loading, setLoading] = useState(false);
