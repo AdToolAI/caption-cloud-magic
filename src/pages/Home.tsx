@@ -28,8 +28,6 @@ import { useNewsRadar } from "@/hooks/useNewsRadar";
 import { RecoCard } from "@/features/recommendations/RecoCard";
 import { usePostingTimes } from "@/hooks/usePostingTimes";
 import { transformPostingSlotsToHeatmap } from "@/lib/postingTimesTransform";
-import { WelcomeBonusModal } from "@/components/welcome/WelcomeBonusModal";
-import { useWelcomeBonus } from "@/hooks/useWelcomeBonus";
 import { type WeekPost } from "@/components/dashboard/WeekDayCard";
 import { WeekTimelineDay } from "@/components/dashboard/WeekTimelineDay";
 import { WeekPostEditor } from "@/components/dashboard/WeekPostEditor";
