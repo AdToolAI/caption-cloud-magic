@@ -22,6 +22,14 @@ serve(async (req) => {
   }
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "grant-welcome-bonus" });
 
+  if (!WELCOME_BONUS_ENABLED) {
+    return new Response(
+      JSON.stringify({ granted: false, reason: "disabled" }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+
 
   try {
     const supabase = createClient(
