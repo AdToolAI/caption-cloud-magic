@@ -9,6 +9,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
+// Welcome bonus disabled (12.09.2026): no starter credits for new users.
+const WELCOME_BONUS_ENABLED = false;
 const WELCOME_BONUS_AMOUNT_EUR = 10.00;
 const WELCOME_BONUS_AMOUNT_USD = 10.00;
 const MAX_ACCOUNT_AGE_DAYS = 7;
