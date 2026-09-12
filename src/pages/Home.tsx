@@ -28,8 +28,6 @@ import { useNewsRadar } from "@/hooks/useNewsRadar";
 import { RecoCard } from "@/features/recommendations/RecoCard";
 import { usePostingTimes } from "@/hooks/usePostingTimes";
 import { transformPostingSlotsToHeatmap } from "@/lib/postingTimesTransform";
-import { WelcomeBonusModal } from "@/components/welcome/WelcomeBonusModal";
-import { useWelcomeBonus } from "@/hooks/useWelcomeBonus";
 import { type WeekPost } from "@/components/dashboard/WeekDayCard";
 import { WeekTimelineDay } from "@/components/dashboard/WeekTimelineDay";
 import { WeekPostEditor } from "@/components/dashboard/WeekPostEditor";
@@ -56,7 +54,7 @@ const Home = () => {
   const navigate = useNavigate();
   const { topInsight } = useNewsRadar();
   const sm = useStrategyMode();
-  const welcomeBonus = useWelcomeBonus();
+  
   const [todayPosts, setTodayPosts] = useState<Post[]>([]);
   const [weekDays, setWeekDays] = useState<{ date: string; name: string; day: number; isToday: boolean; posts: WeekPost[] }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -514,14 +512,6 @@ const Home = () => {
 
   return (
     <div className="bg-background">
-      {welcomeBonus.shouldShow && welcomeBonus.bonusAmount && welcomeBonus.bonusCurrency && (
-        <WelcomeBonusModal
-          open={welcomeBonus.shouldShow}
-          bonusAmount={welcomeBonus.bonusAmount}
-          bonusCurrency={welcomeBonus.bonusCurrency}
-          onDismiss={welcomeBonus.dismiss}
-        />
-      )}
       <SEO
         title={language === "de" ? "KI Social Media Manager" : language === "es" ? "Gestor de Redes Sociales con IA" : "AI Social Media Manager"}
         description={language === "de" 

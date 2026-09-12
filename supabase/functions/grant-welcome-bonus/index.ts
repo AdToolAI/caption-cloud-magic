@@ -9,6 +9,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
+// Welcome bonus disabled (12.09.2026): no starter credits for new users.
+const WELCOME_BONUS_ENABLED = false;
 const WELCOME_BONUS_AMOUNT_EUR = 10.00;
 const WELCOME_BONUS_AMOUNT_USD = 10.00;
 const MAX_ACCOUNT_AGE_DAYS = 7;
@@ -19,6 +21,14 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
   if (isQaMockRequest(req)) return qaMockJson(corsHeaders, { name: "grant-welcome-bonus" });
+
+  if (!WELCOME_BONUS_ENABLED) {
+    return new Response(
+      JSON.stringify({ granted: false, reason: "disabled" }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
 
 
   try {

@@ -2543,7 +2543,7 @@ export const translations: Record<Language, any> = {
           statusReserved: "Reserved",
           historyTitle: "Redemption history",
           historyEmpty: "No codes redeemed yet.",
-          creditsHint: "Credits for videos, images and music are not part of the code — your 10 EUR starting balance stays, further credits are purchased separately.",
+          creditsHint: "Credits for videos, images and music are not part of the code — they are purchased separately.",
           foundersHint: "Voucher checkouts do not claim one of the 1,000 Founders seats and do not include Founders benefits.",
           success: {
             title: "Code redeemed",
@@ -7460,7 +7460,7 @@ export const translations: Record<Language, any> = {
         statusReserved: "Reserviert",
         historyTitle: "Einlösungen",
         historyEmpty: "Noch keine Codes eingelöst.",
-        creditsHint: "Guthaben für Videos, Bilder und Musik ist nicht Teil des Codes — die 10 € Startguthaben bleiben, weitere Credits werden separat gekauft.",
+        creditsHint: "Guthaben für Videos, Bilder und Musik ist nicht Teil des Codes — es wird separat gekauft.",
         foundersHint: "Checkouts mit Gutschein beanspruchen keinen der 1.000 Gründer-Plätze und enthalten keine Gründer-Vorteile.",
         success: {
           title: "Code eingelöst",
@@ -12300,7 +12300,7 @@ export const translations: Record<Language, any> = {
         statusReserved: "Reservado",
         historyTitle: "Historial de canjes",
         historyEmpty: "Aún no has canjeado códigos.",
-        creditsHint: "Los créditos para vídeos, imágenes y música no forman parte del código — tu saldo inicial de 10 € se mantiene.",
+        creditsHint: "Los créditos para vídeos, imágenes y música no forman parte del código — se compran por separado.",
         foundersHint: "Las compras con cupón no ocupan una de las 1.000 plazas de fundador ni incluyen sus ventajas.",
         success: {
           title: "Código canjeado",
