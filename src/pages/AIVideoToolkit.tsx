@@ -24,7 +24,7 @@ import { ToolkitGenerator } from '@/components/ai-video/ToolkitGenerator';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
 import { AIVideoDisclaimer } from '@/components/ai-video/AIVideoDisclaimer';
-import { FirstVideoGuide } from '@/components/ai-video/FirstVideoGuide';
+
 import { SystemLoadPill } from '@/components/render/SystemLoadPill';
 import { EnhanceVideoPanel } from '@/components/ai-video/EnhanceVideoPanel';
 
@@ -235,7 +235,7 @@ export default function AIVideoToolkit() {
           </TabsList>
 
           <TabsContent value="generate" className="space-y-6">
-            <FirstVideoGuide />
+            
             <Link
               to="/library"
               className="flex items-center justify-between gap-3 p-3 rounded-lg border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent hover:border-primary/40 transition group"

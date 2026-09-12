@@ -514,14 +514,6 @@ const Home = () => {
 
   return (
     <div className="bg-background">
-      {welcomeBonus.shouldShow && welcomeBonus.bonusAmount && welcomeBonus.bonusCurrency && (
-        <WelcomeBonusModal
-          open={welcomeBonus.shouldShow}
-          bonusAmount={welcomeBonus.bonusAmount}
-          bonusCurrency={welcomeBonus.bonusCurrency}
-          onDismiss={welcomeBonus.dismiss}
-        />
-      )}
       <SEO
         title={language === "de" ? "KI Social Media Manager" : language === "es" ? "Gestor de Redes Sociales con IA" : "AI Social Media Manager"}
         description={language === "de" 
