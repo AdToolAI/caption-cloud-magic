@@ -11,7 +11,7 @@
  *   - QA cockpit margin checks
  *
  * No hand-maintained numbers: every row comes from
- * `src/lib/cost/videoPricingCatalog.ts` (sell >= 1.75× cost).
+  * `src/lib/cost/videoPricingCatalog.ts` (break-even: no margin by design).
  */
 
 import {

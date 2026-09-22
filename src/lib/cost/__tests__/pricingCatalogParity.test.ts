@@ -12,7 +12,7 @@ import {
   buildComposerCostTable,
 } from '@/lib/cost/composerSourceToCatalog';
 import { VIDEO_PROVIDER_MARGINS, computeMarginPct } from '@/lib/cost/videoProviderMargins';
-import { USD_PER_EUR } from '@/lib/cost/fx';
+import { USD_PER_EUR, breakEvenSellEUR } from '@/lib/cost/fx';
 import { CLIP_SOURCE_COSTS } from '@/types/video-composer';
 
 const ROOT = resolve(__dirname, '../../../..');

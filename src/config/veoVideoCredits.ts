@@ -3,7 +3,7 @@ import { Currency } from './pricing';
 
 /**
  * Google Veo 3.1 Pricing — alle 4 Varianten
- * Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
+  * Pricing policy (22.09.2026): break-even — prices are derived from provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
  *
  * | Variante     | Replicate $/s | Verkauf €/s |
  * | lite-720p    | 0.15          | 0.45        |
