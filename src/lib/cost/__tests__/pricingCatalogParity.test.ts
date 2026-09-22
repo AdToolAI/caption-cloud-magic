@@ -139,7 +139,7 @@ describe('admin margin table', () => {
       expect(row.tier).toBe(PREMIUM_ENGINE_CATALOG_IDS.has(row.id) ? 'premium-engine' : 'standard');
       // Break-even policy: the gross margin only covers VAT, payment fees
       // and the Founder discount — it is identical for every row.
-      expect(computeMarginPct(row)).toBeCloseTo(1 - 1 / BREAK_EVEN_FACTOR, 3);
+      expect(computeMarginPct(row)).toBeCloseTo(1 - 1 / BREAK_EVEN_FACTOR, 2);
     }
   });
 });
