@@ -1,53 +1,54 @@
 /**
- * Net margin floor — the 1.75x promise must hold AFTER payment fees.
+ * Break-even pricing (22.09.2026).
  *
- * A gross sale loses ~10% to payment-processing (method fee, cross-border
- * surcharge, conversion spread — measured on a real $10 purchase that netted
- * 7.69 EUR). Checking the margin against the gross price silently overstated
- * it, so every catalog entry is now checked against NET revenue:
+ * AI video models are sold at cost: a gross EUR price must, after the
+ * inclusive 19% VAT, ~10% payment-processing fees and the largest customer
+ * discount (Founder 10%), leave exactly the provider cost plus a 3% drift
+ * buffer — no profit, no loss.
  *
- *   sellEUR * PAYMENT_NET_FACTOR >= MARGIN_FLOOR_MULTIPLE * costEUR
- *
- * Seedance 2.5 is the only documented commercial exception.
+ *   sellEUR / 1.19 * 0.90 * 0.90 ≈ costEUR * 1.03
  */
 import { describe, it, expect } from 'vitest';
 import {
   PAYMENT_NET_FACTOR,
-  MARGIN_FLOOR_MULTIPLE,
-  NET_MARGIN_FLOOR_EXCEPTIONS,
-  minGrossEURForCost,
+  VAT_RATE,
+  MAX_DISCOUNT_FACTOR,
+  COST_SAFETY_BUFFER,
+  BREAK_EVEN_FACTOR,
+  breakEvenSellEUR,
   netRevenueEUR,
 } from '@/lib/cost/fx';
 import { VIDEO_PRICING_CATALOG } from '@/lib/cost/videoPricingCatalog';
 
 const entries = Object.values(VIDEO_PRICING_CATALOG);
 
-describe('net margin floor (after payment fees)', () => {
+describe('break-even pricing', () => {
   it('reads the catalog', () => {
     expect(entries.length).toBeGreaterThan(10);
   });
 
-  it('uses the measured net factor', () => {
+  it('uses the documented factors', () => {
     expect(PAYMENT_NET_FACTOR).toBe(0.9);
+    expect(VAT_RATE).toBe(0.19);
+    expect(MAX_DISCOUNT_FACTOR).toBe(0.9);
+    expect(COST_SAFETY_BUFFER).toBe(1.03);
+    expect(BREAK_EVEN_FACTOR).toBeCloseTo(1.5132, 4);
     expect(netRevenueEUR(10)).toBe(9);
-    // 1.75 / 0.90 = 1.9445x gross over provider cost
-    expect(minGrossEURForCost(1)).toBeCloseTo(1.9445, 4);
   });
 
-  it.each(
-    entries
-      .filter((e) => !NET_MARGIN_FLOOR_EXCEPTIONS.has(e.id))
-      .map((e) => [e.id, e] as const),
-  )('%s clears the net margin floor', (_id, entry) => {
-    expect(netRevenueEUR(entry.sellEUR)).toBeGreaterThanOrEqual(
-      MARGIN_FLOOR_MULTIPLE * entry.costEUR - 1e-9,
-    );
-  });
+  it.each(entries.map((e) => [e.id, e] as const))(
+    '%s is priced at break-even',
+    (_id, entry) => {
+      expect(entry.sellEUR).toBeCloseTo(breakEvenSellEUR(entry.costEUR), 4);
 
-  it('keeps the documented Seedance 2.5 exception explicit', () => {
-    for (const id of NET_MARGIN_FLOOR_EXCEPTIONS) {
-      const entry = VIDEO_PRICING_CATALOG[id];
-      expect(entry, `exception "${id}" no longer exists in the catalog`).toBeTruthy();
-    }
-  });
+      // Discounted, VAT-inclusive, fee-adjusted revenue covers the cost.
+      const netAfterEverything =
+        (entry.sellEUR / (1 + VAT_RATE)) * PAYMENT_NET_FACTOR * MAX_DISCOUNT_FACTOR;
+      expect(netAfterEverything).toBeGreaterThanOrEqual(entry.costEUR - 1e-4);
+      // ... and does not turn into a profit beyond the safety buffer.
+      expect(netAfterEverything).toBeLessThanOrEqual(
+        entry.costEUR * COST_SAFETY_BUFFER + 1e-4,
+      );
+    },
+  );
 });
