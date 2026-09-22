@@ -42,27 +42,15 @@ function parseSharedSourceMap(): Record<string, { standard: string; pro: string 
   return out;
 }
 
-// Seedance 2.5 720p was deliberately repriced to a 10.00 EUR / 30 s headline
-// price on 03.09.2026, which lands below the 1.75x margin floor (~1.54x).
-const MARGIN_FLOOR_EXCEPTIONS = new Set(['seedance-2-5']);
-
-describe('pricing catalog — 1.75× minimum margin policy', () => {
-  it('every model sells at >= 1.75× provider cost (20.08.2026 re-pricing)', () => {
+describe('pricing catalog — break-even policy (22.09.2026)', () => {
+  it('every model sells at exactly the break-even factor over provider cost', () => {
     const offenders: string[] = [];
     for (const entry of Object.values(VIDEO_PRICING_CATALOG)) {
-      if (MARGIN_FLOOR_EXCEPTIONS.has(entry.id)) continue;
-      const factor = entry.sellEUR / entry.costEUR;
-      if (factor < 1.75) {
-        offenders.push(`${entry.id}: ${factor.toFixed(2)}×`);
+      if (Math.abs(entry.sellEUR - breakEvenSellEUR(entry.costEUR)) > 1e-4) {
+        offenders.push(`${entry.id}: ${entry.sellEUR} != ${breakEvenSellEUR(entry.costEUR)}`);
       }
     }
     expect(offenders).toEqual([]);
-  });
-
-  it('Seedance 2.5 keeps the agreed 30 s price points (720p 10.00 EUR / 11.50 USD, 480p 5.80 EUR)', () => {
-    expect(VIDEO_PRICING_CATALOG['seedance-2-5'].sellEUR * 30).toBeCloseTo(10.0, 2);
-    expect(VIDEO_PRICING_CATALOG['seedance-2-5'].sellUSD * 30).toBeCloseTo(11.5, 2);
-    expect(VIDEO_PRICING_CATALOG['seedance-2-5-480p'].sellEUR * 30).toBeCloseTo(5.8, 2);
   });
 
   it('sellUSD is derived from sellEUR with the shared FX factor (1 EUR = 1.15 USD)', () => {
