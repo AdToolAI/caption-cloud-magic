@@ -68,6 +68,8 @@ function loadBackendRows(): Record<string, Record<string, number>> {
       const v = new RegExp(`${key}:\\s*([\\d.]+)`).exec(m[2]);
       if (v) row[key] = Number(v[1]);
     }
+    // Sell prices are derived from the provider cost on both sides.
+    if (row.costEUR != null) row.sellEUR = breakEvenSellEUR(row.costEUR);
     out[m[1]] = row;
   }
   return out;
