@@ -45,3 +45,25 @@ export function minGrossEURForCost(costEUR: number): number {
  * Seedance 2.5 is a documented commercial exception (10 EUR per 30 s).
  */
 export const NET_MARGIN_FLOOR_EXCEPTIONS = new Set(['seedance-2-5', 'seedance-2-5-480p']);
+
+// ----------------------------------------------------------------------------
+// Break-even pricing (22.09.2026) — mirror of the shared Deno file.
+// ----------------------------------------------------------------------------
+
+/** VAT contained in every gross price (German inclusive tax rate). */
+export const VAT_RATE = 0.19;
+
+/** Largest customer discount that may be applied to a list price (Founder 10%). */
+export const MAX_DISCOUNT_FACTOR = 0.90;
+
+/** Cushion against FX and provider price drift. */
+export const COST_SAFETY_BUFFER = 1.03;
+
+/** Gross price multiple over provider cost that yields a zero result. */
+export const BREAK_EVEN_FACTOR =
+  ((1 + VAT_RATE) * COST_SAFETY_BUFFER) / (PAYMENT_NET_FACTOR * MAX_DISCOUNT_FACTOR);
+
+/** Break-even gross sell price in EUR for a given provider cost. */
+export function breakEvenSellEUR(costEUR: number): number {
+  return round4(costEUR * BREAK_EVEN_FACTOR);
+}

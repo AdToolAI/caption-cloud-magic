@@ -12,6 +12,7 @@ import { tx } from '@/lib/i18nText';
 
 import type { Currency } from './pricing';
 import { usdFromEur } from '@/lib/cost/fx';
+import { VIDEO_PRICING_CATALOG } from '@/lib/cost/videoPricingCatalog';
 import {
   Film, Volume2, Zap, Wand2, Eye, Camera, Video, Sparkles, TrendingUp,
 } from 'lucide-react';
@@ -811,7 +812,13 @@ function deriveTechnicalCapabilities(m: ToolkitModelMeta): ToolkitModel {
     resolution: resolutionLabels[0] ?? union.resolutions[0]?.label ?? '',
     ...(resolutionLabels.length > 1 ? { resolutions: resolutionLabels } : {}),
     aspectRatios: union.aspectRatios,
-    costPerSecond: { EUR: m.costPerSecond.EUR, USD: usdFromEur(m.costPerSecond.EUR) },
+    // Price origin is the canonical catalog (break-even policy, 22.09.2026).
+    // The per-family constants are only a display fallback for ids the catalog
+    // does not know.
+    costPerSecond: (() => {
+      const eur = VIDEO_PRICING_CATALOG[m.id]?.sellEUR ?? m.costPerSecond.EUR;
+      return { EUR: eur, USD: usdFromEur(eur) };
+    })(),
   };
 }
 

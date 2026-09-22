@@ -3,7 +3,7 @@ import { Currency } from './pricing';
 
 /**
  * Google Veo 3.1 Pricing — alle 4 Varianten
- * Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
+  * Pricing policy (22.09.2026): break-even — prices are derived from provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
  *
  * | Variante     | Replicate $/s | Verkauf €/s |
  * | lite-720p    | 0.15          | 0.45        |
@@ -19,8 +19,8 @@ export const VEO_VIDEO_MODELS = {
     replicateModel: 'google/veo-3.1-fast',
     resolution: '720p' as const,
     costPerSecond: {
-      EUR: 0.32,
-      USD: 0.32,
+      EUR: 0.227,
+      USD: 0.227,
     },
     minDuration: 4,
     maxDuration: 8,
@@ -38,8 +38,8 @@ export const VEO_VIDEO_MODELS = {
     replicateModel: 'google/veo-3.1-fast',
     resolution: '1080p' as const,
     costPerSecond: {
-      EUR: 0.475,
-      USD: 0.475,
+      EUR: 0.3329,
+      USD: 0.3329,
     },
     minDuration: 4,
     maxDuration: 8,
@@ -57,8 +57,8 @@ export const VEO_VIDEO_MODELS = {
     replicateModel: 'google/veo-3.1-fast',
     resolution: '1080p' as const,
     costPerSecond: {
-      EUR: 0.86,
-      USD: 0.86,
+      EUR: 0.6053,
+      USD: 0.6053,
     },
     minDuration: 4,
     maxDuration: 8,
@@ -76,8 +76,8 @@ export const VEO_VIDEO_MODELS = {
     replicateModel: 'google/veo-3.1',
     resolution: '1080p' as const,
     costPerSecond: {
-      EUR: 2.365,
-      USD: 2.365,
+      EUR: 1.6645,
+      USD: 1.6645,
     },
     minDuration: 4,
     maxDuration: 8,

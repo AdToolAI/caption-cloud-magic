@@ -1,7 +1,7 @@
 import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
-// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
+// Pricing policy (22.09.2026): break-even — prices are derived from provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 // Prices here MUST match _shared/videoPricingCatalog.ts — the backend reads
 // from the catalog, and the frontend reads from useVideoPricingCatalog() with
 // this file as fallback only.
@@ -10,7 +10,10 @@ export const KLING_VIDEO_MODELS = {
     name: 'Kling 2.5 Turbo Pro',
     provider: 'Kuaishou (Replicate)',
     quality: '720p',
-    costPerSecond: { EUR: 0.07, USD: 0.07 },
+    costPerSecond: {
+      EUR: 0.0454,
+      USD: 0.0454,
+    },
     minDuration: 5,
     maxDuration: 10,
     allowedDurations: [5, 8, 10] as const,
@@ -24,7 +27,10 @@ export const KLING_VIDEO_MODELS = {
     name: 'Kling 2.6',
     provider: 'Kuaishou (Replicate)',
     quality: '1080p',
-    costPerSecond: { EUR: 0.09, USD: 0.09 },
+    costPerSecond: {
+      EUR: 0.0605,
+      USD: 0.0605,
+    },
     minDuration: 5,
     maxDuration: 15,
     allowedDurations: [5, 8, 10, 15] as const,
@@ -38,7 +44,10 @@ export const KLING_VIDEO_MODELS = {
     name: 'Kling 3.0',
     provider: 'Kuaishou (Replicate)',
     quality: '1080p',
-    costPerSecond: { EUR: 0.135, USD: 0.135 },
+    costPerSecond: {
+      EUR: 0.0908,
+      USD: 0.0908,
+    },
     minDuration: 3,
     maxDuration: 15,
     allowedDurations: [3, 5, 8, 10, 15] as const,
@@ -52,7 +61,10 @@ export const KLING_VIDEO_MODELS = {
     name: 'Kling 3.0 Omni',
     provider: 'Kuaishou (Replicate)',
     quality: '1080p · Native Lip-Sync EN',
-    costPerSecond: { EUR: 0.43, USD: 0.43 },
+    costPerSecond: {
+      EUR: 0.3026,
+      USD: 0.3026,
+    },
     minDuration: 5,
     maxDuration: 15,
     allowedDurations: [5, 8, 10, 15] as const,

@@ -1,15 +1,15 @@
 import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
-// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
+// Pricing policy (22.09.2026): break-even — prices are derived from provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 export const LTX_VIDEO_MODELS = {
   'ltx-standard': {
     name: 'LTX 2.3 Fast',
     provider: 'Lightricks (Replicate)',
     quality: '1080p',
     costPerSecond: {
-      EUR: 0.135,
-      USD: 0.135,
+      EUR: 0.0908,
+      USD: 0.0908,
     },
     minDuration: 6,
     maxDuration: 20,
@@ -25,8 +25,8 @@ export const LTX_VIDEO_MODELS = {
     provider: 'Lightricks (Replicate)',
     quality: '1080p',
     costPerSecond: {
-      EUR: 0.18,
-      USD: 0.18,
+      EUR: 0.1211,
+      USD: 0.1211,
     },
     minDuration: 6,
     maxDuration: 10,

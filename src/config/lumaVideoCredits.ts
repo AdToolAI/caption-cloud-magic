@@ -1,15 +1,15 @@
 import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
-// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
+// Pricing policy (22.09.2026): break-even — prices are derived from provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 export const LUMA_VIDEO_MODELS = {
   'luma-standard': {
     name: 'Luma Ray 2 Standard',
     provider: 'Luma AI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.155,
-      USD: 0.155,
+      EUR: 0.1059,
+      USD: 0.1059,
     },
     minDuration: 5,
     maxDuration: 9,
@@ -25,8 +25,8 @@ export const LUMA_VIDEO_MODELS = {
     provider: 'Luma AI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.255,
-      USD: 0.255,
+      EUR: 0.1816,
+      USD: 0.1816,
     },
     minDuration: 5,
     maxDuration: 9,
@@ -42,8 +42,8 @@ export const LUMA_VIDEO_MODELS = {
     provider: 'Luma AI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.135,
-      USD: 0.135,
+      EUR: 0.0908,
+      USD: 0.0908,
     },
     minDuration: 5,
     maxDuration: 5,
@@ -59,8 +59,8 @@ export const LUMA_VIDEO_MODELS = {
     provider: 'Luma AI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.2,
-      USD: 0.2,
+      EUR: 0.1362,
+      USD: 0.1362,
     },
     minDuration: 10,
     maxDuration: 10,

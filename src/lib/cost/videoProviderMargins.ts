@@ -11,7 +11,7 @@
  *   - QA cockpit margin checks
  *
  * No hand-maintained numbers: every row comes from
- * `src/lib/cost/videoPricingCatalog.ts` (sell >= 1.75× cost).
+  * `src/lib/cost/videoPricingCatalog.ts` (break-even: no margin by design).
  */
 
 import {
@@ -47,7 +47,7 @@ export const VIDEO_PROVIDER_MARGINS: VideoProviderMargin[] = Object.values(
   tier: PREMIUM_ENGINE_CATALOG_IDS.has(entry.id) ? 'premium-engine' : 'standard',
 }));
 
-export const MARGIN_FLOOR = 0.42; // warn if margin < 42% (drift below the 1.75× floor)
+export const MARGIN_FLOOR = 0; // break-even policy (22.09.2026): margins are ~0 by design
 
 export function computeMarginPct(row: Pick<VideoProviderMargin, 'sellEUR' | 'costEUR'>): number {
   if (row.sellEUR <= 0) return 0;

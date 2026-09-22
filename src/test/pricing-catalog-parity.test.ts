@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { AI_VIDEO_TOOLKIT_MODELS } from '@/config/aiVideoModelRegistry';
-import { USD_PER_EUR } from '@/lib/cost/fx';
+import { USD_PER_EUR, breakEvenSellEUR } from '@/lib/cost/fx';
 import { VIDEO_PRICING_CATALOG as CLIENT_CATALOG } from '@/lib/cost/videoPricingCatalog';
 
 function loadBackendCatalog(): Record<string, { sellEUR: number; sellUSD: number }> {
@@ -19,10 +19,12 @@ function loadBackendCatalog(): Record<string, { sellEUR: number; sellUSD: number
     'utf8',
   );
   const out: Record<string, { sellEUR: number; sellUSD: number }> = {};
-  const re = /'([^']+)':\s*\{\s*id:\s*'[^']+',[^}]*?sellEUR:\s*([\d.]+)/g;
+  // Since the break-even policy (22.09.2026) the backend keeps only the
+  // provider cost; the sell price is derived from it.
+  const re = /'([^']+)':\s*\{\s*id:\s*'[^']+',[^}]*?costEUR:\s*([\d.]+)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src))) {
-    const sellEUR = Number(m[2]);
+    const sellEUR = breakEvenSellEUR(Number(m[2]));
     // USD is derived from EUR in the catalog, never hand-maintained.
     out[m[1]] = { sellEUR, sellUSD: Math.round(sellEUR * USD_PER_EUR * 10000) / 10000 };
   }
@@ -66,6 +68,8 @@ function loadBackendRows(): Record<string, Record<string, number>> {
       const v = new RegExp(`${key}:\\s*([\\d.]+)`).exec(m[2]);
       if (v) row[key] = Number(v[1]);
     }
+    // Sell prices are derived from the provider cost on both sides.
+    if (row.costEUR != null) row.sellEUR = breakEvenSellEUR(row.costEUR);
     out[m[1]] = row;
   }
   return out;

@@ -12,21 +12,26 @@ import {
   buildComposerCostTable,
 } from '@/lib/cost/composerSourceToCatalog';
 import { VIDEO_PROVIDER_MARGINS, computeMarginPct } from '@/lib/cost/videoProviderMargins';
-import { USD_PER_EUR } from '@/lib/cost/fx';
+import { USD_PER_EUR, breakEvenSellEUR, BREAK_EVEN_FACTOR } from '@/lib/cost/fx';
 import { CLIP_SOURCE_COSTS } from '@/types/video-composer';
 
 const ROOT = resolve(__dirname, '../../../..');
 const SHARED_CATALOG = resolve(ROOT, 'supabase/functions/_shared/videoPricingCatalog.ts');
 const SHARED_MAP = resolve(ROOT, 'supabase/functions/_shared/composerSourceToCatalog.ts');
 
-/** Extract `id: sellEUR/costEUR` pairs from the Deno-side catalog source. */
+/**
+ * Extract `id: costEUR` from the Deno-side catalog source. Since the
+ * break-even policy (22.09.2026) only the provider cost is maintained; the
+ * sell price is derived from it on both sides.
+ */
 function parseSharedCatalog(): Record<string, { sellEUR: number; costEUR: number }> {
   const src = readFileSync(SHARED_CATALOG, 'utf8');
   const out: Record<string, { sellEUR: number; costEUR: number }> = {};
-  const rowRe = /\{\s*id:\s*'([^']+)'[^}]*?sellEUR:\s*([\d.]+)[^}]*?costEUR:\s*([\d.]+)/g;
+  const rowRe = /\{\s*id:\s*'([^']+)'[^}]*?costEUR:\s*([\d.]+)/g;
   let m: RegExpExecArray | null;
   while ((m = rowRe.exec(src)) !== null) {
-    out[m[1]] = { sellEUR: Number(m[2]), costEUR: Number(m[3]) };
+    const costEUR = Number(m[2]);
+    out[m[1]] = { sellEUR: breakEvenSellEUR(costEUR), costEUR };
   }
   return out;
 }
@@ -42,27 +47,15 @@ function parseSharedSourceMap(): Record<string, { standard: string; pro: string 
   return out;
 }
 
-// Seedance 2.5 720p was deliberately repriced to a 10.00 EUR / 30 s headline
-// price on 03.09.2026, which lands below the 1.75x margin floor (~1.54x).
-const MARGIN_FLOOR_EXCEPTIONS = new Set(['seedance-2-5']);
-
-describe('pricing catalog — 1.75× minimum margin policy', () => {
-  it('every model sells at >= 1.75× provider cost (20.08.2026 re-pricing)', () => {
+describe('pricing catalog — break-even policy (22.09.2026)', () => {
+  it('every model sells at exactly the break-even factor over provider cost', () => {
     const offenders: string[] = [];
     for (const entry of Object.values(VIDEO_PRICING_CATALOG)) {
-      if (MARGIN_FLOOR_EXCEPTIONS.has(entry.id)) continue;
-      const factor = entry.sellEUR / entry.costEUR;
-      if (factor < 1.75) {
-        offenders.push(`${entry.id}: ${factor.toFixed(2)}×`);
+      if (Math.abs(entry.sellEUR - breakEvenSellEUR(entry.costEUR)) > 1e-4) {
+        offenders.push(`${entry.id}: ${entry.sellEUR} != ${breakEvenSellEUR(entry.costEUR)}`);
       }
     }
     expect(offenders).toEqual([]);
-  });
-
-  it('Seedance 2.5 keeps the agreed 30 s price points (720p 10.00 EUR / 11.50 USD, 480p 5.80 EUR)', () => {
-    expect(VIDEO_PRICING_CATALOG['seedance-2-5'].sellEUR * 30).toBeCloseTo(10.0, 2);
-    expect(VIDEO_PRICING_CATALOG['seedance-2-5'].sellUSD * 30).toBeCloseTo(11.5, 2);
-    expect(VIDEO_PRICING_CATALOG['seedance-2-5-480p'].sellEUR * 30).toBeCloseTo(5.8, 2);
   });
 
   it('sellUSD is derived from sellEUR with the shared FX factor (1 EUR = 1.15 USD)', () => {
@@ -144,10 +137,9 @@ describe('admin margin table', () => {
       expect(row.sellEUR).toBe(entry.sellEUR);
       expect(row.costEUR).toBe(entry.costEUR);
       expect(row.tier).toBe(PREMIUM_ENGINE_CATALOG_IDS.has(row.id) ? 'premium-engine' : 'standard');
-      // Seedance 2.5 720p is the documented low-margin headline price (see above).
-      if (!MARGIN_FLOOR_EXCEPTIONS.has(row.id)) {
-        expect(computeMarginPct(row)).toBeGreaterThan(0.42);
-      }
+      // Break-even policy: the gross margin only covers VAT, payment fees
+      // and the Founder discount — it is identical for every row.
+      expect(computeMarginPct(row)).toBeCloseTo(1 - 1 / BREAK_EVEN_FACTOR, 2);
     }
   });
 });

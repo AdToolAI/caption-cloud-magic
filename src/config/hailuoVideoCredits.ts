@@ -7,8 +7,8 @@ export const HAILUO_VIDEO_MODELS = {
     provider: 'MiniMax (Replicate)',
     quality: '768p',
     costPerSecond: {
-      EUR: 0.1,
-      USD: 0.1,
+      EUR: 0.0681,
+      USD: 0.0681,
     },
     minDuration: 6,
     maxDuration: 10,
@@ -24,10 +24,10 @@ export const HAILUO_VIDEO_MODELS = {
     name: 'Hailuo 2.3 Pro',
     provider: 'MiniMax (Replicate)',
     quality: '1080p',
-    // Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
+    // Pricing policy (22.09.2026): break-even — prices are derived from provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
     costPerSecond: {
-      EUR: 0.165,
-      USD: 0.165,
+      EUR: 0.1135,
+      USD: 0.1135,
     },
     minDuration: 6,
     maxDuration: 10,

@@ -8,7 +8,7 @@
  *   - 720p:  ~$0.14 / s
  *   - 1080p: ~$0.28 / s
  *
- * Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
+  * Pricing policy (22.09.2026): break-even — prices are derived from provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
  */
 
 export const HAPPYHORSE_VIDEO_MODELS = {
@@ -16,7 +16,10 @@ export const HAPPYHORSE_VIDEO_MODELS = {
     name: 'HappyHorse 1.0',
     provider: 'Alibaba (Replicate)',
     resolution: '720p',
-    costPerSecond: { EUR: 0.3, USD: 0.3 },
+    costPerSecond: {
+      EUR: 0.2118,
+      USD: 0.2118,
+    },
     minDuration: 3,
     maxDuration: 15,
     description: 'Multi-shot consistency · 720p · 3-15s',
@@ -26,7 +29,10 @@ export const HAPPYHORSE_VIDEO_MODELS = {
     name: 'HappyHorse 1.0 Pro',
     provider: 'Alibaba (Replicate)',
     resolution: '1080p',
-    costPerSecond: { EUR: 0.605, USD: 0.605 },
+    costPerSecond: {
+      EUR: 0.4237,
+      USD: 0.4237,
+    },
     minDuration: 3,
     maxDuration: 15,
     description: 'Multi-shot consistency · 1080p · 3-15s',

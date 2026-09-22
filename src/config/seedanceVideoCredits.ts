@@ -1,7 +1,7 @@
 import { tx } from "@/lib/i18nText";
 import { Currency } from './pricing';
 
-// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
+// Pricing policy (22.09.2026): break-even — prices are derived from provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 // Verifizierte Replicate-Slugs (21.07.2026):
 export const SEEDANCE_VIDEO_MODELS = {
   'seedance-mini': {
@@ -9,8 +9,8 @@ export const SEEDANCE_VIDEO_MODELS = {
     provider: 'ByteDance (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.045,
-      USD: 0.045,
+      EUR: 0.0303,
+      USD: 0.0303,
     },
     minDuration: 3,
     maxDuration: 15,
@@ -25,8 +25,8 @@ export const SEEDANCE_VIDEO_MODELS = {
     provider: 'ByteDance (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.32,
-      USD: 0.32,
+      EUR: 0.227,
+      USD: 0.227,
     },
     minDuration: 3,
     maxDuration: 15,
@@ -41,8 +41,8 @@ export const SEEDANCE_VIDEO_MODELS = {
     provider: 'ByteDance (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.385,
-      USD: 0.385,
+      EUR: 0.2724,
+      USD: 0.2724,
     },
     minDuration: 3,
     maxDuration: 15,
@@ -59,8 +59,8 @@ export const SEEDANCE_VIDEO_MODELS = {
     provider: 'ByteDance (ModelArk)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.3333,
-      USD: 0.3833,
+      EUR: 0.3284,
+      USD: 0.3284,
     },
     minDuration: 4,
     maxDuration: 30,

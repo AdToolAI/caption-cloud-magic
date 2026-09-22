@@ -53,3 +53,32 @@ export function minGrossEURForCost(costEUR: number): number {
  * 480p scaled proportionally) — documented, not accidental drift.
  */
 export const NET_MARGIN_FLOOR_EXCEPTIONS = new Set(['seedance-2-5', 'seedance-2-5-480p']);
+
+// ----------------------------------------------------------------------------
+// Break-even pricing (22.09.2026)
+// ----------------------------------------------------------------------------
+// Policy change: AI video models are sold at cost. A gross EUR price must,
+// after VAT (inclusive), payment fees and the largest customer discount, leave
+// exactly the provider cost plus a small FX/price-drift buffer:
+//
+//   gross / (1 + VAT) * PAYMENT_NET_FACTOR * MAX_DISCOUNT_FACTOR
+//     = costEUR * COST_SAFETY_BUFFER
+// ----------------------------------------------------------------------------
+
+/** VAT contained in every gross price (German inclusive tax rate). */
+export const VAT_RATE = 0.19;
+
+/** Largest customer discount that may be applied to a list price (Founder 10%). */
+export const MAX_DISCOUNT_FACTOR = 0.90;
+
+/** Cushion against FX and provider price drift. */
+export const COST_SAFETY_BUFFER = 1.03;
+
+/** Gross price multiple over provider cost that yields a zero result. */
+export const BREAK_EVEN_FACTOR =
+  ((1 + VAT_RATE) * COST_SAFETY_BUFFER) / (PAYMENT_NET_FACTOR * MAX_DISCOUNT_FACTOR);
+
+/** Break-even gross sell price in EUR for a given provider cost. */
+export function breakEvenSellEUR(costEUR: number): number {
+  return round4(costEUR * BREAK_EVEN_FACTOR);
+}

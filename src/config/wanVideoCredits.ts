@@ -1,7 +1,7 @@
 import { Currency } from './pricing';
 import { tx } from '@/lib/i18nText';
 
-// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
+// Pricing policy (22.09.2026): break-even — prices are derived from provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 export const WAN_VIDEO_MODELS = {
   'wan-standard': {
     name: 'Wan 2.5 Standard',
@@ -9,8 +9,8 @@ export const WAN_VIDEO_MODELS = {
     quality: '720p',
     version: '2.5',
     costPerSecond: {
-      EUR: 0.09,
-      USD: 0.09,
+      EUR: 0.0605,
+      USD: 0.0605,
     },
     minDuration: 5,
     maxDuration: 10,
@@ -27,8 +27,8 @@ export const WAN_VIDEO_MODELS = {
     quality: '1080p',
     version: '2.5',
     costPerSecond: {
-      EUR: 0.155,
-      USD: 0.155,
+      EUR: 0.1059,
+      USD: 0.1059,
     },
     minDuration: 5,
     maxDuration: 10,
@@ -45,8 +45,8 @@ export const WAN_VIDEO_MODELS = {
     quality: '720p',
     version: '2.6',
     costPerSecond: {
-      EUR: 0.09,
-      USD: 0.09,
+      EUR: 0.0605,
+      USD: 0.0605,
     },
     minDuration: 5,
     maxDuration: 10,
@@ -63,8 +63,8 @@ export const WAN_VIDEO_MODELS = {
     quality: '1080p',
     version: '2.6',
     costPerSecond: {
-      EUR: 0.155,
-      USD: 0.155,
+      EUR: 0.1059,
+      USD: 0.1059,
     },
     minDuration: 5,
     maxDuration: 10,
@@ -81,8 +81,8 @@ export const WAN_VIDEO_MODELS = {
     quality: '720p',
     version: '2.7',
     costPerSecond: {
-      EUR: 0.22,
-      USD: 0.22,
+      EUR: 0.1513,
+      USD: 0.1513,
     },
     minDuration: 5,
     maxDuration: 15,
@@ -99,8 +99,8 @@ export const WAN_VIDEO_MODELS = {
     quality: '1080p',
     version: '2.7',
     costPerSecond: {
-      EUR: 0.32,
-      USD: 0.32,
+      EUR: 0.227,
+      USD: 0.227,
     },
     minDuration: 5,
     maxDuration: 15,

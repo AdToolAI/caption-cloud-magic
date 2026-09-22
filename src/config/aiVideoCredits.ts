@@ -158,14 +158,14 @@ export const AI_VIDEO_PRICING = {
   defaultDuration: 10, // seconds
 } as const;
 
-// Pricing policy (20.08.2026): sell prices cut by 35% vs. the old 3.00x catalog; margin floor is now 1.75x provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
+// Pricing policy (22.09.2026): break-even — prices are derived from provider cost. Canonical source: src/lib/cost/videoPricingCatalog.ts
 export const AI_VIDEO_MODELS = {
   'sora-2-standard': {
     name: 'Sora 2 Standard',
     provider: 'OpenAI (Replicate)',
     costPerSecond: {
-      EUR: 0.22,
-      USD: 0.22,
+      EUR: 0.1513,
+      USD: 0.1513,
     },
     maxDuration: 30,
     description: tx({ de: 'Hochwertige AI-Videos ab 2,20 € pro 10 Sekunden', en: 'High-quality AI videos from €2.20 ​​per 10 seconds', es: 'Vídeos con IA de alta calidad desde 2,20 € por 10 segundos' }),
@@ -175,8 +175,8 @@ export const AI_VIDEO_MODELS = {
     name: 'Sora 2 Pro',
     provider: 'OpenAI (Replicate)',
     costPerSecond: {
-      EUR: 1.08,
-      USD: 1.08,
+      EUR: 0.7566,
+      USD: 0.7566,
     },
     maxDuration: 30,
     description: tx({ de: 'Premium-Qualität ab 10,80 € pro 10 Sekunden', en: 'Premium quality from €10.80 per 10 seconds', es: 'Calidad premium desde 10,80 € los 10 segundos' }),
