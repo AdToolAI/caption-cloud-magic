@@ -19,14 +19,19 @@ const ROOT = resolve(__dirname, '../../../..');
 const SHARED_CATALOG = resolve(ROOT, 'supabase/functions/_shared/videoPricingCatalog.ts');
 const SHARED_MAP = resolve(ROOT, 'supabase/functions/_shared/composerSourceToCatalog.ts');
 
-/** Extract `id: sellEUR/costEUR` pairs from the Deno-side catalog source. */
+/**
+ * Extract `id: costEUR` from the Deno-side catalog source. Since the
+ * break-even policy (22.09.2026) only the provider cost is maintained; the
+ * sell price is derived from it on both sides.
+ */
 function parseSharedCatalog(): Record<string, { sellEUR: number; costEUR: number }> {
   const src = readFileSync(SHARED_CATALOG, 'utf8');
   const out: Record<string, { sellEUR: number; costEUR: number }> = {};
-  const rowRe = /\{\s*id:\s*'([^']+)'[^}]*?sellEUR:\s*([\d.]+)[^}]*?costEUR:\s*([\d.]+)/g;
+  const rowRe = /\{\s*id:\s*'([^']+)'[^}]*?costEUR:\s*([\d.]+)/g;
   let m: RegExpExecArray | null;
   while ((m = rowRe.exec(src)) !== null) {
-    out[m[1]] = { sellEUR: Number(m[2]), costEUR: Number(m[3]) };
+    const costEUR = Number(m[2]);
+    out[m[1]] = { sellEUR: breakEvenSellEUR(costEUR), costEUR };
   }
   return out;
 }
