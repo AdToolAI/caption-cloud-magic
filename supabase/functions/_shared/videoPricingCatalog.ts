@@ -6,14 +6,14 @@ import { usdFromEur, breakEvenSellEUR } from "./fx.ts";
 // (via the /functions/v1/pricing-catalog endpoint) so the price shown to the
 // user before generation always matches the amount actually deducted after.
 //
-// Margin policy (03.09.2026): every AI video model must clear 1.75× the
-// provider cost measured on NET revenue, i.e. AFTER payment-processing fees
-// (see PAYMENT_NET_FACTOR in ./fx.ts). Concretely: sellEUR × 0.90 >= 1.75 ×
-// costEUR. Checking the GROSS price used to overstate the margin by ~10%.
-// Guarded by src/test/pricing-net-margin.test.ts. The only documented
-// exceptions are the Seedance 2.5 tiers (10 EUR per 30 s, deliberate). Lipsync (Sync.so), Audio (ElevenLabs)
-// and Picture models are NOT part of this catalog — they are billed on
-// separate rails and priced independently.
+// Pricing policy (22.09.2026): BREAK-EVEN. sellEUR is no longer maintained by
+// hand — it is derived from the provider cost via breakEvenSellEUR() in
+// ./fx.ts, so that after the inclusive 19% VAT, ~10% payment-processing fees
+// and the largest customer discount (Founder 10%) exactly the provider cost
+// plus a 3% drift buffer remains: no profit, no loss.
+// Guarded by src/test/pricing-net-margin.test.ts. Lipsync (Sync.so), Audio
+// (ElevenLabs), Music and Picture models are NOT part of this catalog — they
+// are billed on separate rails and priced independently.
 // ============================================================================
 
 export type CatalogEntry = {
