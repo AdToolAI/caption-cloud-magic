@@ -12,6 +12,7 @@ import { tx } from '@/lib/i18nText';
 
 import type { Currency } from './pricing';
 import { usdFromEur } from '@/lib/cost/fx';
+import { VIDEO_PRICING_CATALOG } from '@/lib/cost/videoPricingCatalog';
 import {
   Film, Volume2, Zap, Wand2, Eye, Camera, Video, Sparkles, TrendingUp,
 } from 'lucide-react';
