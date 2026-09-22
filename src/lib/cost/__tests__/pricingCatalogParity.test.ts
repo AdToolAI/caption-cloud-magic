@@ -12,7 +12,7 @@ import {
   buildComposerCostTable,
 } from '@/lib/cost/composerSourceToCatalog';
 import { VIDEO_PROVIDER_MARGINS, computeMarginPct } from '@/lib/cost/videoProviderMargins';
-import { USD_PER_EUR, breakEvenSellEUR } from '@/lib/cost/fx';
+import { USD_PER_EUR, breakEvenSellEUR, BREAK_EVEN_FACTOR } from '@/lib/cost/fx';
 import { CLIP_SOURCE_COSTS } from '@/types/video-composer';
 
 const ROOT = resolve(__dirname, '../../../..');
@@ -137,10 +137,9 @@ describe('admin margin table', () => {
       expect(row.sellEUR).toBe(entry.sellEUR);
       expect(row.costEUR).toBe(entry.costEUR);
       expect(row.tier).toBe(PREMIUM_ENGINE_CATALOG_IDS.has(row.id) ? 'premium-engine' : 'standard');
-      // Seedance 2.5 720p is the documented low-margin headline price (see above).
-      if (!MARGIN_FLOOR_EXCEPTIONS.has(row.id)) {
-        expect(computeMarginPct(row)).toBeGreaterThan(0.42);
-      }
+      // Break-even policy: the gross margin only covers VAT, payment fees
+      // and the Founder discount — it is identical for every row.
+      expect(computeMarginPct(row)).toBeCloseTo(1 - 1 / BREAK_EVEN_FACTOR, 3);
     }
   });
 });
