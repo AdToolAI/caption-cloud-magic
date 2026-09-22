@@ -8,8 +8,8 @@ export const GROK_VIDEO_MODELS = {
     provider: 'xAI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.11,
-      USD: 0.11,
+      EUR: 0.0757,
+      USD: 0.0757,
     },
     minDuration: 5,
     maxDuration: 15,

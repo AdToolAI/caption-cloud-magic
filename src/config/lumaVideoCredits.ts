@@ -8,8 +8,8 @@ export const LUMA_VIDEO_MODELS = {
     provider: 'Luma AI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.155,
-      USD: 0.155,
+      EUR: 0.1059,
+      USD: 0.1059,
     },
     minDuration: 5,
     maxDuration: 9,
@@ -25,8 +25,8 @@ export const LUMA_VIDEO_MODELS = {
     provider: 'Luma AI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.255,
-      USD: 0.255,
+      EUR: 0.1816,
+      USD: 0.1816,
     },
     minDuration: 5,
     maxDuration: 9,
@@ -42,8 +42,8 @@ export const LUMA_VIDEO_MODELS = {
     provider: 'Luma AI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.135,
-      USD: 0.135,
+      EUR: 0.0908,
+      USD: 0.0908,
     },
     minDuration: 5,
     maxDuration: 5,
@@ -59,8 +59,8 @@ export const LUMA_VIDEO_MODELS = {
     provider: 'Luma AI (Replicate)',
     quality: '720p',
     costPerSecond: {
-      EUR: 0.2,
-      USD: 0.2,
+      EUR: 0.1362,
+      USD: 0.1362,
     },
     minDuration: 10,
     maxDuration: 10,

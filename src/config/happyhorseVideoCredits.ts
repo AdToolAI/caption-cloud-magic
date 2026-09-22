@@ -16,7 +16,10 @@ export const HAPPYHORSE_VIDEO_MODELS = {
     name: 'HappyHorse 1.0',
     provider: 'Alibaba (Replicate)',
     resolution: '720p',
-    costPerSecond: { EUR: 0.3, USD: 0.3 },
+    costPerSecond: {
+      EUR: 0.2118,
+      USD: 0.2118,
+    },
     minDuration: 3,
     maxDuration: 15,
     description: 'Multi-shot consistency · 720p · 3-15s',
@@ -26,7 +29,10 @@ export const HAPPYHORSE_VIDEO_MODELS = {
     name: 'HappyHorse 1.0 Pro',
     provider: 'Alibaba (Replicate)',
     resolution: '1080p',
-    costPerSecond: { EUR: 0.605, USD: 0.605 },
+    costPerSecond: {
+      EUR: 0.4237,
+      USD: 0.4237,
+    },
     minDuration: 3,
     maxDuration: 15,
     description: 'Multi-shot consistency · 1080p · 3-15s',

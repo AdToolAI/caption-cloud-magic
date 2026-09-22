@@ -8,8 +8,8 @@ export const LTX_VIDEO_MODELS = {
     provider: 'Lightricks (Replicate)',
     quality: '1080p',
     costPerSecond: {
-      EUR: 0.135,
-      USD: 0.135,
+      EUR: 0.0908,
+      USD: 0.0908,
     },
     minDuration: 6,
     maxDuration: 20,
@@ -25,8 +25,8 @@ export const LTX_VIDEO_MODELS = {
     provider: 'Lightricks (Replicate)',
     quality: '1080p',
     costPerSecond: {
-      EUR: 0.18,
-      USD: 0.18,
+      EUR: 0.1211,
+      USD: 0.1211,
     },
     minDuration: 6,
     maxDuration: 10,
