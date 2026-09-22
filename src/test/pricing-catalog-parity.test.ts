@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { AI_VIDEO_TOOLKIT_MODELS } from '@/config/aiVideoModelRegistry';
-import { USD_PER_EUR } from '@/lib/cost/fx';
+import { USD_PER_EUR, breakEvenSellEUR } from '@/lib/cost/fx';
 import { VIDEO_PRICING_CATALOG as CLIENT_CATALOG } from '@/lib/cost/videoPricingCatalog';
 
 function loadBackendCatalog(): Record<string, { sellEUR: number; sellUSD: number }> {
